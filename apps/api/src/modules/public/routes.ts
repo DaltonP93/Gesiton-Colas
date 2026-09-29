@@ -173,7 +173,8 @@ export const publicRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
   app.post(
     '/public/kiosks/:token/tickets',
     {
-      config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
+      // Varios kioscos de una sucursal suelen compartir la misma IP pública.
+      config: { rateLimit: { max: 120, timeWindow: '1 minute' } },
       schema: {
         tags,
         summary: 'Emitir un turno desde un kiosco o desde el celular (fila virtual)',
