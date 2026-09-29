@@ -44,8 +44,8 @@ export type AppConfig = z.infer<typeof envSchema>;
 
 export function loadConfig(overrides: Partial<Record<keyof AppConfig, unknown>> = {}): AppConfig {
   const config = envSchema.parse({ ...process.env, ...overrides });
-  if (config.NODE_ENV === 'production' && config.JWT_SECRET.startsWith('dev-secret')) {
-    throw new Error('JWT_SECRET debe configurarse en producción');
+  if (config.NODE_ENV === 'production' && (config.JWT_SECRET.startsWith('dev-secret') || config.JWT_SECRET.startsWith('cambie-este-valor'))) {
+    throw new Error('JWT_SECRET debe configurarse con un valor propio en producción');
   }
   return config;
 }

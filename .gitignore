@@ -9,3 +9,4 @@ uploads/
 .vite/
 test-results/
 playwright-report/
+e2e/.uploads/

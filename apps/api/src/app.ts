@@ -165,9 +165,11 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
   // Frontend compilado (SPA) servido desde la misma instancia en producción.
   const webDist = config.WEB_DIST ? path.resolve(config.WEB_DIST) : null;
   if (webDist && existsSync(path.join(webDist, 'index.html'))) {
-    await app.register(fastifyStatic, { root: webDist, prefix: '/', wildcard: false, maxAge: '1h' });
+    await app.register(fastifyStatic, { root: webDist, prefix: '/', maxAge: '1h' });
     app.setNotFoundHandler((request, reply) => {
-      if (request.raw.url?.startsWith('/api/') || request.raw.url?.startsWith('/uploads/')) {
+      const path = (request.raw.url ?? '').split('?')[0]!;
+      // Las rutas de la API, archivos subidos y recursos con extensión inexistentes devuelven 404.
+      if (path.startsWith('/api/') || path.startsWith('/uploads/') || /\.[a-z0-9]{1,8}$/i.test(path)) {
         return reply.code(404).send({ error: 'not_found', message: 'Ruta no encontrada' });
       }
       return reply.header('cache-control', 'no-cache').sendFile('index.html', webDist);

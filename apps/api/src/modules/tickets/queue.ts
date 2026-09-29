@@ -356,6 +356,7 @@ async function requireReadyWorkstation(db: DbOrTx, tenantId: string, userId: str
     .limit(1);
   if (!ws?.branchId || !ws.counterId) throw badRequest('Configure su sucursal y puesto de atención antes de llamar');
   if (ws.serviceIds.length === 0) throw badRequest('Seleccione al menos un servicio para atender');
+  if (ws.paused) throw badRequest('Está en pausa. Reanude la atención para llamar turnos.');
   return { branchId: ws.branchId, counterId: ws.counterId, serviceIds: ws.serviceIds };
 }
 
