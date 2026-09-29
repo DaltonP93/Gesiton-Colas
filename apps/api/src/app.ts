@@ -57,6 +57,8 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
         }
       : false,
     trustProxy: true,
+    // En producción no se registra cada petición (menos ruido); los errores sí se registran.
+    disableRequestLogging: config.NODE_ENV === 'production',
     bodyLimit: 2 * 1024 * 1024,
   }).withTypeProvider<ZodTypeProvider>();
 
