@@ -22,6 +22,9 @@ export interface TenantDTO {
   plan: PlanId;
   status: 'active' | 'suspended';
   settings: TenantSettings;
+  /** Organización de demostración creada desde "Probar demo". */
+  isDemo: boolean;
+  demoExpiresAt: ISODate | null;
   createdAt: ISODate;
 }
 
@@ -35,6 +38,11 @@ export interface UserDTO {
   locale: Locale | null;
   branchIds: string[];
   serviceIds: string[];
+  emailVerified: boolean;
+  /** Invitado por correo que todavía no aceptó. */
+  invitePending: boolean;
+  /** Falso si la cuenta todavía no tiene contraseña (ingresa por enlace/código). */
+  hasPassword: boolean;
   lastLoginAt: ISODate | null;
   createdAt: ISODate;
 }

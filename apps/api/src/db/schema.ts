@@ -49,6 +49,9 @@ export const tenants = pgTable('tenants', {
   status: text('status').$type<'active' | 'suspended'>().notNull().default('active'),
   settings: jsonb('settings').$type<TenantSettings>().notNull(),
   storageBytes: bigint('storage_bytes', { mode: 'number' }).notNull().default(0),
+  /** Organización de demostración (se crea desde "Probar demo" y vence). */
+  isDemo: boolean('is_demo').notNull().default(false),
+  demoExpiresAt: timestamp('demo_expires_at', { withTimezone: true }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -64,6 +67,13 @@ export const users = pgTable(
     role: text('role').$type<Role>().notNull().default('agent'),
     active: boolean('active').notNull().default(true),
     locale: text('locale'),
+    emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
+    /** Invitado por correo que todavía no definió su contraseña. */
+    invitePending: boolean('invite_pending').notNull().default(false),
+    /** Falso para cuentas creadas por invitación o demo que aún no eligieron contraseña. */
+    hasPassword: boolean('has_password').notNull().default(true),
+    /** Los tokens de sesión emitidos antes de esta fecha dejan de valer (cambio de contraseña). */
+    sessionsValidAfter: timestamp('sessions_valid_after', { withTimezone: true }),
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -427,6 +437,46 @@ export const webhookDeliveries = pgTable(
     index('webhook_deliveries_due_idx').on(t.status, t.nextAttemptAt),
     index('webhook_deliveries_webhook_idx').on(t.webhookId, t.createdAt),
   ],
+);
+
+export type AuthTokenPurpose = 'verify_email' | 'reset_password' | 'email_login' | 'invite';
+
+/** Enlaces y códigos de un solo uso enviados por correo (se guardan con hash). */
+export const authTokens = pgTable(
+  'auth_tokens',
+  {
+    id: id(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    purpose: text('purpose').$type<AuthTokenPurpose>().notNull(),
+    tokenHash: text('token_hash').notNull(),
+    /** Código numérico alternativo al enlace (acceso por código). */
+    codeHash: text('code_hash'),
+    attempts: integer('attempts').notNull().default(0),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('auth_tokens_hash_idx').on(t.tokenHash), index('auth_tokens_user_idx').on(t.userId, t.purpose)],
+);
+
+/** Vinculación de TVs / tablets con un código de 6 dígitos (sin escribir URLs largas). */
+export const devicePairings = pgTable(
+  'device_pairings',
+  {
+    id: id(),
+    code: text('code').notNull(),
+    secretHash: text('secret_hash').notNull(),
+    tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }),
+    targetType: text('target_type').$type<'display' | 'kiosk'>(),
+    targetId: uuid('target_id'),
+    userAgent: text('user_agent').notNull().default(''),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    claimedAt: timestamp('claimed_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index('device_pairings_code_idx').on(t.code, t.expiresAt)],
 );
 
 export type Tenant = typeof tenants.$inferSelect;

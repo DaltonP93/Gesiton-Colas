@@ -8,7 +8,7 @@ import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { LogController, type FastifyInstance } from 'fastify';
 import {
   hasZodFastifySchemaValidationErrors,
   jsonSchemaTransform,
@@ -22,6 +22,7 @@ import { createDatabase, type Database } from './db/client';
 import { runMigrations } from './db/migrate';
 import { ensureSuperadmin } from './db/seed';
 import { AppError } from './lib/errors';
+import { startMaintenance } from './lib/maintenance';
 import { agentRoutes } from './modules/agent/routes';
 import { authRoutes } from './modules/auth/routes';
 import { catalogRoutes } from './modules/catalog/routes';
@@ -58,7 +59,7 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
       : false,
     trustProxy: true,
     // En producción no se registra cada petición (menos ruido); los errores sí se registran.
-    disableRequestLogging: config.NODE_ENV === 'production',
+    logController: new LogController({ disableRequestLogging: config.NODE_ENV === 'production' }),
     bodyLimit: 2 * 1024 * 1024,
   }).withTypeProvider<ZodTypeProvider>();
 
@@ -178,11 +179,21 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
     });
   }
 
+  // Solo para pruebas automatizadas: permite leer los correos enviados sin SMTP.
+  if (config.DEV_OUTBOX && ctx.mailer.driver === 'log') {
+    app.get('/api/v1/dev/outbox', { schema: { hide: true } }, async () => ctx.mailer.outbox());
+  }
+  if (config.NODE_ENV === 'production' && ctx.mailer.driver === 'log') {
+    app.log.warn('SMTP no configurado: los correos (verificación, recuperación de contraseña, demos) solo se muestran en el log');
+  }
+
   ctx.rt.attach(app.server);
+  const stopMaintenance = config.NODE_ENV !== 'test' ? startMaintenance(ctx) : () => undefined;
   if (config.NODE_ENV !== 'test') ctx.webhooks.start();
   await ensureSuperadmin(ctx);
 
   app.addHook('onClose', async () => {
+    stopMaintenance();
     ctx.webhooks.stop();
     ctx.rt.close();
     await pool?.pool.end();

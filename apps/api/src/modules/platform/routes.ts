@@ -78,7 +78,7 @@ export const platformRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async 
     async (request, reply) => {
       const [exists] = await ctx.db.select({ id: users.id }).from(users).where(eq(users.email, request.body.adminEmail));
       if (exists) throw conflict('Ya existe un usuario con ese email');
-      const { tenant } = await ctx.db.transaction((tx) => createTenantWithDefaults(tx, request.body));
+      const { tenant } = await ctx.db.transaction((tx) => createTenantWithDefaults(tx, { ...request.body, emailVerified: true }));
       return reply.code(201).send(toTenantDTO(tenant));
     },
   );
@@ -94,11 +94,27 @@ export const platformRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async 
           name: z.string().trim().min(2).max(120).optional(),
           plan: z.enum(PLAN_IDS).optional(),
           status: z.enum(['active', 'suspended']).optional(),
+          /** `false` convierte una demo en organización definitiva. */
+          isDemo: z.boolean().optional(),
+          /** Extiende la demo N días (desde hoy o desde su vencimiento, lo que sea posterior). */
+          extendDemoDays: z.number().int().min(1).max(365).optional(),
         }),
       },
     },
     async (request) => {
-      const [row] = await ctx.db.update(tenants).set(request.body).where(eq(tenants.id, request.params.id)).returning();
+      const { isDemo, extendDemoDays, ...rest } = request.body;
+      const [current] = await ctx.db.select().from(tenants).where(eq(tenants.id, request.params.id));
+      if (!current) throw notFound('Organización');
+      const patch: Partial<typeof tenants.$inferInsert> = { ...rest };
+      if (isDemo === false) {
+        patch.isDemo = false;
+        patch.demoExpiresAt = null;
+      }
+      if (extendDemoDays && current.isDemo && isDemo !== false) {
+        const from = Math.max(Date.now(), current.demoExpiresAt?.getTime() ?? 0);
+        patch.demoExpiresAt = new Date(from + extendDemoDays * 24 * 3600 * 1000);
+      }
+      const [row] = await ctx.db.update(tenants).set(patch).where(eq(tenants.id, request.params.id)).returning();
       if (!row) throw notFound('Organización');
       if (request.body.status === 'suspended') ctx.refreshDevices(row.id);
       return toTenantDTO(row);

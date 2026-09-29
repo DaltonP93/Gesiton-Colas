@@ -1,0 +1,126 @@
+import { escapeHtml, type Branding } from '@gc/shared';
+import type { MailMessage } from './mailer';
+
+export interface EmailBrand {
+  appName: string;
+  primaryColor: string;
+  logoUrl: string | null;
+  publicUrl: string;
+}
+
+export function brandFrom(branding: Branding | null | undefined, publicUrl: string): EmailBrand {
+  const base = publicUrl.replace(/\/$/, '');
+  const logo = branding?.logoUrl ? (/^https?:/.test(branding.logoUrl) ? branding.logoUrl : `${base}${branding.logoUrl}`) : null;
+  return {
+    appName: branding?.appName ?? 'Gestión de Colas',
+    primaryColor: branding?.primaryColor ?? '#2563eb',
+    logoUrl: logo,
+    publicUrl: base,
+  };
+}
+
+interface LayoutInput {
+  brand: EmailBrand;
+  title: string;
+  intro: string[];
+  cta?: { label: string; url: string };
+  code?: string;
+  outro?: string[];
+}
+
+/** Maqueta HTML compatible con la mayoría de los clientes de correo (tablas y estilos en línea). */
+function layout({ brand, title, intro, cta, code, outro = [] }: LayoutInput): { html: string; text: string } {
+  const p = (t: string) => `<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#334155">${escapeHtml(t)}</p>`;
+  const header = brand.logoUrl
+    ? `<img src="${escapeHtml(brand.logoUrl)}" alt="${escapeHtml(brand.appName)}" style="max-height:44px;max-width:220px">`
+    : `<span style="font-size:20px;font-weight:800;color:${brand.primaryColor}">${escapeHtml(brand.appName)}</span>`;
+  const button = cta
+    ? `<table role="presentation" cellspacing="0" cellpadding="0" style="margin:24px 0"><tr><td style="border-radius:10px;background:${brand.primaryColor}">
+        <a href="${escapeHtml(cta.url)}" style="display:inline-block;padding:14px 26px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:10px">${escapeHtml(cta.label)}</a>
+      </td></tr></table>`
+    : '';
+  const codeBlock = code
+    ? `<p style="margin:8px 0 6px;font-size:13px;color:#64748b">O ingrese este código:</p>
+       <p style="margin:0 0 20px;font-size:32px;font-weight:800;letter-spacing:8px;color:#0f172a;font-family:Menlo,Consolas,monospace">${escapeHtml(code)}</p>`
+    : '';
+  const link = cta
+    ? `<p style="margin:0 0 14px;font-size:12px;line-height:1.5;color:#94a3b8">Si el botón no funciona, copie este enlace en su navegador:<br><a href="${escapeHtml(cta.url)}" style="color:${brand.primaryColor};word-break:break-all">${escapeHtml(cta.url)}</a></p>`
+    : '';
+  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${escapeHtml(title)}</title></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f1f5f9;padding:32px 12px"><tr><td align="center">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden">
+<tr><td style="padding:28px 32px 8px">${header}</td></tr>
+<tr><td style="padding:12px 32px 28px">
+<h1 style="margin:0 0 16px;font-size:22px;line-height:1.3;color:#0f172a">${escapeHtml(title)}</h1>
+${intro.map(p).join('')}${button}${codeBlock}${outro.map(p).join('')}${link}
+</td></tr>
+<tr><td style="padding:16px 32px;background:#f8fafc;font-size:12px;color:#94a3b8">${escapeHtml(brand.appName)} · <a href="${escapeHtml(brand.publicUrl)}" style="color:#94a3b8">${escapeHtml(brand.publicUrl.replace(/^https?:\/\//, ''))}</a></td></tr>
+</table></td></tr></table></body></html>`;
+  const text = [title, '', ...intro, ...(cta ? ['', `${cta.label}: ${cta.url}`] : []), ...(code ? ['', `Código: ${code}`] : []), ...(outro.length ? ['', ...outro] : []), '', `— ${brand.appName}`].join('\n');
+  return { html, text };
+}
+
+const greet = (name: string) => `Hola ${name.split(' ')[0] || ''},`.replace(' ,', ',');
+
+export function verifyEmailMail(to: string, name: string, url: string, brand: EmailBrand): MailMessage {
+  const { html, text } = layout({
+    brand,
+    title: 'Confirme su correo electrónico',
+    intro: [greet(name), `Gracias por registrarse en ${brand.appName}. Confirme su dirección de correo para proteger su cuenta y recibir avisos importantes.`],
+    cta: { label: 'Confirmar mi correo', url },
+    outro: ['El enlace vence en 3 días. Si usted no creó esta cuenta, ignore este mensaje.'],
+  });
+  return { to, subject: `Confirme su correo · ${brand.appName}`, html, text, tag: 'verify_email' };
+}
+
+export function resetPasswordMail(to: string, name: string, url: string, brand: EmailBrand): MailMessage {
+  const { html, text } = layout({
+    brand,
+    title: 'Restablecer contraseña',
+    intro: [greet(name), 'Recibimos un pedido para restablecer la contraseña de su cuenta. Haga clic en el botón para elegir una nueva.'],
+    cta: { label: 'Elegir nueva contraseña', url },
+    outro: ['El enlace vence en 1 hora y solo puede usarse una vez. Si usted no lo pidió, puede ignorar este correo: su contraseña no cambiará.'],
+  });
+  return { to, subject: `Restablecer contraseña · ${brand.appName}`, html, text, tag: 'reset_password' };
+}
+
+export function emailLoginMail(to: string, name: string, url: string, code: string, brand: EmailBrand): MailMessage {
+  const { html, text } = layout({
+    brand,
+    title: 'Su acceso a la plataforma',
+    intro: [greet(name), 'Use el botón para ingresar sin contraseña, o escriba el código en la pantalla de inicio de sesión.'],
+    cta: { label: 'Ingresar ahora', url },
+    code,
+    outro: ['El enlace y el código vencen en 15 minutos. Si usted no intentó ingresar, ignore este correo.'],
+  });
+  return { to, subject: `Código de acceso ${code} · ${brand.appName}`, html, text, tag: 'email_login' };
+}
+
+export function inviteMail(to: string, name: string, inviter: string, organization: string, url: string, brand: EmailBrand): MailMessage {
+  const { html, text } = layout({
+    brand,
+    title: `Lo invitaron a ${organization}`,
+    intro: [greet(name), `${inviter} lo invitó a usar ${brand.appName} en ${organization}. Acepte la invitación y elija su contraseña para comenzar.`],
+    cta: { label: 'Aceptar invitación', url },
+    outro: ['La invitación vence en 7 días.'],
+  });
+  return { to, subject: `Invitación a ${organization} · ${brand.appName}`, html, text, tag: 'invite' };
+}
+
+export function demoMail(to: string, name: string, url: string, code: string, days: number, brand: EmailBrand): MailMessage {
+  const { html, text } = layout({
+    brand,
+    title: 'Su demo está lista',
+    intro: [
+      greet(name),
+      `Creamos una organización de demostración con datos de ejemplo: servicios, turnos, una pantalla de TV, un kiosco y publicidad. Puede probar todo durante ${days} días.`,
+    ],
+    cta: { label: 'Entrar a mi demo', url },
+    code,
+    outro: [
+      'Dentro de la demo puede definir una contraseña desde su perfil. Si luego quiere seguir usándola, contáctenos para pasarla a un plan sin perder la configuración.',
+    ],
+  });
+  return { to, subject: `Su demo de ${brand.appName} está lista`, html, text, tag: 'demo' };
+}
