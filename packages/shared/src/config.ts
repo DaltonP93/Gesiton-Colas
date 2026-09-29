@@ -1,0 +1,291 @@
+import { z } from 'zod';
+import { ALERT_SOUNDS, DISPLAY_LAYOUTS, LOCALES } from './enums';
+
+const color = z.string().regex(/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i, 'Color hexadecimal inválido');
+const cssText = z.string().max(50_000);
+
+/* ------------------------------------------------------------------ */
+/* Configuración de la organización (tenant)                           */
+/* ------------------------------------------------------------------ */
+
+export const brandingSchema = z.object({
+  appName: z.string().min(1).max(80).default('Gestión de Colas'),
+  logoUrl: z.string().max(2048).nullable().default(null),
+  faviconUrl: z.string().max(2048).nullable().default(null),
+  primaryColor: color.default('#2563eb'),
+  accentColor: color.default('#f59e0b'),
+  backgroundColor: color.default('#f1f5f9'),
+  surfaceColor: color.default('#ffffff'),
+  textColor: color.default('#0f172a'),
+  fontFamily: z.string().max(120).default('Inter'),
+  borderRadius: z.number().int().min(0).max(32).default(12),
+  colorScheme: z.enum(['light', 'dark', 'auto']).default('light'),
+  customCss: cssText.default(''),
+});
+export type Branding = z.infer<typeof brandingSchema>;
+
+/** Términos que cada organización puede renombrar (Turno/Ficha/Ticket, Ventanilla/Box/Mesa...). */
+export const terminologySchema = z.object({
+  ticket: z.string().max(40).default('Turno'),
+  tickets: z.string().max(40).default('Turnos'),
+  counter: z.string().max(40).default('Ventanilla'),
+  counters: z.string().max(40).default('Ventanillas'),
+  service: z.string().max(40).default('Servicio'),
+  services: z.string().max(40).default('Servicios'),
+  branch: z.string().max(40).default('Sucursal'),
+  branches: z.string().max(40).default('Sucursales'),
+  customer: z.string().max(40).default('Cliente'),
+  agent: z.string().max(40).default('Operador'),
+});
+export type Terminology = z.infer<typeof terminologySchema>;
+
+export const customerFieldSchema = z.object({
+  key: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_]{0,39}$/, 'Clave inválida (letras, números y _)'),
+  label: z.string().min(1).max(80),
+  type: z.enum(['text', 'number', 'email', 'tel', 'document', 'select', 'date']).default('text'),
+  required: z.boolean().default(false),
+  options: z.array(z.string().max(80)).max(50).default([]),
+  placeholder: z.string().max(120).default(''),
+});
+export type CustomerField = z.infer<typeof customerFieldSchema>;
+
+export const ticketSettingsSchema = z.object({
+  /** Cantidad de dígitos del número (A001 = 3). */
+  digits: z.number().int().min(1).max(6).default(3),
+  /** Reinicio de la numeración. */
+  reset: z.enum(['daily', 'never']).default('daily'),
+  /** Numeración independiente por servicio o compartida por sucursal. */
+  scope: z.enum(['service', 'branch']).default('service'),
+  /** Veces que se puede rellamar antes de marcar "no se presentó" automáticamente (0 = nunca). */
+  autoNoShowAfterCalls: z.number().int().min(0).max(20).default(0),
+  /**
+   * Cada cuántos turnos preferenciales se intercala un turno normal para evitar
+   * que la cola normal quede bloqueada (0 = siempre prioriza por peso).
+   */
+  priorityRatio: z.number().int().min(0).max(20).default(0),
+  /** Mostrar/anunciar el nombre del cliente en pantallas (consultorios, farmacias...). */
+  announceCustomerName: z.boolean().default(false),
+});
+export type TicketSettings = z.infer<typeof ticketSettingsSchema>;
+
+export const tenantSettingsSchema = z.object({
+  branding: brandingSchema.prefault({}),
+  terminology: terminologySchema.prefault({}),
+  tickets: ticketSettingsSchema.prefault({}),
+  customerFields: z.array(customerFieldSchema).max(30).default([]),
+  locale: z.enum(LOCALES).default('es'),
+  timezone: z.string().max(64).default('UTC'),
+});
+export type TenantSettings = z.infer<typeof tenantSettingsSchema>;
+
+/* ------------------------------------------------------------------ */
+/* Pantallas (TV / cartelería)                                          */
+/* ------------------------------------------------------------------ */
+
+export const displayConfigSchema = z.object({
+  layout: z.enum(DISPLAY_LAYOUTS).default('split'),
+  title: z.string().max(120).default(''),
+  sidebarPosition: z.enum(['left', 'right']).default('right'),
+  /** Ancho del panel de turnos en el layout dividido (% de la pantalla). */
+  sidebarWidth: z.number().int().min(20).max(60).default(32),
+  /** Servicios que muestra la pantalla (vacío = todos los de la sucursal). */
+  services: z.array(z.string()).default([]),
+  showClock: z.boolean().default(true),
+  showDate: z.boolean().default(true),
+  showLogo: z.boolean().default(true),
+  showHistory: z.boolean().default(true),
+  historySize: z.number().int().min(1).max(20).default(5),
+  /** Segundos que se destaca un llamado (overlay en layout de pantalla completa). */
+  callHighlightSeconds: z.number().int().min(2).max(60).default(10),
+  theme: z
+    .object({
+      background: color.default('#0f172a'),
+      text: color.default('#f8fafc'),
+      panelBackground: color.default('#1e293b'),
+      accent: color.default('#38bdf8'),
+      callBackground: color.default('#2563eb'),
+      callText: color.default('#ffffff'),
+      priorityColor: color.default('#f59e0b'),
+      fontFamily: z.string().max(120).default('Inter'),
+      /** Escala tipográfica (1 = normal). */
+      fontScale: z.number().min(0.5).max(3).default(1),
+    })
+    .prefault({}),
+  voice: z
+    .object({
+      enabled: z.boolean().default(true),
+      lang: z.string().max(20).default('es-ES'),
+      voiceName: z.string().max(200).default(''),
+      rate: z.number().min(0.5).max(2).default(0.95),
+      pitch: z.number().min(0).max(2).default(1),
+      volume: z.number().min(0).max(1).default(1),
+      /** Variables: {{code}} {{service}} {{counter}} {{priority}} {{customer}} {{branch}} */
+      template: z.string().max(300).default('Turno {{code}}, por favor diríjase a {{counter}}'),
+      codeMode: z.enum(['number', 'spell']).default('spell'),
+      repeat: z.number().int().min(1).max(3).default(1),
+    })
+    .prefault({}),
+  sound: z
+    .object({
+      enabled: z.boolean().default(true),
+      /** Uno de los sonidos incluidos o una URL propia. */
+      file: z.union([z.enum(ALERT_SOUNDS), z.string().url()]).default('airport-bingbong'),
+      volume: z.number().min(0).max(1).default(0.9),
+    })
+    .prefault({}),
+  ticker: z
+    .object({
+      enabled: z.boolean().default(false),
+      messages: z.array(z.string().max(300)).max(50).default([]),
+      /** Velocidad en píxeles por segundo. */
+      speed: z.number().int().min(10).max(400).default(80),
+      background: color.default('#f59e0b'),
+      color: color.default('#0f172a'),
+    })
+    .prefault({}),
+  media: z
+    .object({
+      /** Silenciar todo el contenido publicitario. */
+      muted: z.boolean().default(false),
+      /** Volumen general del contenido (0-1). */
+      volume: z.number().min(0).max(1).default(0.6),
+      /** Volumen al que baja el contenido mientras se anuncia un turno. */
+      duckVolume: z.number().min(0).max(1).default(0.1),
+      /** Duración por defecto de imágenes y páginas web (segundos). */
+      defaultDuration: z.number().int().min(3).max(3600).default(15),
+      /** Transición entre elementos. */
+      transition: z.enum(['none', 'fade', 'slide']).default('fade'),
+      shuffle: z.boolean().default(false),
+      /** Mostrar el contenido a pantalla completa cuando no hay llamados recientes (layout split). */
+      fitMode: z.enum(['contain', 'cover']).default('cover'),
+    })
+    .prefault({}),
+  customCss: cssText.default(''),
+});
+export type DisplayConfig = z.infer<typeof displayConfigSchema>;
+
+/* ------------------------------------------------------------------ */
+/* Kioscos (dispensadores de turnos)                                   */
+/* ------------------------------------------------------------------ */
+
+export const DEFAULT_TICKET_TEMPLATE = `<div class="t">
+  {{logo}}
+  <div class="org">{{organization}}</div>
+  <div class="branch">{{branch}}</div>
+  <div class="label">Su turno</div>
+  <div class="code">{{code}}</div>
+  <div class="service">{{service}}</div>
+  <div class="priority">{{priority}}</div>
+  <div class="meta">{{date}} · {{time}}</div>
+  <div class="meta">Personas antes que usted: {{waiting}}</div>
+  {{qr}}
+  <div class="foot">Escanee el código para seguir su turno desde el celular</div>
+</div>`;
+
+export const DEFAULT_TICKET_CSS = `.t{font-family:system-ui,sans-serif;text-align:center;color:#000;padding:4mm 2mm}
+.t img.logo{max-width:40mm;max-height:18mm;margin:0 auto 2mm;display:block}
+.t .org{font-weight:700;font-size:14pt}
+.t .branch{font-size:10pt;margin-bottom:3mm}
+.t .label{font-size:10pt;text-transform:uppercase;letter-spacing:1px}
+.t .code{font-size:40pt;font-weight:800;line-height:1.1}
+.t .service{font-size:13pt;font-weight:600}
+.t .priority{font-size:10pt;margin-bottom:2mm}
+.t .meta{font-size:9pt}
+.t img.qr{width:28mm;height:28mm;margin:3mm auto 1mm;display:block}
+.t .foot{font-size:8pt}`;
+
+export const kioskConfigSchema = z.object({
+  title: z.string().max(120).default('¡Bienvenido!'),
+  subtitle: z.string().max(200).default('Toque el servicio que necesita'),
+  /** Agrupar servicios por departamento. */
+  groupByDepartment: z.boolean().default(false),
+  /** Servicios disponibles (vacío = todos los habilitados en la sucursal). */
+  services: z.array(z.string()).default([]),
+  /**
+   * - `buttons`: pregunta Normal / Preferencial
+   * - `list`: muestra todas las prioridades
+   * - `none`: siempre emite turnos normales
+   */
+  priorityMode: z.enum(['buttons', 'list', 'none']).default('buttons'),
+  /** Campos del cliente que se piden antes de emitir el turno (claves de customerFields o name/document/phone/email). */
+  askFields: z.array(z.string()).default([]),
+  showQr: z.boolean().default(true),
+  showWaitingCount: z.boolean().default(true),
+  /** Segundos antes de volver a la pantalla inicial. */
+  returnSeconds: z.number().int().min(3).max(120).default(8),
+  print: z
+    .object({
+      enabled: z.boolean().default(true),
+      paperWidthMm: z.number().int().min(40).max(210).default(80),
+      template: z.string().max(20_000).default(DEFAULT_TICKET_TEMPLATE),
+      css: cssText.default(DEFAULT_TICKET_CSS),
+    })
+    .prefault({}),
+  theme: z
+    .object({
+      background: color.default('#f1f5f9'),
+      text: color.default('#0f172a'),
+      buttonBackground: color.default('#2563eb'),
+      buttonText: color.default('#ffffff'),
+      priorityButtonBackground: color.default('#f59e0b'),
+      fontFamily: z.string().max(120).default('Inter'),
+      fontScale: z.number().min(0.5).max(3).default(1),
+      columns: z.number().int().min(1).max(6).default(2),
+    })
+    .prefault({}),
+  customCss: cssText.default(''),
+});
+export type KioskConfig = z.infer<typeof kioskConfigSchema>;
+
+/* ------------------------------------------------------------------ */
+
+export function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** Mezcla profunda: los arrays y valores primitivos de `patch` reemplazan a los de `base`. */
+export function deepMerge<T>(base: T, patch: unknown): T {
+  if (!isPlainObject(base) || !isPlainObject(patch)) return (patch === undefined ? base : patch) as T;
+  const out: Record<string, unknown> = { ...base };
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === undefined) continue;
+    out[key] = isPlainObject(out[key]) && isPlainObject(value) ? deepMerge(out[key], value) : value;
+  }
+  return out as T;
+}
+
+/** Normaliza una configuración guardada completando valores por defecto y descartando valores inválidos. */
+export function normalizeConfig<S extends z.ZodType>(schema: S, value: unknown): z.infer<S> {
+  let candidate: unknown = isPlainObject(value) ? structuredClone(value) : {};
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const parsed = schema.safeParse(candidate);
+    if (parsed.success) return parsed.data;
+    for (const issue of parsed.error.issues) removePath(candidate, issue.path);
+  }
+  return schema.parse({});
+}
+
+function removePath(target: unknown, path: PropertyKey[]) {
+  if (path.length === 0) return;
+  let node: unknown = target;
+  for (const key of path.slice(0, -1)) {
+    if (!node || typeof node !== 'object') return;
+    node = (node as Record<PropertyKey, unknown>)[key];
+  }
+  if (!node || typeof node !== 'object') return;
+  const last = path[path.length - 1]!;
+  if (Array.isArray(node) && typeof last === 'number') node.splice(last, 1);
+  else delete (node as Record<PropertyKey, unknown>)[last];
+}
+
+export const defaultTenantSettings = (): TenantSettings => tenantSettingsSchema.parse({});
+export const defaultDisplayConfig = (): DisplayConfig => displayConfigSchema.parse({});
+export const defaultKioskConfig = (): KioskConfig => kioskConfigSchema.parse({});
+
+/** Campos estándar del cliente siempre disponibles. */
+export const BUILTIN_CUSTOMER_FIELDS: CustomerField[] = [
+  { key: 'name', label: 'Nombre', type: 'text', required: false, options: [], placeholder: '' },
+  { key: 'document', label: 'Documento', type: 'document', required: false, options: [], placeholder: '' },
+  { key: 'phone', label: 'Teléfono', type: 'tel', required: false, options: [], placeholder: '' },
+  { key: 'email', label: 'Email', type: 'email', required: false, options: [], placeholder: '' },
+];
