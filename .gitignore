@@ -1,18 +1,12 @@
-config/app.php
-nbproject/
-modules/*
-
-###> symfony/framework-bundle ###
+node_modules/
+dist/
+coverage/
 .env
-/public/bundles/
-/var/
-/vendor/
-###< symfony/framework-bundle ###
-###> symfony/web-server-bundle ###
-.web-server-pid
-###< symfony/web-server-bundle ###
-
-###> symfony/phpunit-bridge ###
-.phpunit
-/phpunit.xml
-###< symfony/phpunit-bridge ###
+.env.local
+*.log
+uploads/
+.DS_Store
+.vite/
+test-results/
+playwright-report/
+e2e/.uploads/

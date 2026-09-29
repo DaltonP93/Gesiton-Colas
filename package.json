@@ -1,0 +1,29 @@
+{
+  "name": "gestion-colas",
+  "version": "3.0.0",
+  "private": true,
+  "description": "Gestión de Colas — plataforma SaaS de gestión de turnos, pantallas y cartelería digital",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "npm run dev --workspace @gc/api & npm run dev --workspace @gc/web",
+    "dev:api": "npm run dev --workspace @gc/api",
+    "dev:web": "npm run dev --workspace @gc/web",
+    "build": "npm run build --workspace @gc/web && npm run build --workspace @gc/api",
+    "start": "npm run start --workspace @gc/api",
+    "db:generate": "npm run db:generate --workspace @gc/api",
+    "db:migrate": "npm run db:migrate --workspace @gc/api",
+    "db:seed": "npm run db:seed --workspace @gc/api",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0"
+  }
+}
