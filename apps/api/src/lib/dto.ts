@@ -53,6 +53,8 @@ export function toTenantDTO(t: Tenant): TenantDTO {
     plan: t.plan,
     status: t.status,
     settings: tenantSettings(t),
+    isDemo: t.isDemo,
+    demoExpiresAt: iso(t.demoExpiresAt),
     createdAt: t.createdAt.toISOString(),
   };
 }
@@ -80,6 +82,9 @@ export function toUserDTO(u: User, branchIds: string[] = [], serviceIds: string[
     locale: (u.locale as UserDTO['locale']) ?? null,
     branchIds,
     serviceIds,
+    emailVerified: Boolean(u.emailVerifiedAt),
+    invitePending: u.invitePending,
+    hasPassword: u.hasPassword,
     lastLoginAt: iso(u.lastLoginAt),
     createdAt: u.createdAt.toISOString(),
   };

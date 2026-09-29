@@ -55,7 +55,12 @@ export interface NewTenantInput {
   organizationName: string;
   adminName: string;
   adminEmail: string;
-  adminPassword: string;
+  /** Sin contraseña: la cuenta ingresa por enlace/código de correo hasta definir una. */
+  adminPassword?: string | null;
+  /** El correo ya fue verificado (p. ej. alta hecha por el superadministrador). */
+  emailVerified?: boolean;
+  /** Crea una organización de demostración que vence en N días. */
+  demoDays?: number;
   timezone?: string;
   locale?: Locale;
   plan?: PlanId;
@@ -75,7 +80,14 @@ export async function createTenantWithDefaults(db: DbOrTx, input: NewTenantInput
   const slug = await uniqueSlug(db, input.organizationName);
   const [tenant] = await db
     .insert(tenants)
-    .values({ slug, name: input.organizationName, plan: input.plan ?? 'free', settings })
+    .values({
+      slug,
+      name: input.organizationName,
+      plan: input.plan ?? 'free',
+      settings,
+      isDemo: Boolean(input.demoDays),
+      demoExpiresAt: input.demoDays ? new Date(Date.now() + input.demoDays * 24 * 3600 * 1000) : null,
+    })
     .returning();
   const tenantId = tenant!.id;
 
@@ -84,7 +96,9 @@ export async function createTenantWithDefaults(db: DbOrTx, input: NewTenantInput
     .values({
       tenantId,
       email: input.adminEmail.toLowerCase().trim(),
-      passwordHash: await hashPassword(input.adminPassword),
+      passwordHash: await hashPassword(input.adminPassword || randomToken(32)),
+      hasPassword: Boolean(input.adminPassword),
+      emailVerifiedAt: input.emailVerified ? new Date() : null,
       name: input.adminName,
       role: 'admin',
     })
@@ -160,7 +174,7 @@ export async function createTenantWithDefaults(db: DbOrTx, input: NewTenantInput
     config: defaultKioskConfig(),
   });
 
-  return { tenant: tenant!, admin: admin!, branch: branch! };
+  return { tenant: tenant!, admin: admin!, branch: branch!, services: createdServices, playlistId: playlist!.id };
 }
 
 /** Crea el superadministrador de la plataforma a partir de SUPERADMIN_EMAIL / SUPERADMIN_PASSWORD. */
@@ -176,6 +190,7 @@ export async function ensureSuperadmin(ctx: Pick<AppContext, 'config' | 'db' | '
     passwordHash: await hashPassword(password),
     name: 'Administrador de plataforma',
     role: 'superadmin',
+    emailVerifiedAt: new Date(),
   });
   ctx.log.info({ email: normalized }, 'Superadministrador creado');
 }

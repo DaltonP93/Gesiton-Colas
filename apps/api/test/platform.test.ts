@@ -201,10 +201,14 @@ describe('integraciones', () => {
       const branch = (await api(app, orgA, 'GET', '/branches')).body[0];
       const service = (await api(app, orgA, 'GET', '/services')).body[0];
       await api(app, orgA, 'POST', '/tickets', { branchId: branch.id, serviceId: service.id });
-      await app.ctx.webhooks.processDue();
-      await new Promise((r) => setTimeout(r, 100));
+      // La entrega es asíncrona: se procesa la cola hasta recibirla.
+      const findDelivery = () => received.find((r) => r.headers['x-gc-event'] === 'ticket.created');
+      for (let i = 0; i < 30 && !findDelivery(); i++) {
+        await app.ctx.webhooks.processDue();
+        await new Promise((r) => setTimeout(r, 100));
+      }
 
-      const delivery = received.find((r) => r.headers['x-gc-event'] === 'ticket.created');
+      const delivery = findDelivery();
       expect(delivery).toBeDefined();
       const expected = hmacSha256(hook.body.secret, `${delivery!.headers['x-gc-timestamp']}.${delivery!.body}`);
       expect(delivery!.headers['x-gc-signature']).toBe(`sha256=${expected}`);

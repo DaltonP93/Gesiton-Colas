@@ -4,6 +4,7 @@ import type { AppConfig } from './config';
 import type { Database } from './db/client';
 import { createAuth, type Auth } from './lib/auth';
 import { toCallDTO } from './lib/dto';
+import { createMailer, type Mailer } from './lib/mailer';
 import { createStorage, type Storage } from './lib/storage';
 import { WebhookDispatcher } from './modules/webhooks/dispatcher';
 import { Realtime, rooms } from './realtime';
@@ -15,6 +16,7 @@ export interface AppContext {
   storage: Storage;
   rt: Realtime;
   webhooks: WebhookDispatcher;
+  mailer: Mailer;
   log: FastifyBaseLogger;
   /** Notifica un cambio de turno a pantallas, operadores, seguimiento público y webhooks. */
   publishTicket(
@@ -49,6 +51,7 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
   const rt = new Realtime(db, auth, log, config.CORS_ORIGINS);
   const webhooks = new WebhookDispatcher(db, log, config.WEBHOOKS_ALLOW_PRIVATE);
   const storage = createStorage(config);
+  const mailer = createMailer(config, log);
 
   return {
     config,
@@ -57,6 +60,7 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
     storage,
     rt,
     webhooks,
+    mailer,
     log,
     publishTicket(tenantId, event, ticket, extra = {}, options = {}) {
       const call = toCallDTO(ticket);

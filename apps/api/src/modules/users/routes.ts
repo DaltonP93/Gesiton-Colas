@@ -4,9 +4,13 @@ import { z } from 'zod';
 import { LOCALES } from '@gc/shared';
 import type { AppContext } from '../../context';
 import type { DbOrTx } from '../../db/client';
-import { branches, services, userBranches, userServices, users } from '../../db/schema';
-import { hashPassword, tenantIdOf } from '../../lib/auth';
-import { toUserDTO } from '../../lib/dto';
+import { branches, services, tenants, userBranches, userServices, users } from '../../db/schema';
+import type { FastifyRequest } from 'fastify';
+import { hashPassword, sessionsResetNow, tenantIdOf } from '../../lib/auth';
+import { randomToken } from '../../lib/crypto';
+import { brandFrom, inviteMail } from '../../lib/emails';
+import { issueToken } from '../../lib/tokens';
+import { tenantSettings, toUserDTO } from '../../lib/dto';
 import { badRequest, conflict, notFound } from '../../lib/errors';
 import { assertWithinLimit } from '../../lib/plans';
 import { idParam, updateSchema } from '../../lib/schemas';
@@ -15,7 +19,8 @@ import { userScope } from '../tickets/queue';
 const userBody = z.object({
   email: z.string().trim().toLowerCase().email().max(200),
   name: z.string().trim().min(2).max(120),
-  password: z.string().min(8).max(200),
+  /** Si se omite, se envía una invitación por correo para que el usuario elija su contraseña. */
+  password: z.string().min(8).max(200).optional(),
   role: z.enum(['admin', 'manager', 'agent']).default('agent'),
   active: z.boolean().default(true),
   locale: z.enum(LOCALES).nullable().default(null),
@@ -71,22 +76,67 @@ export const userRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
     );
   });
 
-  app.post('/users', { preHandler: admin, schema: { tags, body: userBody } }, async (request, reply) => {
-    const tenantId = tenantIdOf(request);
-    const { password, branchIds, serviceIds, ...data } = request.body;
-    await assertWithinLimit(ctx.db, tenantId, 'users');
-    const [exists] = await ctx.db.select({ id: users.id }).from(users).where(eq(users.email, data.email));
-    if (exists) throw conflict('Ya existe un usuario con ese email');
-    const created = await ctx.db.transaction(async (tx) => {
-      const [user] = await tx
-        .insert(users)
-        .values({ ...data, tenantId, passwordHash: await hashPassword(password) })
-        .returning();
-      await setAssignments(tx, tenantId, user!.id, branchIds, serviceIds);
-      return dto(tx, user!.id);
-    });
-    return reply.code(201).send(created);
-  });
+  async function sendInvite(userId: string, inviter: string) {
+    const [row] = await ctx.db
+      .select({ user: users, tenant: tenants })
+      .from(users)
+      .leftJoin(tenants, eq(tenants.id, users.tenantId))
+      .where(eq(users.id, userId));
+    if (!row) throw notFound('Usuario');
+    const base = ctx.config.PUBLIC_URL.replace(/\/$/, '');
+    const { token } = await issueToken(ctx.db, userId, 'invite');
+    const brand = brandFrom(row.tenant ? tenantSettings(row.tenant).branding : null, base);
+    await ctx.mailer.send(inviteMail(row.user.email, row.user.name, inviter, row.tenant?.name ?? brand.appName, `${base}/invitacion?token=${token}`, brand));
+  }
+
+  const inviterName = (request: FastifyRequest) => (request.auth?.kind === 'user' ? request.auth.user.name : 'El administrador');
+
+  app.post(
+    '/users',
+    { preHandler: admin, schema: { tags, summary: 'Crear usuario (sin contraseña = invitación por correo)', body: userBody } },
+    async (request, reply) => {
+      const tenantId = tenantIdOf(request);
+      const { password, branchIds, serviceIds, ...data } = request.body;
+      await assertWithinLimit(ctx.db, tenantId, 'users');
+      const [exists] = await ctx.db.select({ id: users.id }).from(users).where(eq(users.email, data.email));
+      if (exists) throw conflict('Ya existe un usuario con ese email');
+      const invite = !password;
+      const created = await ctx.db.transaction(async (tx) => {
+        const [user] = await tx
+          .insert(users)
+          .values({
+            ...data,
+            tenantId,
+            passwordHash: await hashPassword(password ?? randomToken(32)),
+            hasPassword: !invite,
+            invitePending: invite,
+            // El administrador responde por el correo de quienes crea con contraseña.
+            emailVerifiedAt: invite ? null : new Date(),
+          })
+          .returning();
+        await setAssignments(tx, tenantId, user!.id, branchIds, serviceIds);
+        return dto(tx, user!.id);
+      });
+      if (invite) await sendInvite(created.id, inviterName(request));
+      return reply.code(201).send(created);
+    },
+  );
+
+  app.post(
+    '/users/:id/invite',
+    { preHandler: admin, schema: { tags, summary: 'Reenviar la invitación por correo', params: idParam } },
+    async (request) => {
+      const tenantId = tenantIdOf(request);
+      const [target] = await ctx.db
+        .select()
+        .from(users)
+        .where(and(eq(users.id, request.params.id), eq(users.tenantId, tenantId)));
+      if (!target) throw notFound('Usuario');
+      if (!target.invitePending) throw badRequest('El usuario ya aceptó la invitación');
+      await sendInvite(target.id, inviterName(request));
+      return { ok: true };
+    },
+  );
 
   app.put(
     '/users/:id',
@@ -111,7 +161,12 @@ export const userRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
       }
       return ctx.db.transaction(async (tx) => {
         const patch: Partial<typeof users.$inferInsert> = { ...data };
-        if (password) patch.passwordHash = await hashPassword(password);
+        if (password) {
+          patch.passwordHash = await hashPassword(password);
+          patch.hasPassword = true;
+          patch.invitePending = false;
+          patch.sessionsValidAfter = sessionsResetNow();
+        }
         if (Object.keys(patch).length > 0) await tx.update(users).set(patch).where(eq(users.id, target.id));
         await setAssignments(tx, tenantId, target.id, branchIds, serviceIds);
         return dto(tx, target.id);

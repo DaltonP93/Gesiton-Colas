@@ -41,7 +41,8 @@ import {
   toPublicTenantDTO,
   toServiceDTO,
 } from '../../lib/dto';
-import { badRequest, forbidden, notFound } from '../../lib/errors';
+import { assertTenantAvailable } from '../../lib/auth';
+import { badRequest, notFound } from '../../lib/errors';
 import { dayInTimezone } from '../../lib/tz';
 import { customerSchema } from '../tickets/routes';
 import { cancelTicket, countAhead, findTickets, issueTicket, loadTicket } from '../tickets/queue';
@@ -70,7 +71,7 @@ export const publicRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
   async function activeTenant(tenantId: string) {
     const [tenant] = await ctx.db.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
     if (!tenant) throw notFound('Organización');
-    if (tenant.status !== 'active') throw forbidden('Servicio suspendido');
+    assertTenantAvailable(tenant);
     return tenant;
   }
 

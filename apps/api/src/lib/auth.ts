@@ -7,7 +7,7 @@ import type { AppConfig } from '../config';
 import type { Database } from '../db/client';
 import { apiKeys, tenants, users, type Tenant, type User } from '../db/schema';
 import { sha256 } from './crypto';
-import { forbidden, unauthorized } from './errors';
+import { AppError, forbidden, unauthorized } from './errors';
 
 export type AuthInfo =
   | { kind: 'user'; userId: string; tenantId: string | null; role: Role; user: User; tenant: Tenant | null }
@@ -60,6 +60,9 @@ export function createAuth(config: AppConfig, db: Database) {
         .limit(1);
       const found = row[0];
       if (!found || !found.user.active) return null;
+      // Tokens emitidos antes de un cambio o restablecimiento de contraseña ya no valen.
+      const validAfter = found.user.sessionsValidAfter?.getTime();
+      if (validAfter && (payload.iat ?? 0) * 1000 < validAfter) return null;
       return { user: found.user, tenant: found.tenant };
     } catch {
       return null;
@@ -129,9 +132,7 @@ export function createAuth(config: AppConfig, db: Database) {
       } else if (options.role && !hasRole(auth.role, options.role)) {
         throw forbidden();
       }
-      if (auth.tenant && auth.tenant.status !== 'active' && auth.role !== 'superadmin') {
-        throw forbidden('La organización está suspendida. Contacte al soporte.');
-      }
+      if (auth.tenant && auth.role !== 'superadmin') assertTenantAvailable(auth.tenant);
     };
   }
 
@@ -139,6 +140,19 @@ export function createAuth(config: AppConfig, db: Database) {
 }
 
 export type Auth = ReturnType<typeof createAuth>;
+
+/** Falla si la organización está suspendida o si su demo venció. */
+export function assertTenantAvailable(tenant: Pick<Tenant, 'status' | 'isDemo' | 'demoExpiresAt'>) {
+  if (tenant.status !== 'active') throw forbidden('La organización está suspendida. Contacte al soporte.');
+  if (tenant.isDemo && tenant.demoExpiresAt && tenant.demoExpiresAt.getTime() < Date.now()) {
+    throw new AppError(403, 'demo_expired', 'La demo venció. Contáctenos para continuar con un plan y conservar su configuración.');
+  }
+}
+
+/** Marca de tiempo (redondeada al segundo) a partir de la cual valen los nuevos tokens de sesión. */
+export function sessionsResetNow() {
+  return new Date(Math.floor(Date.now() / 1000) * 1000);
+}
 
 /** Devuelve el tenant de la petición autenticada o falla. */
 export function tenantIdOf(request: FastifyRequest): string {

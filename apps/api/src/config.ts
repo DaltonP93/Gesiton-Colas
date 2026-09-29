@@ -19,6 +19,29 @@ const envSchema = z.object({
   /** Orígenes permitidos para CORS separados por coma (`*` = todos). */
   CORS_ORIGINS: z.string().default('*'),
   ALLOW_SIGNUP: bool(true),
+  /** Permite solicitar una organización de demostración por correo. */
+  ALLOW_DEMO: bool(true),
+  /** Días que dura una demo antes de vencer. */
+  DEMO_DAYS: z.coerce.number().int().min(1).max(365).default(14),
+  /**
+   * Verificación del correo al registrarse:
+   * - `required`: no puede ingresar hasta confirmar el correo
+   * - `optional`: puede usar el sistema y se le recuerda verificarlo
+   * - `off`: no se envía correo de verificación
+   */
+  EMAIL_VERIFICATION: z.enum(['required', 'optional', 'off']).default('optional'),
+  /** `smtp` para enviar correos reales; `log` los muestra en consola (desarrollo). Por defecto smtp si hay SMTP_HOST o SMTP_URL. */
+  MAIL_DRIVER: z.enum(['smtp', 'log']).optional(),
+  /** URL SMTP completa, p. ej. smtps://usuario:clave@smtp.proveedor.com:465 */
+  SMTP_URL: z.string().optional(),
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().default(587),
+  SMTP_SECURE: bool(false),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  MAIL_FROM: z.string().default('Gestión de Colas <no-reply@gestioncolas.local>'),
+  /** Solo para pruebas automatizadas: expone los correos enviados en /api/v1/dev/outbox (con MAIL_DRIVER=log). */
+  DEV_OUTBOX: bool(false),
   AUTO_MIGRATE: bool(true),
   SUPERADMIN_EMAIL: z.string().email().optional().or(z.literal('').transform(() => undefined)),
   SUPERADMIN_PASSWORD: z.string().optional(),
