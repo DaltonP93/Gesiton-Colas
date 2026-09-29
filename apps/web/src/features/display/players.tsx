@@ -333,6 +333,47 @@ export function TextSlide({ media }: PlayerProps) {
   );
 }
 
+/** Audio dentro de una lista: suena con una visualización de la marca. */
+export function AudioSlide({ media, volume, muted, onEnded, onError }: PlayerProps) {
+  const ref = useRef<HTMLAudioElement>(null);
+  const ended = useLatest(onEnded);
+  const failed = useLatest(onError);
+  useEffect(() => {
+    const audio = ref.current;
+    if (!audio) return;
+    audio.volume = clamp(volume);
+    audio.muted = muted;
+    audio.play().catch((error: DOMException) => {
+      if (error.name === 'NotAllowedError') {
+        audio.muted = true;
+        void audio.play().catch(() => failed.current());
+      } else failed.current();
+    });
+  }, [media.url]);
+  useEffect(() => {
+    if (!ref.current) return;
+    ref.current.volume = clamp(volume);
+    ref.current.muted = muted;
+  }, [volume, muted]);
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center gap-[4%] bg-gradient-to-br from-indigo-900 via-slate-900 to-black text-white">
+      <div className="flex h-[22%] items-end gap-[1.2%]" aria-hidden>
+        {Array.from({ length: 9 }, (_, i) => (
+          <span
+            key={i}
+            className="w-[1.2vw] rounded-full bg-white/80"
+            style={{ height: '100%', animation: `gc-eq ${0.7 + (i % 4) * 0.18}s ease-in-out ${i * 0.07}s infinite alternate` }}
+          />
+        ))}
+      </div>
+      <p className="px-[6%] text-center font-bold" style={{ fontSize: 'clamp(1rem, 4.5cqmin, 4rem)' }}>
+        ♪ {media.name}
+      </p>
+      <audio ref={ref} src={assetUrl(media.url)} autoPlay onEnded={() => ended.current()} onError={() => failed.current()} />
+    </div>
+  );
+}
+
 export function playerFor(media: MediaDTO) {
   switch (media.kind) {
     case 'video':
@@ -344,6 +385,8 @@ export function playerFor(media: MediaDTO) {
       return VimeoPlayer;
     case 'image':
       return ImageSlide;
+    case 'audio':
+      return AudioSlide;
     case 'text':
       return TextSlide;
     default:

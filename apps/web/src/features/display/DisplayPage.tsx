@@ -8,6 +8,7 @@ import { ApiError, api, assetUrl } from '../../lib/api';
 import { translator } from '../../lib/i18n';
 import { connectSocket } from '../../lib/socket';
 import { fontStack, loadFont, setCustomCss } from '../../lib/theme';
+import { BackgroundMusic } from './BackgroundMusic';
 import { MediaPlayer } from './MediaPlayer';
 import { useAnnouncer } from './useAnnouncer';
 
@@ -30,6 +31,7 @@ export default function DisplayPage() {
       <FullMessage
         title={status === 404 ? 'Pantalla no encontrada' : status === 403 ? 'Servicio suspendido' : 'Sin conexión con el servidor'}
         text={status === 404 ? 'Verifique el enlace de la pantalla en el panel de administración.' : 'Reintentando automáticamente…'}
+        action={status === 404 ? { href: '/vincular?nuevo=1', label: 'Vincular este equipo con un código' } : undefined}
       />
     );
   }
@@ -37,11 +39,16 @@ export default function DisplayPage() {
   return <DisplayScreen boot={query.data} token={token} refetch={() => void query.refetch()} />;
 }
 
-function FullMessage({ title, text }: { title: string; text: string }) {
+function FullMessage({ title, text, action }: { title: string; text: string; action?: { href: string; label: string } }) {
   return (
     <div className="flex h-screen flex-col items-center justify-center bg-slate-950 p-8 text-center text-white">
       <p className="text-4xl font-bold">{title}</p>
       <p className="mt-3 text-lg text-slate-400">{text}</p>
+      {action && (
+        <a href={action.href} className="mt-8 rounded-full bg-white px-6 py-3 text-lg font-semibold text-slate-900">
+          {action.label}
+        </a>
+      )}
     </div>
   );
 }
@@ -157,10 +164,13 @@ function DisplayScreen({ boot, token, refetch }: { boot: DisplayBootstrapDTO; to
     fontFamily: fontStack(theme.fontFamily),
   } as CSSProperties;
 
+  // Con música ambiental, la publicidad se reproduce sin sonido para no superponerse.
+  const musicOn = config.music.enabled && boot.music.length > 0;
+  const mediaSettings = useMemo(() => (musicOn ? { ...config.media, muted: true } : config.media), [config.media, musicOn]);
   const media = (
     <MediaPlayer
       items={playlistItems}
-      settings={config.media}
+      settings={mediaSettings}
       ducked={speaking}
       audioUnlocked={unlocked}
       fallback={<MediaFallback tenant={tenant} />}
@@ -177,7 +187,16 @@ function DisplayScreen({ boot, token, refetch }: { boot: DisplayBootstrapDTO; to
     >
       {config.layout === 'fullscreen' ? <FullscreenLayout {...props} /> : config.layout === 'tickets' ? <TicketsLayout {...props} /> : <SplitLayout {...props} />}
 
-      {!unlocked && (config.voice.enabled || config.sound.enabled) && (
+      <BackgroundMusic
+        tracks={boot.music}
+        volume={config.music.volume}
+        shuffle={config.music.shuffle}
+        ducked={speaking}
+        duckVolume={config.media.duckVolume}
+        enabled={musicOn && unlocked && !preview}
+      />
+
+      {!unlocked && (config.voice.enabled || config.sound.enabled || musicOn) && (
         <button
           type="button"
           onClick={unlock}

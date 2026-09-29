@@ -41,6 +41,11 @@ export default function KioskPage() {
       <div className="flex h-screen flex-col items-center justify-center bg-slate-100 p-8 text-center">
         <p className="text-3xl font-bold">{status === 404 ? 'Kiosco no encontrado' : 'Sin conexión'}</p>
         <p className="mt-2 text-slate-500">{status === 404 ? 'Verifique el enlace en el panel.' : 'Reintentando…'}</p>
+        {status === 404 && (
+          <a href="/vincular?nuevo=1" className="mt-6 rounded-full bg-slate-900 px-6 py-3 font-semibold text-white">
+            Vincular este equipo con un código
+          </a>
+        )}
       </div>
     );
   }

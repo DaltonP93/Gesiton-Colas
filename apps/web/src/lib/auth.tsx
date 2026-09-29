@@ -17,9 +17,12 @@ interface AuthState {
   settings: TenantSettings;
   terms: Terminology;
   login(email: string, password: string): Promise<MeDTO>;
-  register(data: { organizationName: string; name: string; email: string; password: string }): Promise<MeDTO>;
+  /** Devuelve `null` si hay que confirmar el correo antes de ingresar. */
+  register(data: { organizationName: string; name: string; email: string; password: string }): Promise<MeDTO | null>;
   logout(): void;
   refresh(): Promise<void>;
+  /** Guarda la sesión devuelta por los flujos de acceso por correo (verificación, enlace, invitación...). */
+  acceptSession(res: MeDTO & { token: string }): MeDTO;
   can(role: Role): boolean;
   /** El superadministrador entra a una organización para dar soporte. */
   impersonate(tenantId: string | null): Promise<void>;
@@ -88,11 +91,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       async register(data) {
         const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         const locale = navigator.language?.slice(0, 2);
-        const res = await api.post<MeDTO & { token: string }>('/auth/register', {
+        const res = await api.post<(MeDTO & { token: string }) | { verificationRequired: true; email: string }>('/auth/register', {
           ...data,
           timezone,
           locale: ['es', 'en', 'pt'].includes(locale) ? locale : 'es',
         });
+        if ('verificationRequired' in res) return null;
         session.token = res.token;
         queryClient.clear();
         setMe(res);
@@ -100,6 +104,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       logout,
       refresh,
+      acceptSession(res) {
+        session.token = res.token;
+        session.tenantOverride = null;
+        queryClient.clear();
+        setMe(res);
+        return res;
+      },
       can: (role) => (me ? hasRole(me.user.role, role) : false),
       async impersonate(tenantId) {
         session.tenantOverride = tenantId;

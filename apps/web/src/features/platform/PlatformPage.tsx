@@ -38,7 +38,7 @@ type PlatformTenant = TenantDTO & {
   usage: { users: number; branches: number; displays: number; tickets30d: number };
 };
 
-type TenantPatch = { id: string; name?: string; plan?: PlanId; status?: TenantDTO['status'] };
+type TenantPatch = { id: string; name?: string; plan?: PlanId; status?: TenantDTO['status']; isDemo?: boolean; extendDemoDays?: number };
 
 const PLATFORM_NAME = defaultTenantSettings().branding.appName;
 
@@ -219,6 +219,15 @@ function TenantsCard({ onCreate }: { onCreate: () => void }) {
     }
   }
 
+  async function demoAction(tenant: PlatformTenant, action: 'extend' | 'convert') {
+    try {
+      await update.mutateAsync(action === 'extend' ? { id: tenant.id, extendDemoDays: 14 } : { id: tenant.id, isDemo: false });
+      toast(action === 'extend' ? `Se extendió la demo de «${tenant.name}» 14 días.` : `«${tenant.name}» ahora es una organización definitiva.`);
+    } catch (err) {
+      toast(errorMessage(err), 'error');
+    }
+  }
+
   async function enter(tenant: PlatformTenant) {
     setEntering(tenant.id);
     try {
@@ -320,6 +329,11 @@ function TenantsCard({ onCreate }: { onCreate: () => void }) {
                   <td>
                     <div className="flex items-center gap-2 whitespace-nowrap">
                       {tenant.status === 'active' ? <Badge color="#16a34a">Activa</Badge> : <Badge color="#dc2626">Suspendida</Badge>}
+                      {tenant.isDemo && (
+                        <Badge color={tenant.demoExpiresAt && new Date(tenant.demoExpiresAt) < new Date() ? '#dc2626' : '#7c3aed'}>
+                          Demo · {tenant.demoExpiresAt ? `vence ${formatDateTime(tenant.demoExpiresAt)}` : 'sin vencimiento'}
+                        </Badge>
+                      )}
                       <Button
                         size="sm"
                         variant="ghost"
@@ -329,6 +343,16 @@ function TenantsCard({ onCreate }: { onCreate: () => void }) {
                       >
                         {tenant.status === 'active' ? 'Suspender' : 'Reactivar'}
                       </Button>
+                      {tenant.isDemo && (
+                        <>
+                          <Button size="sm" variant="ghost" disabled={busy} onClick={() => demoAction(tenant, 'extend')}>
+                            +14 días
+                          </Button>
+                          <Button size="sm" variant="ghost" disabled={busy} onClick={() => demoAction(tenant, 'convert')}>
+                            Convertir en cliente
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </td>
                   <td>

@@ -20,6 +20,25 @@ colas.ejemplo.com {
 }
 ```
 
+### Correo electrónico (SMTP)
+
+Necesario para la demo por correo, la verificación de email, «olvidé mi contraseña», el ingreso con código y las invitaciones. Funciona con cualquier proveedor SMTP:
+
+| Proveedor | Configuración |
+| --- | --- |
+| Google Workspace / Gmail | `SMTP_URL=smtps://usuario%40dominio.com:CLAVE_DE_APLICACION@smtp.gmail.com:465` |
+| Microsoft 365 | `SMTP_HOST=smtp.office365.com`, `SMTP_PORT=587`, `SMTP_USER`, `SMTP_PASS` |
+| Amazon SES | `SMTP_HOST=email-smtp.<región>.amazonaws.com`, `SMTP_PORT=587`, credenciales SMTP de SES |
+| SendGrid | `SMTP_HOST=smtp.sendgrid.net`, `SMTP_USER=apikey`, `SMTP_PASS=<API key>` |
+| Brevo / Mailgun / Resend | Use el host, usuario y clave SMTP que indique el proveedor |
+
+Defina también `MAIL_FROM` con un remitente de su dominio (configure SPF/DKIM en el proveedor para evitar la carpeta de spam). Los correos usan el logo, colores y nombre de cada organización.
+
+Opciones relacionadas:
+
+- `EMAIL_VERIFICATION=required` exige confirmar el correo antes de ingresar (`optional` lo recuerda con un aviso; `off` lo desactiva).
+- `ALLOW_DEMO` y `DEMO_DAYS` controlan la demo por correo. Las demos vencidas quedan bloqueadas y se eliminan 30 días después; desde `/plataforma` se pueden extender o convertir en clientes.
+
 ### Almacenamiento en la nube (S3, Cloudflare R2, MinIO, Spaces)
 
 ```
@@ -46,7 +65,9 @@ La API no guarda estado en memoria salvo las conexiones de Socket.IO. Para escal
 
 ## Pantallas (TV)
 
-Abra el enlace de la pantalla (**Pantallas → Configurar → Enlace**) en cualquier navegador moderno:
+La forma más simple: en el navegador de la TV abra **`https://su-dominio/vincular`**. Aparece un código de 6 dígitos; en el portal (**Vincular dispositivo**) escriba el código y elija la pantalla. La TV pasa sola a su pantalla y la recuerda al encenderse.
+
+También puede abrir directamente el enlace de la pantalla (**Pantallas → Configurar → Enlace**) en cualquier navegador moderno:
 
 | Dispositivo | Recomendación |
 | --- | --- |
@@ -55,7 +76,8 @@ Abra el enlace de la pantalla (**Pantallas → Configurar → Enlace**) en cualq
 | Mini PC / Windows / Linux | Chrome o Edge en modo kiosco: `chrome --kiosk --autoplay-policy=no-user-gesture-required https://…/pantalla/TOKEN` |
 | Raspberry Pi | Chromium en modo kiosco con los mismos parámetros al iniciar la sesión. |
 
-- La voz usa la síntesis del sistema (sin costo). Las voces disponibles dependen del equipo; en **Voz y sonido** puede elegir una específica y probarla.
+- La voz usa la síntesis del sistema (sin costo). Las voces disponibles dependen del equipo; en **Voz y sonido** puede elegir una específica y probarla. En **Sonidos de llamado** hay una guía para instalar más voces en Windows, Android/Google TV y macOS.
+- Sonidos: 19 tonos incluidos, audios propios (también una voz grabada) y música ambiental o radios por streaming que bajan el volumen en cada llamado.
 - La pantalla mantiene el dispositivo encendido (Wake Lock), se reconecta sola y aplica los cambios de configuración y publicidad sin recargar.
 
 ## Kioscos e impresoras

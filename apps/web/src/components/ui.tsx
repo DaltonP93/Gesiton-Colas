@@ -26,7 +26,7 @@ export function cx(...classes: (string | false | null | undefined)[]) {
 /* ------------------------------------------------------------------ */
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'accent' | 'success';
-type Size = 'sm' | 'md' | 'lg' | 'xl';
+type Size = 'sm' | 'md' | 'lg' | 'xl' | 'icon';
 
 const variants: Record<Variant, string> = {
   primary: 'bg-primary text-primary-fg hover:brightness-110 shadow-sm',
@@ -42,6 +42,7 @@ const sizes: Record<Size, string> = {
   md: 'h-10 px-4 text-sm gap-2',
   lg: 'h-12 px-5 text-base gap-2',
   xl: 'h-16 px-7 text-lg gap-3',
+  icon: 'size-8 p-0',
 };
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -61,7 +62,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       type={type}
       disabled={disabled || loading}
       className={cx(
-        'inline-flex shrink-0 items-center justify-center rounded-ui font-medium whitespace-nowrap transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50',
+        'inline-flex shrink-0 items-center justify-center rounded-ui font-medium whitespace-nowrap transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:shrink-0',
         variants[variant],
         sizes[size],
         className,
@@ -75,7 +76,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
 });
 
 export function IconButton({ label, className, ...rest }: ButtonProps & { label: string }) {
-  return <Button variant="ghost" size="sm" aria-label={label} title={label} className={cx('w-8 px-0', className)} {...rest} />;
+  return <Button variant="ghost" size="icon" aria-label={label} title={label} className={className} {...rest} />;
 }
 
 /* ------------------------------------------------------------------ */

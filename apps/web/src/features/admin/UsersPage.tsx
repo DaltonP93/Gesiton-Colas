@@ -1,4 +1,4 @@
-import { Pencil, Plus, ShieldCheck, Trash2, Users } from 'lucide-react';
+import { Pencil, Plus, Send, ShieldCheck, Trash2, Users } from 'lucide-react';
 import { useId, useState, type FormEvent, type ReactNode } from 'react';
 import type { Role, UserDTO } from '@gc/shared';
 import {
@@ -19,7 +19,7 @@ import {
   cx,
   useFeedback,
 } from '../../components/ui';
-import { ApiError, errorMessage } from '../../lib/api';
+import { ApiError, api, errorMessage } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { formatDateTime } from '../../lib/format';
 import { useBranches, useRemove, useSave, useServices, useUsers } from '../../lib/queries';
@@ -92,6 +92,15 @@ export default function UsersPage() {
   const list = users.data ?? [];
   const branchName = new Map((branches.data ?? []).map((b) => [b.id, b.name]));
   const limit = me?.limits?.users ?? null;
+
+  async function resendInvite(user: UserDTO) {
+    try {
+      await api.post(`/users/${user.id}/invite`);
+      toast(`Invitación reenviada a ${user.email}.`);
+    } catch (err) {
+      toast(errorMessage(err), 'error');
+    }
+  }
 
   async function handleDelete(user: UserDTO) {
     const ok = await confirm({
@@ -174,7 +183,15 @@ export default function UsersPage() {
                     <td>
                       <RoleBadge role={user.role} />
                     </td>
-                    <td>{user.active ? <Badge color="#16a34a">Activo</Badge> : <Badge color="#dc2626">Inactivo</Badge>}</td>
+                    <td>
+                      {user.invitePending ? (
+                        <Badge color="#d97706">Invitación pendiente</Badge>
+                      ) : user.active ? (
+                        <Badge color="#16a34a">Activo</Badge>
+                      ) : (
+                        <Badge color="#dc2626">Inactivo</Badge>
+                      )}
+                    </td>
                     <td className="whitespace-nowrap text-muted">{user.lastLoginAt ? formatDateTime(user.lastLoginAt) : 'Nunca'}</td>
                     <td>
                       {user.branchIds.length === 0 ? (
@@ -189,6 +206,9 @@ export default function UsersPage() {
                     </td>
                     <td>
                       <div className="flex justify-end gap-1">
+                        {user.invitePending && (
+                          <IconButton label="Reenviar invitación" icon={<Send className="size-4" />} onClick={() => void resendInvite(user)} />
+                        )}
                         <IconButton label="Editar" icon={<Pencil className="size-4" />} onClick={() => setEditing(userForm(user))} />
                         <IconButton
                           label={isSelf ? 'No puede eliminar su propio usuario' : 'Eliminar'}
@@ -266,6 +286,7 @@ function UserFormModal({
   const save = useSave<UserDTO>('users', ['users']);
   const roleDescriptions = useRoleDescriptions();
   const [form, setForm] = useState(initial);
+  const [invite, setInvite] = useState(true);
   const [limitError, setLimitError] = useState<string | null>(null);
   const formId = useId();
   const isNew = !form.id;
@@ -280,11 +301,17 @@ function UserFormModal({
         name: form.name.trim(),
         email: form.email.trim(),
         ...(isSelf ? {} : { role: form.role, active: form.active }),
-        ...(form.password ? { password: form.password } : {}),
+        ...(form.password && !(isNew && invite) ? { password: form.password } : {}),
         branchIds: form.branchIds,
         serviceIds: form.serviceIds,
       });
-      toast(isNew ? `Se creó el usuario «${form.name.trim()}».` : 'Cambios guardados.');
+      toast(
+        isNew && invite
+          ? `Le enviamos una invitación a ${form.email.trim()} para que elija su contraseña.`
+          : isNew
+            ? `Se creó el usuario «${form.name.trim()}».`
+            : 'Cambios guardados.',
+      );
       onClose();
     } catch (err) {
       if (err instanceof ApiError && err.status === 402) setLimitError(err.message);
@@ -335,22 +362,33 @@ function UserFormModal({
               ))}
             </Select>
           </Field>
-          <Field
-            label="Contraseña"
-            required={isNew}
-            hint={isNew ? 'Mínimo 8 caracteres. Compártala con la persona de forma segura.' : 'Dejar vacío para no cambiar.'}
-          >
-            <Input
-              type="password"
+          {!(isNew && invite) && (
+            <Field
+              label="Contraseña"
               required={isNew}
-              minLength={8}
-              maxLength={200}
-              value={form.password}
-              onChange={(e) => set('password', e.target.value)}
-              autoComplete="new-password"
-            />
-          </Field>
+              hint={isNew ? 'Mínimo 8 caracteres. Compártala con la persona de forma segura.' : 'Dejar vacío para no cambiar.'}
+            >
+              <Input
+                type="password"
+                required={isNew}
+                minLength={8}
+                maxLength={200}
+                value={form.password}
+                onChange={(e) => set('password', e.target.value)}
+                autoComplete="new-password"
+              />
+            </Field>
+          )}
         </div>
+
+        {isNew && (
+          <Toggle
+            checked={invite}
+            onChange={setInvite}
+            label="Enviar invitación por correo"
+            hint={invite ? 'La persona recibirá un enlace para aceptar y elegir su propia contraseña.' : 'Usted define la contraseña y se la comparte.'}
+          />
+        )}
 
         <Toggle
           checked={form.active}
