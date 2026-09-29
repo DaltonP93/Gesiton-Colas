@@ -4,9 +4,23 @@ import { Loading } from './components/ui';
 import { useAuth } from './lib/auth';
 import type { Role } from '@gc/shared';
 import { AdminLayout } from './features/admin/AdminLayout';
-import { LoginPage, RegisterPage } from './features/auth/AuthPages';
+import {
+  AcceptInvitePage,
+  DemoPage,
+  EmailLoginPage,
+  ForgotPasswordPage,
+  LoginPage,
+  MagicLinkPage,
+  RegisterPage,
+  ResetPasswordPage,
+  VerifyEmailPage,
+} from './features/auth/AuthPages';
 import { LandingPage } from './features/landing/LandingPage';
 
+const PortalPage = lazy(() => import('./features/portal/PortalPage'));
+const PairDevicePage = lazy(() => import('./features/portal/PairDevicePage'));
+const DeviceLinkPage = lazy(() => import('./features/portal/DeviceLinkPage'));
+const SoundsPage = lazy(() => import('./features/admin/SoundsPage'));
 const DashboardPage = lazy(() => import('./features/admin/DashboardPage'));
 const MonitorPage = lazy(() => import('./features/admin/MonitorPage'));
 const BranchesPage = lazy(() => import('./features/admin/BranchesPage'));
@@ -34,7 +48,7 @@ function RequireAuth({ children, role }: { children: ReactNode; role?: Role }) {
   const { me, loading, can } = useAuth();
   const location = useLocation();
   if (loading) return <Loading />;
-  if (!me) return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />;
+  if (!me) return <Navigate to={`/login?next=${encodeURIComponent(location.pathname + location.search)}`} replace />;
   if (role && !can(role)) return <Navigate to="/app" replace />;
   if (!me.tenant && me.user.role === 'superadmin' && location.pathname.startsWith('/app')) return <Navigate to="/plataforma" replace />;
   return <>{children}</>;
@@ -47,17 +61,6 @@ function Home() {
   return <LandingPage />;
 }
 
-function AppIndex() {
-  const { can } = useAuth();
-  return can('manager') ? (
-    <Lazy>
-      <DashboardPage />
-    </Lazy>
-  ) : (
-    <Navigate to="/app/atencion" replace />
-  );
-}
-
 const page = (el: ReactNode, role?: Role) => (
   <RequireAuth role={role}>
     <Lazy>{el}</Lazy>
@@ -68,6 +71,21 @@ export const router = createBrowserRouter([
   { path: '/', element: <Home /> },
   { path: '/login', element: <LoginPage /> },
   { path: '/registro', element: <RegisterPage /> },
+  { path: '/demo', element: <DemoPage /> },
+  { path: '/ingresar-con-correo', element: <EmailLoginPage /> },
+  { path: '/acceso', element: <MagicLinkPage /> },
+  { path: '/olvide-contrasena', element: <ForgotPasswordPage /> },
+  { path: '/restablecer', element: <ResetPasswordPage /> },
+  { path: '/verificar', element: <VerifyEmailPage /> },
+  { path: '/invitacion', element: <AcceptInvitePage /> },
+  {
+    path: '/vincular',
+    element: (
+      <Lazy>
+        <DeviceLinkPage />
+      </Lazy>
+    ),
+  },
   {
     path: '/app',
     element: (
@@ -76,7 +94,10 @@ export const router = createBrowserRouter([
       </RequireAuth>
     ),
     children: [
-      { index: true, element: <AppIndex /> },
+      { index: true, element: page(<PortalPage />) },
+      { path: 'resumen', element: page(<DashboardPage />, 'manager') },
+      { path: 'vincular', element: page(<PairDevicePage />, 'manager') },
+      { path: 'sonidos', element: page(<SoundsPage />, 'manager') },
       { path: 'atencion', element: page(<AgentConsole />) },
       { path: 'monitor', element: page(<MonitorPage />, 'manager') },
       { path: 'sucursales', element: page(<BranchesPage />, 'admin') },

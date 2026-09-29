@@ -95,3 +95,15 @@ export function useStaffRealtime(branchId: string | null | undefined, onEvent?: 
     };
   }, [branchId, qc]);
 }
+
+export interface PublicConfig {
+  allowSignup: boolean;
+  allowDemo: boolean;
+  demoDays: number;
+  emailVerification: 'required' | 'optional' | 'off';
+  emailEnabled: boolean;
+}
+
+/** Opciones públicas de la instalación (si el registro o la demo están habilitados). */
+export const usePublicConfig = () =>
+  useQuery({ queryKey: ['public-config'], queryFn: () => api.public<PublicConfig>('/public/config'), staleTime: 10 * 60_000 });

@@ -18,6 +18,9 @@ Plataforma **SaaS** de gestión de turnos, pantallas y publicidad digital. Organ
 | **Reportes** | Espera y atención promedio, por servicio, operador, hora y día. Monitor en vivo y exportación a CSV/Excel. |
 | **Integraciones** | API REST con OpenAPI/Swagger (`/api/docs`), API keys con permisos, **webhooks firmados (HMAC-SHA256) con reintentos**, Socket.IO. Ideal para ERP, CRM, WhatsApp, Zapier, Make o n8n. |
 | **SaaS** | Registro autónomo de organizaciones, datos aislados por organización, planes con límites (sucursales, pantallas, kioscos, usuarios, almacenamiento), superadministrador con modo soporte. |
+| **Acceso por correo** | **Demo por correo** (organización de ejemplo con historial, operadores, publicidad y turnos, con vencimiento), verificación de email, **olvidé mi contraseña**, ingreso sin contraseña con **enlace o código de 6 dígitos**, invitación de usuarios por correo. SMTP con cualquier proveedor. |
+| **Portal de herramientas** | Al ingresar, un portal abre la consola, el **kiosco / triage** o el **panel TV** con un clic, copia enlaces o muestra el QR. Las TVs y tablets se **vinculan con un código de 6 dígitos** desde `/vincular`, sin escribir URLs largas; el equipo recuerda su pantalla. |
+| **Sonidos y audio** | 19 sonidos de llamado incluidos (escuchar y descargar), subida de audios propios (MP3, WAV, OGG, M4A) como tono de llamado o voz grabada, **música ambiental** y radios por streaming con atenuación en cada llamado, y guía para instalar más voces. |
 
 Funciona en **cualquier dispositivo con navegador**: Smart TV, Android TV/Google TV, mini PC, Raspberry Pi, tablets, celulares, Windows, macOS y Linux.
 
@@ -59,6 +62,8 @@ npm run db:seed              # opcional: organización demo (demo@gestioncolas.l
 npm run dev                  # API en :3000 y web en :5173 (con proxy a la API)
 ```
 
+Sin SMTP configurado, los correos (verificación, recuperación, códigos, demos) se imprimen en la consola de la API con sus enlaces, para poder probar todos los flujos en desarrollo.
+
 | Comando | Qué hace |
 | --- | --- |
 | `npm run dev:api` / `npm run dev:web` | Levanta solo la API o solo el frontend |
@@ -67,14 +72,18 @@ npm run dev                  # API en :3000 y web en :5173 (con proxy a la API)
 | `npm run build` | Compila web y API (`apps/api/dist`, `apps/web/dist`) |
 | `npm start` | Inicia la API compilada; si existe `apps/web/dist`, también sirve el frontend |
 | `npm run db:generate` | Genera una migración a partir de cambios en `apps/api/src/db/schema.ts` |
+| `npm run e2e` | Prueba de punta a punta en Chromium (requiere `npm run build`) |
+| `node apps/web/scripts/generate-sounds.mjs` | Regenera los sonidos de llamado sintetizados |
 
 ## Rutas principales
 
 | Ruta | Uso |
 | --- | --- |
 | `/` | Página pública del producto |
-| `/registro`, `/login` | Alta de organización e inicio de sesión |
-| `/app` | Panel de administración |
+| `/registro`, `/login`, `/demo` | Alta de organización, inicio de sesión y demo por correo |
+| `/ingresar-con-correo`, `/olvide-contrasena` | Acceso con código por correo y recuperación de contraseña |
+| `/app` | Portal de herramientas (consola, kiosco, panel TV, administración) |
+| `/vincular` | Se abre en la TV o tablet para vincularla con un código |
 | `/app/atencion` | Consola del operador |
 | `/pantalla/:token` | Pantalla de TV (enlace por pantalla) |
 | `/kiosco/:token` | Kiosco táctil · `?modo=movil` para fila virtual |

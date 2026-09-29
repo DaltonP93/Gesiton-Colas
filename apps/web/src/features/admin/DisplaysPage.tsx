@@ -19,13 +19,16 @@ import {
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ALERT_SOUNDS,
+  ALERT_SOUND_LABELS,
   TEMPLATE_VARIABLES,
+  isAlertSound,
   defaultDisplayConfig,
   deepMerge,
   type CallDTO,
   type DisplayConfig,
   type DisplayDTO,
 } from '@gc/shared';
+import { Link } from 'react-router';
 import { CopyField } from '../../components/CopyField';
 import { QrCode } from '../../components/QrCode';
 import {
@@ -52,7 +55,7 @@ import {
 import { api, errorMessage } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { formatDateTime } from '../../lib/format';
-import { useBranches, useDisplays, usePlaylists, useServices } from '../../lib/queries';
+import { useBranches, useDisplays, useMedia, usePlaylists, useServices } from '../../lib/queries';
 import { FONT_OPTIONS } from '../../lib/theme';
 import { callSpeechText, pickVoice, playSound, soundUrl, speak } from '../display/useAnnouncer';
 
@@ -70,16 +73,6 @@ const THEME_PRESETS: { name: string; theme: Partial<DisplayConfig['theme']> }[] 
   { name: 'Elegante', theme: { background: '#000000', text: '#f5f5f5', panelBackground: '#171717', accent: '#eab308', callBackground: '#facc15', callText: '#0a0a0a' } },
   { name: 'Banco', theme: { background: '#0b1f3a', text: '#e2e8f0', panelBackground: '#12305a', accent: '#60a5fa', callBackground: '#dc2626', callText: '#ffffff' } },
 ];
-
-const SOUND_LABELS: Record<string, string> = {
-  'airport-bingbong': 'Aeropuerto',
-  'ding-dong': 'Ding dong',
-  'doorbell-bingbong': 'Timbre',
-  'ekiga-vm': 'Aviso corto',
-  infobleep: 'Bip informativo',
-  'quito-mariscal-sucre': 'Terminal',
-  toydoorbell: 'Campanita',
-};
 
 export const displayUrl = (token: string) => `${window.location.origin}/pantalla/${token}`;
 
@@ -466,6 +459,7 @@ function DisplayEditor({ display, onClose }: { display: DisplayDTO; onClose: () 
                     </Select>
                   </Field>
                 </div>
+                <MusicSettings config={config} set={set} />
                 <Card title="Cintillo de mensajes" description="Texto que se desplaza en la parte inferior.">
                   <div className="space-y-4">
                     <Toggle checked={config.ticker.enabled} onChange={(enabled) => set({ ticker: { ...config.ticker, enabled } })} label="Mostrar cintillo" />
@@ -497,7 +491,13 @@ function DisplayEditor({ display, onClose }: { display: DisplayDTO; onClose: () 
                   <div className="min-w-0 flex-1 space-y-2 text-sm text-muted">
                     <p className="font-medium text-fg">Cómo instalarla</p>
                     <ol className="list-decimal space-y-1 pl-5">
-                      <li>Abra el enlace en el navegador de la TV o del equipo conectado (o escanee el QR).</li>
+                      <li>
+                        Lo más fácil: en la TV abra <strong className="text-fg">{window.location.host}/vincular</strong> y escriba el código en{' '}
+                        <Link to="/app/vincular" className="font-medium text-primary hover:underline">
+                          Vincular dispositivo
+                        </Link>
+                        . También puede abrir el enlace directamente o escanear el QR.
+                      </li>
                       <li>Toque la pantalla una vez para habilitar el sonido y use el botón de pantalla completa.</li>
                       <li>
                         Para modo kiosco sin interacción en Chrome/Edge:{' '}
@@ -604,6 +604,43 @@ function ScaledPreview({ src }: { src: string }) {
   );
 }
 
+function MusicSettings({ config, set }: { config: DisplayConfig; set: (p: Partial<DisplayConfig>) => void }) {
+  const media = useMedia();
+  const audios = (media.data ?? []).filter((m) => m.kind === 'audio');
+  const music = config.music;
+  const setMusic = (patch: Partial<DisplayConfig['music']>) => set({ music: { ...music, ...patch } });
+  return (
+    <Card title="Música ambiental" description="Audios o radios que suenan de fondo en la sala de espera. Se atenúan en cada llamado y, mientras suenan, la publicidad se reproduce sin sonido.">
+      <div className="space-y-4">
+        <Toggle checked={music.enabled} onChange={(enabled) => setMusic({ enabled })} label="Reproducir música ambiental" />
+        <Field label="Audios">
+          <ChipSelect
+            options={audios.map((m) => ({ value: m.id, label: m.name }))}
+            value={music.mediaIds}
+            onChange={(mediaIds) => setMusic({ mediaIds })}
+            emptyLabel="No hay audios en la biblioteca"
+          />
+        </Field>
+        <p className="text-sm text-muted">
+          Suba música en{' '}
+          <Link to="/app/sonidos" className="font-medium text-primary hover:underline">
+            Sonidos de llamado
+          </Link>{' '}
+          o agregue una radio por URL en la{' '}
+          <Link to="/app/contenido" className="font-medium text-primary hover:underline">
+            biblioteca de medios
+          </Link>
+          .
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <RangeInput label="Volumen de la música" value={music.volume} min={0} max={1} step={0.05} onChange={(volume) => setMusic({ volume })} format={(v) => `${Math.round(v * 100)}%`} />
+          <Toggle checked={music.shuffle} onChange={(shuffle) => setMusic({ shuffle })} label="Orden aleatorio" />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 function VoiceSettings({ config, set }: { config: DisplayConfig; set: (p: Partial<DisplayConfig>) => void }) {
   const { terms } = useAuth();
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -632,7 +669,10 @@ function VoiceSettings({ config, set }: { config: DisplayConfig; set: (p: Partia
   };
   const voice = config.voice;
   const setVoice = (patch: Partial<DisplayConfig['voice']>) => set({ voice: { ...voice, ...patch } });
-  const isCustomSound = !(ALERT_SOUNDS as readonly string[]).includes(config.sound.file);
+  const media = useMedia();
+  const audios = (media.data ?? []).filter((m) => m.kind === 'audio');
+  const isOwnAudio = audios.some((m) => m.url === config.sound.file);
+  const isCustomSound = !isAlertSound(config.sound.file) && !isOwnAudio;
 
   async function test() {
     if (config.sound.enabled) await playSound(soundUrl(config.sound.file), config.sound.volume);
@@ -698,11 +738,24 @@ function VoiceSettings({ config, set }: { config: DisplayConfig; set: (p: Partia
                 value={isCustomSound ? 'custom' : config.sound.file}
                 onChange={(e) => set({ sound: { ...config.sound, file: e.target.value === 'custom' ? 'https://' : e.target.value } })}
               >
-                {ALERT_SOUNDS.map((s) => (
-                  <option key={s} value={s}>
-                    {SOUND_LABELS[s] ?? s}
-                  </option>
+                {(['Suaves', 'Llamativos', 'Musicales', 'Clásicos'] as const).map((category) => (
+                  <optgroup key={category} label={category}>
+                    {ALERT_SOUNDS.filter((s) => ALERT_SOUND_LABELS[s].category === category).map((s) => (
+                      <option key={s} value={s}>
+                        {ALERT_SOUND_LABELS[s].label}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
+                {audios.length > 0 && (
+                  <optgroup label="Sus audios">
+                    {audios.map((m) => (
+                      <option key={m.id} value={m.url}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
                 <option value="custom">URL propia…</option>
               </Select>
             </Field>
@@ -713,6 +766,13 @@ function VoiceSettings({ config, set }: { config: DisplayConfig; set: (p: Partia
               <Input value={config.sound.file} onChange={(e) => set({ sound: { ...config.sound, file: e.target.value } })} />
             </Field>
           )}
+          <p className="text-sm text-muted">
+            Escuche todos los tonos, descárguelos o suba los suyos en{' '}
+            <Link to="/app/sonidos" className="font-medium text-primary hover:underline">
+              Sonidos de llamado
+            </Link>
+            .
+          </p>
         </div>
       </Card>
       <Button variant="secondary" icon={<Volume2 className="size-4" />} onClick={() => void test()}>

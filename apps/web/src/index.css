@@ -108,6 +108,15 @@ body {
   }
 }
 
+@keyframes gc-eq {
+  from {
+    transform: scaleY(0.15);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
 @keyframes gc-marquee {
   from {
     transform: translateX(0);

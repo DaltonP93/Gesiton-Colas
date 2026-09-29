@@ -5,6 +5,7 @@ import {
   Globe,
   Image as ImageIcon,
   Link2,
+  Music,
   Pencil,
   Play,
   Radio,
@@ -18,6 +19,7 @@ import { useMemo, useRef, useState, type DragEvent } from 'react';
 import {
   PROVIDER_LABELS,
   UPLOAD_MIME_TYPES,
+  audioFromUrl,
   defaultDisplayConfig,
   detectMedia,
   type MediaDTO,
@@ -36,6 +38,7 @@ import {
   PageHeader,
   Tabs,
   Textarea,
+  Toggle,
   cx,
   useFeedback,
 } from '../../components/ui';
@@ -45,7 +48,7 @@ import { formatBytes, formatDuration } from '../../lib/format';
 import { useMedia } from '../../lib/queries';
 import { MediaPlayer } from '../display/MediaPlayer';
 
-type Filter = 'all' | 'video' | 'image' | 'platform' | 'text';
+type Filter = 'all' | 'video' | 'image' | 'audio' | 'platform' | 'text';
 
 const PLATFORM_KINDS = new Set(['youtube', 'vimeo', 'embed', 'hls']);
 
@@ -63,12 +66,20 @@ export const PLATFORMS = [
   'Loom',
   'HLS / m3u8',
   'MP4 / WebM',
+  'MP3 / radios',
   'Páginas web',
 ];
 
 export function MediaThumb({ media, className }: { media: MediaDTO; className?: string }) {
   const icon =
     media.kind === 'hls' ? <Radio /> : media.kind === 'embed' ? <Globe /> : media.kind === 'video' ? <FileVideo /> : <Play />;
+  if (media.kind === 'audio') {
+    return (
+      <div className={cx('grid place-items-center bg-gradient-to-br from-fuchsia-600 to-indigo-700 text-white/90 [&_svg]:size-9', className)}>
+        <Music />
+      </div>
+    );
+  }
   if (media.kind === 'text' && media.text) {
     return (
       <div className={cx('flex items-center justify-center p-3 text-center text-sm font-bold', className)} style={{ background: media.text.background, color: media.text.color }}>
@@ -135,6 +146,7 @@ export default function MediaPage() {
       if (filter === 'video') return m.kind === 'video';
       if (filter === 'image') return m.kind === 'image';
       if (filter === 'text') return m.kind === 'text';
+      if (filter === 'audio') return m.kind === 'audio';
       if (filter === 'platform') return PLATFORM_KINDS.has(m.kind);
       return true;
     });
@@ -175,6 +187,7 @@ export default function MediaPage() {
               { value: 'all', label: 'Todo' },
               { value: 'video', label: 'Videos', icon: <Video className="size-4" /> },
               { value: 'image', label: 'Imágenes', icon: <ImageIcon className="size-4" /> },
+              { value: 'audio', label: 'Audio', icon: <Music className="size-4" /> },
               { value: 'platform', label: 'Plataformas', icon: <Globe className="size-4" /> },
               { value: 'text', label: 'Textos', icon: <Type className="size-4" /> },
             ]}
@@ -281,7 +294,7 @@ function UploadModal({ open, onClose }: { open: boolean; onClose: () => void }) 
 
   const add = (files: FileList | File[]) => {
     const accepted = Array.from(files).filter((f) => UPLOAD_MIME_TYPES[f.type]);
-    if (accepted.length < Array.from(files).length) toast('Algunos archivos no son compatibles (use MP4, WebM, JPG, PNG, GIF, WebP o SVG)', 'error');
+    if (accepted.length < Array.from(files).length) toast('Algunos archivos no son compatibles (use MP4, WebM, JPG, PNG, GIF, WebP, SVG, MP3, WAV u OGG)', 'error');
     setItems((prev) => [...prev, ...accepted.map((file) => ({ file, progress: 0, status: 'pending' as const }))]);
   };
 
@@ -323,8 +336,8 @@ function UploadModal({ open, onClose }: { open: boolean; onClose: () => void }) 
     <Modal
       open={open}
       onClose={close}
-      title="Subir videos e imágenes"
-      description="MP4, WebM, MOV, JPG, PNG, GIF, WebP o SVG. Los videos se reproducen completos; las imágenes durante el tiempo indicado."
+      title="Subir videos, imágenes y audios"
+      description="MP4, WebM, MOV, JPG, PNG, GIF, WebP, SVG, MP3, WAV, OGG o M4A. Videos y audios se reproducen completos; las imágenes durante el tiempo indicado."
       size="lg"
       footer={
         <>
@@ -405,13 +418,15 @@ function UrlModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [url, setUrl] = useState('');
   const [name, setName] = useState('');
   const [duration, setDuration] = useState('');
-  const detected = useMemo(() => (url.trim().length > 4 ? detectMedia(url) : null), [url]);
+  const [asAudio, setAsAudio] = useState(false);
+  const detected = useMemo(() => (url.trim().length > 4 ? (asAudio ? audioFromUrl(url) : detectMedia(url)) : null), [url, asAudio]);
   const needsDuration = detected && ['embed', 'image', 'hls'].includes(detected.kind);
 
   const save = useMutation({
     mutationFn: () =>
       api.post<MediaDTO>('/media', {
         url,
+        asAudio: asAudio || undefined,
         name: name || undefined,
         duration: duration ? Number(duration) : needsDuration ? (detected?.suggestedDuration ?? 30) : null,
       }),
@@ -450,12 +465,15 @@ function UrlModal({ open, onClose }: { open: boolean; onClose: () => void }) {
         <Field label="URL">
           <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=…" autoFocus />
         </Field>
+        <Toggle checked={asAudio} onChange={setAsAudio} label="Es una radio o audio por streaming" hint="Actívelo para enlaces de radios online (Icecast/Shoutcast) que no terminan en .mp3." />
         {detected && (
           <>
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <Badge color="#2563eb">{PROVIDER_LABELS[detected.provider]}</Badge>
               <span className="text-muted">
-                {detected.kind === 'embed'
+                {detected.kind === 'audio'
+                  ? 'Audio: úselo como música ambiental, sonido de llamado o dentro de una lista.'
+                  : detected.kind === 'embed'
                   ? 'Se mostrará embebido durante el tiempo indicado.'
                   : ['youtube', 'vimeo', 'video'].includes(detected.kind)
                     ? 'Se reproducirá hasta terminar (o durante el tiempo indicado).'
@@ -465,7 +483,11 @@ function UrlModal({ open, onClose }: { open: boolean; onClose: () => void }) {
               </span>
             </div>
             <div className="aspect-video overflow-hidden rounded-ui border border-border bg-black">
-              {detected.kind === 'image' ? (
+              {detected.kind === 'audio' ? (
+                <div className="grid size-full place-items-center">
+                  <audio src={detected.url} controls className="w-3/4" />
+                </div>
+              ) : detected.kind === 'image' ? (
                 <img src={detected.url} alt="" className="size-full object-contain" />
               ) : detected.kind === 'video' ? (
                 <video src={detected.url} controls muted className="size-full" />

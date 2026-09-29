@@ -82,7 +82,8 @@ function PersonalCard({ me }: { me: MeDTO }) {
 }
 
 function PasswordCard() {
-  const { refresh } = useAuth();
+  const { me, refresh, acceptSession } = useAuth();
+  const hasPassword = me?.user.hasPassword ?? true;
   const { toast } = useFeedback();
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
@@ -103,14 +104,16 @@ function PasswordCard() {
       setError('Las contraseñas no coinciden.');
       return;
     }
-    if (next === current) {
+    if (hasPassword && next === current) {
       setError('La nueva contraseña debe ser distinta de la actual.');
       return;
     }
     setSaving(true);
     try {
-      await api.put<MeDTO>('/auth/me', { currentPassword: current, newPassword: next });
-      await refresh();
+      // Al cambiar la contraseña se cierran las demás sesiones y se recibe un token nuevo.
+      const res = await api.put<MeDTO & { token?: string }>('/auth/me', { currentPassword: hasPassword ? current : undefined, newPassword: next });
+      if (res.token) acceptSession({ ...res, token: res.token });
+      else await refresh();
       setCurrent('');
       setNext('');
       setRepeat('');
@@ -123,11 +126,20 @@ function PasswordCard() {
   }
 
   return (
-    <Card title="Cambiar contraseña" description="Use al menos 8 caracteres. Le recomendamos combinar letras, números y símbolos.">
+    <Card
+      title={hasPassword ? 'Cambiar contraseña' : 'Definir una contraseña'}
+      description={
+        hasPassword
+          ? 'Use al menos 8 caracteres. Al cambiarla se cerrarán sus sesiones en otros dispositivos.'
+          : 'Ingresó con un enlace o código por correo. Defina una contraseña para poder ingresar también con ella.'
+      }
+    >
       <form onSubmit={submit} className="space-y-4">
-        <Field label="Contraseña actual" required>
-          <Input type="password" required value={current} onChange={(e) => setCurrent(e.target.value)} autoComplete="current-password" />
-        </Field>
+        {hasPassword && (
+          <Field label="Contraseña actual" required>
+            <Input type="password" required value={current} onChange={(e) => setCurrent(e.target.value)} autoComplete="current-password" />
+          </Field>
+        )}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Nueva contraseña" required>
             <Input type="password" required minLength={8} maxLength={200} value={next} onChange={(e) => setNext(e.target.value)} autoComplete="new-password" />
@@ -142,8 +154,8 @@ function PasswordCard() {
           </p>
         )}
         <div className="flex justify-end">
-          <Button type="submit" icon={<KeyRound className="size-4" />} loading={saving} disabled={!current || !next || !repeat}>
-            Cambiar contraseña
+          <Button type="submit" icon={<KeyRound className="size-4" />} loading={saving} disabled={(hasPassword && !current) || !next || !repeat}>
+            {hasPassword ? 'Cambiar contraseña' : 'Guardar contraseña'}
           </Button>
         </div>
       </form>

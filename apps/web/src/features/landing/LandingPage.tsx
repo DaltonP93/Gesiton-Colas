@@ -6,6 +6,7 @@ import {
   MonitorPlay,
   Palette,
   Smartphone,
+  Sparkles,
   Tablet,
   Video,
   Webhook,
@@ -40,6 +41,9 @@ export function LandingPage() {
           <a href="/api/docs" className="hidden text-sm text-muted hover:text-fg sm:inline">
             API
           </a>
+          <Link to="/demo" className="hidden sm:block">
+            <Button variant="ghost">Ver demo</Button>
+          </Link>
           <Link to="/login">
             <Button variant="ghost">Ingresar</Button>
           </Link>
@@ -64,12 +68,18 @@ export function LandingPage() {
             <Link to="/registro">
               <Button size="lg">Crear mi organización</Button>
             </Link>
-            <Link to="/login">
-              <Button size="lg" variant="secondary">
-                Ya tengo cuenta
+            <Link to="/demo">
+              <Button size="lg" variant="secondary" icon={<Sparkles className="size-5" />}>
+                Recibir una demo por correo
               </Button>
             </Link>
           </div>
+          <p className="mt-4 text-sm text-muted">
+            ¿Ya tiene cuenta?{' '}
+            <Link to="/login" className="font-medium text-primary hover:underline">
+              Ingrese aquí
+            </Link>
+          </p>
         </div>
         <div className="relative">
           <div className="overflow-hidden rounded-2xl border border-border bg-slate-900 shadow-2xl">

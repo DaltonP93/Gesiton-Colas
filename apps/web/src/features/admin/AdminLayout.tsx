@@ -5,13 +5,18 @@ import {
   ClipboardList,
   Headset,
   LayoutDashboard,
+  LayoutGrid,
+  Link2,
   ListVideo,
+  Music,
   LogOut,
+  MailWarning,
   Menu,
   MonitorPlay,
   Palette,
   Plug,
   Shield,
+  Sparkles,
   Tablet,
   UserRound,
   Users,
@@ -22,7 +27,7 @@ import { useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router';
 import type { Role } from '@gc/shared';
 import { cx } from '../../components/ui';
-import { assetUrl } from '../../lib/api';
+import { api, assetUrl } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 
 interface NavItem {
@@ -43,8 +48,9 @@ export function AdminLayout() {
     {
       title: 'Operación',
       items: [
-        { to: '/app', label: 'Inicio', icon: <LayoutDashboard />, role: 'manager', end: true },
+        { to: '/app', label: 'Portal', icon: <LayoutGrid />, role: 'agent', end: true },
         { to: '/app/atencion', label: 'Atención', icon: <Headset />, role: 'agent' },
+        { to: '/app/resumen', label: 'Resumen del día', icon: <LayoutDashboard />, role: 'manager' },
         { to: '/app/monitor', label: 'Monitor en vivo', icon: <Activity />, role: 'manager' },
         { to: '/app/reportes', label: 'Reportes', icon: <BarChart3 />, role: 'manager' },
       ],
@@ -56,6 +62,8 @@ export function AdminLayout() {
         { to: '/app/kioscos', label: 'Kioscos', icon: <Tablet />, role: 'manager' },
         { to: '/app/contenido', label: 'Biblioteca de medios', icon: <Video />, role: 'manager' },
         { to: '/app/listas', label: 'Listas de reproducción', icon: <ListVideo />, role: 'manager' },
+        { to: '/app/sonidos', label: 'Sonidos de llamado', icon: <Music />, role: 'manager' },
+        { to: '/app/vincular', label: 'Vincular dispositivo', icon: <Link2 />, role: 'manager' },
       ],
     },
     {
@@ -151,6 +159,16 @@ export function AdminLayout() {
   );
 
   const impersonating = me?.user.role === 'superadmin' && me.tenant;
+  const demoDaysLeft = me?.tenant?.isDemo && me.tenant.demoExpiresAt ? Math.max(0, Math.ceil((new Date(me.tenant.demoExpiresAt).getTime() - Date.now()) / 86_400_000)) : null;
+  const [verifySent, setVerifySent] = useState(false);
+  const resendVerification = async () => {
+    try {
+      await api.post('/auth/me/resend-verification');
+      setVerifySent(true);
+    } catch {
+      setVerifySent(false);
+    }
+  };
 
   return (
     <div className="flex min-h-screen">
@@ -178,6 +196,34 @@ export function AdminLayout() {
             >
               Salir
             </button>
+          </div>
+        )}
+        {demoDaysLeft !== null && (
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-primary px-4 py-2 text-center text-sm text-primary-fg">
+            <Sparkles className="size-4" />
+            <span>
+              Está usando una <strong>demo</strong>: {demoDaysLeft === 0 ? 'vence hoy' : `quedan ${demoDaysLeft} día${demoDaysLeft === 1 ? '' : 's'}`}. Puede probar todo con los datos de ejemplo.
+            </span>
+            {!me?.user.hasPassword && (
+              <NavLink to="/app/perfil" className="rounded-ui bg-white/15 px-2 py-0.5 font-medium hover:bg-white/25">
+                Definir contraseña
+              </NavLink>
+            )}
+          </div>
+        )}
+        {me && !me.user.emailVerified && !impersonating && (
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-center text-sm">
+            <MailWarning className="size-4 text-amber-600" />
+            <span>
+              Confirme su correo <strong>{me.user.email}</strong> con el enlace que le enviamos.
+            </span>
+            {verifySent ? (
+              <span className="font-medium text-emerald-700">Correo reenviado</span>
+            ) : (
+              <button type="button" onClick={() => void resendVerification()} className="font-semibold text-primary hover:underline">
+                Reenviar
+              </button>
+            )}
           </div>
         )}
         <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-surface/90 px-4 backdrop-blur lg:hidden">

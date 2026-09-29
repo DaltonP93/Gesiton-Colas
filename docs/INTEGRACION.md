@@ -135,7 +135,21 @@ socket.on('ticket.called', ({ call }) => {
 
 Eventos: `ticket.created`, `ticket.called`, `ticket.updated`, `queue.changed`, `display.config`, `kiosk.config`, `tenant.settings`. Los usuarios del panel deben emitir `subscribe:branch` con el id de la sucursal para recibir los eventos con datos completos.
 
-## 5. Embeber en otros sitios
+## 5. Autenticación de usuarios por correo (apps propias)
+
+Además de `POST /api/v1/auth/login`, una app propia puede usar los mismos flujos del portal:
+
+| Endpoint | Uso |
+| --- | --- |
+| `POST /auth/email-login` `{ email }` | Envía un enlace y un código de 6 dígitos |
+| `POST /auth/email-login/verify` `{ email, code }` o `{ token }` | Devuelve el token de sesión |
+| `POST /auth/forgot-password` `{ email }` y `POST /auth/reset-password` `{ token, password }` | Recuperación de contraseña |
+| `POST /auth/demo` `{ email, name }` | Crea una demo y envía el acceso por correo |
+| `POST /users` sin `password` | Invita a un usuario por correo (`POST /users/:id/invite` reenvía) |
+
+Las respuestas de los envíos son idénticas exista o no la cuenta, para no revelar qué correos están registrados.
+
+## 6. Embeber en otros sitios
 
 Las pantallas, kioscos y el seguimiento son páginas web normales: pueden abrirse en un navegador, en un WebView de una app o dentro de un `<iframe>`:
 

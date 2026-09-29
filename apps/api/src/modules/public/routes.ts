@@ -76,6 +76,18 @@ export const publicRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
     return tenant;
   }
 
+  app.get(
+    '/public/config',
+    { schema: { tags, summary: 'Opciones públicas de la instalación (registro, demo, verificación)', security: [] } },
+    async () => ({
+      allowSignup: ctx.config.ALLOW_SIGNUP,
+      allowDemo: ctx.config.ALLOW_DEMO,
+      demoDays: ctx.config.DEMO_DAYS,
+      emailVerification: ctx.config.EMAIL_VERIFICATION,
+      emailEnabled: ctx.mailer.driver === 'smtp',
+    }),
+  );
+
   /* ------------------------------ Pantalla ---------------------------- */
   app.get(
     '/public/displays/:token',

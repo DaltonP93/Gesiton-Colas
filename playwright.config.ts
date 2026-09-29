@@ -43,6 +43,9 @@ export default defineConfig({
       JWT_SECRET: 'e2e-secret-0123456789abcdef0123456789',
       UPLOAD_DIR: './e2e/.uploads',
       LOG_LEVEL: 'warn',
+      // Los correos se leen desde /api/v1/dev/outbox (solo en pruebas).
+      MAIL_DRIVER: 'log',
+      DEV_OUTBOX: 'true',
     },
   },
 });

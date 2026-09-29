@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ALERT_SOUNDS, codeForSpeech, renderTemplate, type CallDTO, type DisplayConfig } from '@gc/shared';
+import { codeForSpeech, isAlertSound, renderTemplate, type CallDTO, type DisplayConfig } from '@gc/shared';
+import { assetUrl } from '../../lib/api';
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function soundUrl(file: string) {
-  return (ALERT_SOUNDS as readonly string[]).includes(file) ? `/sounds/${file}.wav` : file;
+  return isAlertSound(file) ? `/sounds/${file}.wav` : assetUrl(file);
 }
 
 export function playSound(url: string, volume: number): Promise<void> {

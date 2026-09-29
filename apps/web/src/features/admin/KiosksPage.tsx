@@ -372,7 +372,7 @@ function KioskEditor({ kiosk, onClose }: { kiosk: KioskDTO; onClose: () => void 
 
         {tab === 'link' && (
           <div className="grid gap-6 md:grid-cols-2">
-            <Card title="Kiosco / tótem" description="Abra este enlace en la tablet o tótem de la entrada.">
+            <Card title="Kiosco / tótem" description={`Abra este enlace en la tablet o tótem, o abra ${window.location.host}/vincular en el equipo y vincúlelo con el código desde el portal.`}>
               <div className="space-y-4">
                 <CopyField value={kioskUrl(token)} open />
                 <p className="text-xs text-muted">
