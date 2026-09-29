@@ -316,7 +316,7 @@ function TenantsCard({ onCreate }: { onCreate: () => void }) {
                         value={tenant.plan}
                         disabled={busy}
                         onChange={(e) => changePlan(tenant, e.target.value as PlanId)}
-                        className="h-8 w-36"
+                        className="h-8 w-36 min-w-36"
                       >
                         {PLAN_IDS.map((id) => (
                           <option key={id} value={id}>
@@ -327,13 +327,15 @@ function TenantsCard({ onCreate }: { onCreate: () => void }) {
                     </div>
                   </td>
                   <td>
-                    <div className="flex items-center gap-2 whitespace-nowrap">
+                    <div className="flex min-w-56 flex-wrap items-center gap-x-2 gap-y-1">
                       {tenant.status === 'active' ? <Badge color="#16a34a">Activa</Badge> : <Badge color="#dc2626">Suspendida</Badge>}
                       {tenant.isDemo && (
                         <Badge color={tenant.demoExpiresAt && new Date(tenant.demoExpiresAt) < new Date() ? '#dc2626' : '#7c3aed'}>
                           Demo · {tenant.demoExpiresAt ? `vence ${formatDateTime(tenant.demoExpiresAt)}` : 'sin vencimiento'}
                         </Badge>
                       )}
+                    </div>
+                    <div className="-ml-2 mt-1 flex flex-wrap items-center">
                       <Button
                         size="sm"
                         variant="ghost"

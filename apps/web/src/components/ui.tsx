@@ -311,7 +311,7 @@ export function Card({
     <section className={cx('rounded-ui border border-border bg-surface shadow-sm', className)}>
       {(title || actions) && (
         <header className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1 basis-60">
             {title && <h2 className="text-base font-semibold">{title}</h2>}
             {description && <p className="mt-0.5 text-sm text-muted">{description}</p>}
           </div>

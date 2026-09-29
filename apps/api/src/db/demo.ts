@@ -154,8 +154,37 @@ export async function createDemoOrganization(db: DbOrTx, input: DemoInput) {
   }
   for (let i = 0; i < history.length; i += 100) await db.insert(tickets).values(history.slice(i, i + 100));
 
-  // Turnos en espera hoy (la cola que se ve al entrar).
   const noop = { db, publishTicket: () => undefined };
+
+  // Atendidos hoy: el panel TV, el monitor y el resumen muestran actividad desde el primer momento.
+  const now = Date.now();
+  for (let i = 0; i < 5; i++) {
+    const { ticket } = await issueTicket(noop, {
+      tenantId,
+      branchId: branch.id,
+      serviceId: allServices[i % allServices.length]!.id,
+      priorityId: null,
+      customer: { name: pick(CUSTOMERS) },
+      channel: i % 2 ? 'mobile' : 'kiosk',
+    });
+    const calledAt = new Date(now - (55 - i * 11) * 60_000);
+    const startedAt = new Date(calledAt.getTime() + 40_000);
+    await db
+      .update(tickets)
+      .set({
+        status: 'finished',
+        createdAt: new Date(calledAt.getTime() - between(3, 12) * 60_000),
+        calledAt,
+        startedAt,
+        finishedAt: new Date(startedAt.getTime() + between(3, 8) * 60_000),
+        counterId: branchCounters[i % branchCounters.length]!.id,
+        agentId: agents[i % agents.length]!.id,
+        callCount: 1,
+      })
+      .where(eq(tickets.id, ticket.id));
+  }
+
+  // Turnos en espera hoy (la cola que se ve al entrar).
   for (let i = 0; i < 6; i++) {
     await issueTicket(noop, {
       tenantId,

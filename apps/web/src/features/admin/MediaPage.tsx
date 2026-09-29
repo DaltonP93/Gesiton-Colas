@@ -71,6 +71,8 @@ export const PLATFORMS = [
 ];
 
 export function MediaThumb({ media, className }: { media: MediaDTO; className?: string }) {
+  // Miniaturas externas (YouTube, Vimeo...) pueden no cargar: se muestra el ícono de la plataforma.
+  const [broken, setBroken] = useState(false);
   const icon =
     media.kind === 'hls' ? <Radio /> : media.kind === 'embed' ? <Globe /> : media.kind === 'video' ? <FileVideo /> : <Play />;
   if (media.kind === 'audio') {
@@ -87,7 +89,9 @@ export function MediaThumb({ media, className }: { media: MediaDTO; className?: 
       </div>
     );
   }
-  if (media.thumbnailUrl) return <img src={assetUrl(media.thumbnailUrl)} alt="" loading="lazy" className={cx('object-cover', className)} />;
+  if (media.thumbnailUrl && !broken) {
+    return <img src={assetUrl(media.thumbnailUrl)} alt="" loading="lazy" onError={() => setBroken(true)} className={cx('object-cover', className)} />;
+  }
   if (media.kind === 'video' && media.provider === 'upload') {
     return <video src={`${assetUrl(media.url)}#t=1`} muted preload="metadata" className={cx('bg-black object-cover', className)} />;
   }

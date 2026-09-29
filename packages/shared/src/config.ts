@@ -169,8 +169,8 @@ export const displayConfigSchema = z.object({
       /** Transición entre elementos. */
       transition: z.enum(['none', 'fade', 'slide']).default('fade'),
       shuffle: z.boolean().default(false),
-      /** Mostrar el contenido a pantalla completa cuando no hay llamados recientes (layout split). */
-      fitMode: z.enum(['contain', 'cover']).default('cover'),
+      /** Ajuste de imágenes y videos: completo sin recortar (con fondo difuminado) o llenando el área. */
+      fitMode: z.enum(['contain', 'cover']).default('contain'),
     })
     .prefault({}),
   customCss: cssText.default(''),

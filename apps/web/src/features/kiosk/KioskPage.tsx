@@ -343,7 +343,7 @@ function ServicesStep({
   const columns = { 1: 'sm:grid-cols-1', 2: 'sm:grid-cols-2', 3: 'sm:grid-cols-3', 4: 'sm:grid-cols-4', 5: 'sm:grid-cols-5', 6: 'sm:grid-cols-6' }[config.theme.columns] ?? 'sm:grid-cols-2';
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col">
+    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center-safe pb-[6vh]">
       <div className="text-center">
         <h1 className="text-[2.6em] leading-tight font-extrabold">{config.title}</h1>
         {config.subtitle && <p className="mt-2 text-[1.3em] opacity-70">{config.subtitle}</p>}
