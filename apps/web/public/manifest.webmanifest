@@ -1,0 +1,10 @@
+{
+  "name": "Gestión de Colas",
+  "short_name": "Colas",
+  "description": "Turnos, pantallas, kioscos y publicidad digital",
+  "start_url": "/app",
+  "display": "standalone",
+  "background_color": "#f1f5f9",
+  "theme_color": "#2563eb",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
