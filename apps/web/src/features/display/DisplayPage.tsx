@@ -272,7 +272,7 @@ function Clock({ tenant, showDate, className }: { tenant: PublicTenantDTO; showD
   const time = now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', timeZone: tz });
   const date = now.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long', timeZone: tz });
   return (
-    <div className={cx('text-right leading-tight', className)}>
+    <div className={cx('shrink-0 text-right leading-tight', className)}>
       <p className="font-bold tabular-nums" style={fs(5)}>
         {time}
       </p>
@@ -290,7 +290,7 @@ function Logo({ tenant, className }: { tenant: PublicTenantDTO; className?: stri
     return <img src={assetUrl(tenant.branding.logoUrl)} alt={tenant.name} className={cx('max-h-[8vh] max-w-[40%] object-contain', className)} />;
   }
   return (
-    <p className={cx('truncate font-extrabold', className)} style={fs(3.4)}>
+    <p className={cx('line-clamp-2 min-w-0 leading-tight font-extrabold break-words', className)} style={fs(tenant.branding.appName.length > 18 ? 2.8 : 3.4)}>
       {tenant.branding.appName}
     </p>
   );
@@ -501,7 +501,8 @@ function TicketsLayout({ config, tenant, t, calls, highlight }: LayoutProps) {
           <p className="mb-[1.5vh] font-semibold tracking-widest uppercase opacity-70" style={fs(2.2)}>
             {t('display.history')}
           </p>
-          <div className="grid min-h-0 flex-1 auto-rows-fr grid-cols-2 gap-[1.6vh]">
+          {/* Filas de alto fijo: las tarjetas no se estiran cuando hay pocos llamados. */}
+          <div className="grid min-h-0 flex-1 grid-cols-2 gap-[1.6vh]" style={{ gridTemplateRows: `repeat(${Math.ceil(config.historySize / 2)}, minmax(0, 1fr))` }}>
             {calls.slice(1, config.historySize + 1).map((call) => (
               <div
                 key={`${call.ticketId}:${call.callCount}`}

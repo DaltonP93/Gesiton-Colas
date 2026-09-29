@@ -454,8 +454,8 @@ function DisplayEditor({ display, onClose }: { display: DisplayDTO; onClose: () 
                   </Field>
                   <Field label="Ajuste de imágenes y videos">
                     <Select value={config.media.fitMode} onChange={(e) => set({ media: { ...config.media, fitMode: e.target.value as 'cover' | 'contain' } })}>
-                      <option value="cover">Llenar (recortar bordes)</option>
                       <option value="contain">Completo (con fondo difuminado)</option>
+                      <option value="cover">Llenar (recortar bordes)</option>
                     </Select>
                   </Field>
                 </div>
