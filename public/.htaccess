@@ -1,0 +1,8 @@
+Options -MultiViews
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^(.*)$ index.php [QSA,L]
+SetEnv APP_ENV prod
+#SetEnv LANGUAGE pt_BR
+SetEnv LANGUAGE es_AR
+SetEnv DATABASE_URL mysql://novosga:nma.d.nh4@localhost:3306/novosga?charset=utf8mb4&serverVersion=5.7
