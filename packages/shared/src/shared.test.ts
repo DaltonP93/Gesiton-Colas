@@ -46,6 +46,9 @@ describe('detectMedia', () => {
     expect(detectMedia('https://cdn.example.com/live/index.m3u8')!.kind).toBe('hls');
     expect(detectMedia('https://cdn.example.com/banner.webp?v=2')!.kind).toBe('image');
     expect(detectMedia('example.com/menu')!).toMatchObject({ kind: 'embed', provider: 'web' });
+    expect(detectMedia('https://cdn.example.com/musica/tema.mp3')!.kind).toBe('audio');
+    expect(detectMedia('https://cdn.example.com/aviso.ogg')!.kind).toBe('audio');
+    expect(detectMedia('https://cdn.example.com/clip.ogv')!.kind).toBe('video');
   });
 
   it('rechaza URLs inválidas', () => {

@@ -272,3 +272,76 @@ describe('tiempo real', () => {
     }
   });
 });
+
+describe('vinculación de dispositivos', () => {
+  it('la TV muestra un código y el portal la vincula a una pantalla', async () => {
+    const created = await api(app, null, 'POST', '/public/pairings');
+    expect(created.status).toBe(201);
+    expect(created.body.code).toMatch(/^\d{6}$/);
+    const poll = (secret = created.body.secret) => api(app, null, 'GET', `/public/pairings/${created.body.id}?secret=${secret}`);
+    expect((await poll()).body.status).toBe('pending');
+    expect((await poll('secreto-incorrecto-123')).status).toBe(404);
+
+    const display = (await api(app, orgA, 'GET', '/displays')).body[0];
+    const claim = await api(app, orgA, 'POST', '/pairings/claim', { code: created.body.code, type: 'display', targetId: display.id });
+    expect(claim.body).toMatchObject({ ok: true, name: display.name });
+    expect((await poll()).body).toEqual({ status: 'claimed', target: { type: 'display', token: display.token, name: display.name } });
+
+    // El código es de un solo uso y no se puede vincular a recursos de otra organización.
+    expect((await api(app, orgA, 'POST', '/pairings/claim', { code: created.body.code, type: 'display', targetId: display.id })).status).toBe(400);
+    const other = await api(app, null, 'POST', '/public/pairings');
+    expect((await api(app, orgB, 'POST', '/pairings/claim', { code: other.body.code, type: 'display', targetId: display.id })).status).toBe(404);
+  });
+});
+
+describe('audio', () => {
+  it('sube un audio y lo usa como sonido de llamado y música ambiental', async () => {
+    // WAV mínimo válido (cabecera + 4 muestras de silencio)
+    const data = Buffer.alloc(8);
+    const header = Buffer.alloc(44);
+    header.write('RIFF', 0);
+    header.writeUInt32LE(36 + data.length, 4);
+    header.write('WAVEfmt ', 8);
+    header.writeUInt32LE(16, 16);
+    header.writeUInt16LE(1, 20);
+    header.writeUInt16LE(1, 22);
+    header.writeUInt32LE(8000, 24);
+    header.writeUInt32LE(16000, 28);
+    header.writeUInt16LE(2, 32);
+    header.writeUInt16LE(16, 34);
+    header.write('data', 36);
+    header.writeUInt32LE(data.length, 40);
+    const boundary = '----gcaudio';
+    const upload = await app.inject({
+      method: 'POST',
+      url: '/api/v1/media/upload',
+      headers: { ...orgA.headers, 'content-type': `multipart/form-data; boundary=${boundary}` },
+      payload: Buffer.concat([
+        Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="name"\r\n\r\nCampana propia\r\n`),
+        Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="campana.wav"\r\nContent-Type: audio/wav\r\n\r\n`),
+        header,
+        data,
+        Buffer.from(`\r\n--${boundary}--\r\n`),
+      ]),
+    });
+    expect(upload.statusCode).toBe(201);
+    const audio = upload.json();
+    expect(audio).toMatchObject({ kind: 'audio', provider: 'upload', duration: null });
+
+    const radio = await api(app, orgA, 'POST', '/media', { url: 'https://radio.ejemplo.com/stream', asAudio: true, name: 'Radio' });
+    expect(radio.body.kind).toBe('audio');
+    expect((await api(app, orgA, 'POST', '/media', { url: 'https://cdn.ejemplo.com/musica.mp3' })).body.kind).toBe('audio');
+
+    const display = (await api(app, orgA, 'GET', '/displays')).body[0];
+    const updated = await api(app, orgA, 'PUT', `/displays/${display.id}`, {
+      config: { sound: { file: audio.url }, music: { enabled: true, mediaIds: [audio.id, radio.body.id] } },
+    });
+    expect(updated.status).toBe(200);
+    expect(updated.body.config.sound.file).toBe(audio.url);
+    const boot = await api(app, null, 'GET', `/public/displays/${display.token}`);
+    expect(boot.body.music.map((m: { id: string }) => m.id)).toEqual([audio.id, radio.body.id]);
+
+    const invalid = await api(app, orgA, 'PUT', `/displays/${display.id}`, { config: { sound: { file: 'javascript:alert(1)' } } });
+    expect(invalid.status).toBe(400);
+  });
+});

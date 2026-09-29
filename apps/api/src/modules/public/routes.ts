@@ -35,6 +35,7 @@ import {
   toDepartmentDTO,
   toDisplayDTO,
   toKioskDTO,
+  toMediaDTO,
   toPlaylistDTO,
   toPlaylistItemDTO,
   toPriorityDTO,
@@ -107,11 +108,19 @@ export const publicRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
 
       await ctx.db.update(displays).set({ lastSeenAt: new Date() }).where(eq(displays.id, display.id));
       const dto = toDisplayDTO(display);
+      const music =
+        config.music.enabled && config.music.mediaIds.length
+          ? await ctx.db
+              .select()
+              .from(media)
+              .where(and(eq(media.tenantId, tenant.id), eq(media.kind, 'audio'), inArray(media.id, config.music.mediaIds)))
+          : [];
       return {
         display: { ...dto, config },
         tenant: toPublicTenantDTO(tenant),
         branch: { id: display.branchId, name: branch?.name ?? '' },
         playlist: await loadPlaylist(ctx.db, display.playlistId),
+        music: config.music.mediaIds.map((id) => music.find((m) => m.id === id)).filter((m) => m !== undefined).map(toMediaDTO),
         recentCalls,
       };
     },

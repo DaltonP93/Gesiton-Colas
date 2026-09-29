@@ -29,6 +29,7 @@ import { catalogRoutes } from './modules/catalog/routes';
 import { deviceRoutes } from './modules/devices/routes';
 import { integrationRoutes } from './modules/integrations/routes';
 import { mediaRoutes } from './modules/media/routes';
+import { pairingRoutes } from './modules/pairing/routes';
 import { platformRoutes } from './modules/platform/routes';
 import { publicRoutes } from './modules/public/routes';
 import { reportRoutes } from './modules/reports/routes';
@@ -161,6 +162,7 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
       await api.register(reportRoutes(ctx));
       await api.register(platformRoutes(ctx));
       await api.register(publicRoutes(ctx));
+      await api.register(pairingRoutes(ctx));
     },
     { prefix: '/api/v1' },
   );
