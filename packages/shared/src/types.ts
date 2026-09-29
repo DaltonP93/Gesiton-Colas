@@ -256,6 +256,8 @@ export interface DisplayBootstrapDTO {
   tenant: PublicTenantDTO;
   branch: { id: string; name: string };
   playlist: PlaylistDTO | null;
+  /** Audios de la música ambiental configurada. */
+  music: MediaDTO[];
   recentCalls: CallDTO[];
 }
 
@@ -288,6 +290,19 @@ export interface PublicTicketDTO {
   calledAt: ISODate | null;
   finishedAt: ISODate | null;
   tenant: PublicTenantDTO;
+}
+
+export interface PairingDTO {
+  id: string;
+  code: string;
+  /** Secreto que solo conoce el dispositivo, para consultar el resultado. */
+  secret: string;
+  expiresAt: ISODate;
+}
+
+export interface PairingStatusDTO {
+  status: 'pending' | 'claimed' | 'expired';
+  target?: { type: 'display' | 'kiosk'; token: string; name: string };
 }
 
 export interface ApiKeyDTO {

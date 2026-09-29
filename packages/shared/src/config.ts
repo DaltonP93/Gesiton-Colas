@@ -128,8 +128,12 @@ export const displayConfigSchema = z.object({
   sound: z
     .object({
       enabled: z.boolean().default(true),
-      /** Uno de los sonidos incluidos o una URL propia. */
-      file: z.union([z.enum(ALERT_SOUNDS), z.string().url()]).default('airport-bingbong'),
+      /** Uno de los sonidos incluidos, un audio subido (/uploads/...) o una URL propia. */
+      file: z
+        .string()
+        .max(2048)
+        .refine((v) => (ALERT_SOUNDS as readonly string[]).includes(v) || /^https?:\/\//i.test(v) || v.startsWith('/uploads/'), 'Sonido inválido')
+        .default('airport-bingbong'),
       volume: z.number().min(0).max(1).default(0.9),
     })
     .prefault({}),
@@ -141,6 +145,15 @@ export const displayConfigSchema = z.object({
       speed: z.number().int().min(10).max(400).default(80),
       background: color.default('#f59e0b'),
       color: color.default('#0f172a'),
+    })
+    .prefault({}),
+  /** Música ambiental: audios de la biblioteca que suenan de fondo (se atenúan en cada llamado). */
+  music: z
+    .object({
+      enabled: z.boolean().default(false),
+      mediaIds: z.array(z.string()).max(200).default([]),
+      volume: z.number().min(0).max(1).default(0.35),
+      shuffle: z.boolean().default(true),
     })
     .prefault({}),
   media: z

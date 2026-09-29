@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { PLANS, UPLOAD_MIME_TYPES, detectMedia, scheduleSchema } from '@gc/shared';
+import { PLANS, UPLOAD_MIME_TYPES, audioFromUrl, detectMedia, scheduleSchema } from '@gc/shared';
 import type { AppContext } from '../../context';
 import { displays, media, playlistItems, playlists, tenants } from '../../db/schema';
 import { tenantIdOf } from '../../lib/auth';
@@ -22,6 +22,18 @@ const EXTENSIONS: Record<string, string> = {
   'image/webp': 'webp',
   'image/avif': 'avif',
   'image/svg+xml': 'svg',
+  'audio/mpeg': 'mp3',
+  'audio/mp3': 'mp3',
+  'audio/wav': 'wav',
+  'audio/x-wav': 'wav',
+  'audio/wave': 'wav',
+  'audio/ogg': 'ogg',
+  'audio/opus': 'opus',
+  'audio/mp4': 'm4a',
+  'audio/x-m4a': 'm4a',
+  'audio/aac': 'aac',
+  'audio/flac': 'flac',
+  'audio/webm': 'weba',
 };
 
 const textSchema = z.object({
@@ -39,6 +51,8 @@ const mediaBody = z.object({
   /** Duración en segundos (vacío = hasta que termine el video). */
   duration: z.number().int().min(1).max(86_400).nullable().optional(),
   tags: z.array(z.string().trim().max(40)).max(20).default([]),
+  /** Tratar la URL como audio (radios por streaming sin extensión en la URL). */
+  asAudio: z.boolean().optional(),
 });
 
 const itemSchema = z.object({
@@ -134,7 +148,7 @@ export const mediaRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (ap
           tags: body.tags,
         };
       } else {
-        const detected = body.url ? detectMedia(body.url) : null;
+        const detected = body.url ? (body.asAudio ? audioFromUrl(body.url) : detectMedia(body.url)) : null;
         if (!detected) throw badRequest('Indique una URL válida o un texto');
         values = {
           tenantId,
@@ -160,7 +174,7 @@ export const mediaRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (ap
       preHandler: write,
       schema: {
         tags,
-        summary: 'Subir un video o imagen (multipart/form-data: campos name, duration, tags y luego file)',
+        summary: 'Subir un video, imagen o audio (multipart/form-data: campos name, duration, tags y luego file)',
         consumes: ['multipart/form-data'],
       },
     },
@@ -171,7 +185,7 @@ export const mediaRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (ap
       const kind = UPLOAD_MIME_TYPES[file.mimetype];
       if (!kind) {
         file.file.resume();
-        throw badRequest(`Tipo de archivo no permitido (${file.mimetype}). Use MP4, WebM, JPG, PNG, GIF, WebP o SVG.`);
+        throw badRequest(`Tipo de archivo no permitido (${file.mimetype}). Use MP4, WebM, JPG, PNG, GIF, WebP, SVG, MP3, WAV, OGG o M4A.`);
       }
       const field = (name: string) => {
         const f = file.fields[name];
@@ -222,7 +236,7 @@ export const mediaRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (ap
     '/media/:id',
     {
       preHandler: write,
-      schema: { tags, params: idParam, body: updateSchema(mediaBody.omit({ url: true })) },
+      schema: { tags, params: idParam, body: updateSchema(mediaBody.omit({ url: true, asAudio: true })) },
     },
     async (request) => {
       const tenantId = tenantIdOf(request);

@@ -16,9 +16,10 @@ export interface DetectedMedia {
   suggestedName: string;
 }
 
-const VIDEO_EXT = /\.(mp4|webm|ogv|ogg|mov|m4v)(\?|#|$)/i;
+const VIDEO_EXT = /\.(mp4|webm|ogv|mov|m4v)(\?|#|$)/i;
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|avif|svg|bmp)(\?|#|$)/i;
 const HLS_EXT = /\.m3u8(\?|#|$)/i;
+const AUDIO_EXT = /\.(mp3|wav|oga|ogg|opus|m4a|aac|flac|weba)(\?|#|$)/i;
 
 function safeUrl(raw: string): URL | null {
   try {
@@ -240,6 +241,9 @@ export function detectMedia(raw: string): DetectedMedia | null {
   if (HLS_EXT.test(url.pathname)) {
     return { kind: 'hls', provider: 'hls', url: href, suggestedDuration: 300, suggestedName: `Transmisión ${lastSegment(url)}` };
   }
+  if (AUDIO_EXT.test(url.pathname)) {
+    return { kind: 'audio', provider: 'direct', url: href, suggestedName: decodeURIComponent(lastSegment(url)) };
+  }
   if (VIDEO_EXT.test(url.pathname)) {
     return { kind: 'video', provider: 'direct', url: href, suggestedName: decodeURIComponent(lastSegment(url)) };
   }
@@ -250,8 +254,15 @@ export function detectMedia(raw: string): DetectedMedia | null {
   return { kind: 'embed', provider: 'web', url: href, embedUrl: href, suggestedDuration: 30, suggestedName: h };
 }
 
+/** Detecta una radio o audio por streaming (Icecast/Shoutcast) aunque la URL no tenga extensión. */
+export function audioFromUrl(raw: string): DetectedMedia | null {
+  const url = safeUrl(raw);
+  if (!url) return null;
+  return { kind: 'audio', provider: 'direct', url: url.toString(), suggestedName: decodeURIComponent(lastSegment(url)) };
+}
+
 /** Tipos MIME aceptados para subir a la biblioteca de medios. */
-export const UPLOAD_MIME_TYPES: Record<string, 'video' | 'image'> = {
+export const UPLOAD_MIME_TYPES: Record<string, 'video' | 'image' | 'audio'> = {
   'video/mp4': 'video',
   'video/webm': 'video',
   'video/ogg': 'video',
@@ -262,6 +273,18 @@ export const UPLOAD_MIME_TYPES: Record<string, 'video' | 'image'> = {
   'image/webp': 'image',
   'image/avif': 'image',
   'image/svg+xml': 'image',
+  'audio/mpeg': 'audio',
+  'audio/mp3': 'audio',
+  'audio/wav': 'audio',
+  'audio/x-wav': 'audio',
+  'audio/wave': 'audio',
+  'audio/ogg': 'audio',
+  'audio/opus': 'audio',
+  'audio/mp4': 'audio',
+  'audio/x-m4a': 'audio',
+  'audio/aac': 'audio',
+  'audio/flac': 'audio',
+  'audio/webm': 'audio',
 };
 
 export const PROVIDER_LABELS: Record<MediaProvider, string> = {

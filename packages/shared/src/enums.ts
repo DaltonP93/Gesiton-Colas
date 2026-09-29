@@ -31,7 +31,7 @@ export function hasRole(role: Role, required: Role): boolean {
 export const TICKET_CHANNELS = ['kiosk', 'web', 'api', 'agent', 'mobile'] as const;
 export type TicketChannel = (typeof TICKET_CHANNELS)[number];
 
-export const MEDIA_KINDS = ['video', 'image', 'youtube', 'vimeo', 'hls', 'embed', 'text'] as const;
+export const MEDIA_KINDS = ['video', 'image', 'audio', 'youtube', 'vimeo', 'hls', 'embed', 'text'] as const;
 export type MediaKind = (typeof MEDIA_KINDS)[number];
 
 export const MEDIA_PROVIDERS = [
@@ -95,6 +95,7 @@ export const RT = {
   tenantSettings: 'tenant.settings',
 } as const;
 
+/** Sonidos de alerta incluidos (archivos en /sounds/<id>.wav). */
 export const ALERT_SOUNDS = [
   'airport-bingbong',
   'ding-dong',
@@ -103,5 +104,43 @@ export const ALERT_SOUNDS = [
   'infobleep',
   'quito-mariscal-sucre',
   'toydoorbell',
+  'chime-soft',
+  'bell-ding',
+  'triple-rise',
+  'triple-fall',
+  'announcement',
+  'marimba',
+  'xylophone',
+  'harp',
+  'double-beep',
+  'soft-pop',
+  'gong',
+  'retro',
 ] as const;
 export type AlertSound = (typeof ALERT_SOUNDS)[number];
+
+export const ALERT_SOUND_LABELS: Record<AlertSound, { label: string; category: 'Clásicos' | 'Suaves' | 'Llamativos' | 'Musicales' }> = {
+  'airport-bingbong': { label: 'Aeropuerto', category: 'Clásicos' },
+  'ding-dong': { label: 'Ding dong', category: 'Clásicos' },
+  'doorbell-bingbong': { label: 'Timbre', category: 'Clásicos' },
+  'ekiga-vm': { label: 'Aviso corto', category: 'Clásicos' },
+  infobleep: { label: 'Bip informativo', category: 'Clásicos' },
+  'quito-mariscal-sucre': { label: 'Terminal', category: 'Clásicos' },
+  toydoorbell: { label: 'Campanita', category: 'Clásicos' },
+  'chime-soft': { label: 'Campana suave', category: 'Suaves' },
+  'bell-ding': { label: 'Campana única', category: 'Suaves' },
+  'soft-pop': { label: 'Notificación suave', category: 'Suaves' },
+  'triple-rise': { label: 'Tres tonos ascendentes', category: 'Llamativos' },
+  'triple-fall': { label: 'Tres tonos descendentes', category: 'Llamativos' },
+  announcement: { label: 'Anuncio (4 tonos)', category: 'Llamativos' },
+  'double-beep': { label: 'Doble bip', category: 'Llamativos' },
+  gong: { label: 'Gong', category: 'Llamativos' },
+  marimba: { label: 'Marimba', category: 'Musicales' },
+  xylophone: { label: 'Xilófono', category: 'Musicales' },
+  harp: { label: 'Arpa', category: 'Musicales' },
+  retro: { label: 'Retro 8 bits', category: 'Musicales' },
+};
+
+export function isAlertSound(value: string): value is AlertSound {
+  return (ALERT_SOUNDS as readonly string[]).includes(value);
+}
