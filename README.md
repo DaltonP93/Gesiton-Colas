@@ -1,69 +1,98 @@
-# Novo SGA
+# Gestión de Colas
 
-Support queue management system.
+Plataforma **SaaS** de gestión de turnos, pantallas y publicidad digital. Organiza la atención de todas sus sucursales, muestra contenido en las salas de espera y se integra con cualquier sistema mediante API REST, webhooks y eventos en tiempo real.
 
+> Versión 3 — reescritura completa del sistema anterior (NovoSGA 2 / Symfony 4). El código original se conserva como referencia en [`legacy/novosga`](legacy/novosga).
 
-## Installation
+## Qué incluye
 
-### Via Composer
+| Módulo | Descripción |
+| --- | --- |
+| **Pantallas (TV)** | Llamados con voz (síntesis del navegador), sonido de alerta, historial, reloj y cintillo. Tres diseños: publicidad + turnos, publicidad a pantalla completa con llamado destacado, o solo turnos. Colores, tipografía, tamaños y CSS configurables. |
+| **Publicidad multiplataforma** | Subida de **videos e imágenes** (disco local o S3/R2/MinIO) y contenido de **YouTube, Vimeo, TikTok, Instagram, Facebook, Twitch, Dailymotion, Google Drive, Google Slides, Canva, Loom, transmisiones HLS (m3u8)**, videos/imágenes por URL, páginas web y anuncios de texto. Listas de reproducción con orden, duración, volumen, silencio y **programación por fecha, día y horario**. El volumen baja automáticamente durante un llamado. |
+| **Kioscos** | Emisión táctil de turnos, prioridad (normal/preferencial o lista), datos del cliente configurables, impresión térmica con **plantilla HTML editable**, QR de seguimiento. |
+| **Fila virtual** | El mismo kiosco funciona desde el celular (`?modo=movil`): el cliente saca su turno con un QR y sigue su posición y tiempo estimado en vivo, con aviso al ser llamado. Puede cancelarlo. |
+| **Consola de atención** | Llamar siguiente, llamar uno específico, rellamar, iniciar, finalizar con notas, no se presentó, devolver a la cola, derivar a otro servicio, pausa y emisión manual. Atajos F1–F8. Varios operadores sin duplicados (bloqueo en base de datos). |
+| **Administración** | Sucursales, puestos de atención, departamentos, servicios (prefijo, color, ícono, tiempo estimado), prioridades con peso, usuarios con roles (administrador, supervisor, operador) y asignación a sucursales/servicios. |
+| **Personalización total** | Logo, favicon, colores, tipografía, bordes, modo oscuro, CSS propio, **terminología** (Turno/Ficha/Ticket, Ventanilla/Box/Caja…), numeración (dígitos, reinicio diario, por servicio o sucursal), campos del cliente, idioma (es/en/pt) y zona horaria. |
+| **Reportes** | Espera y atención promedio, por servicio, operador, hora y día. Monitor en vivo y exportación a CSV/Excel. |
+| **Integraciones** | API REST con OpenAPI/Swagger (`/api/docs`), API keys con permisos, **webhooks firmados (HMAC-SHA256) con reintentos**, Socket.IO. Ideal para ERP, CRM, WhatsApp, Zapier, Make o n8n. |
+| **SaaS** | Registro autónomo de organizaciones, datos aislados por organización, planes con límites (sucursales, pantallas, kioscos, usuarios, almacenamiento), superadministrador con modo soporte. |
+| **Acceso por correo** | **Demo por correo** (organización de ejemplo con historial, operadores, publicidad y turnos, con vencimiento), verificación de email, **olvidé mi contraseña**, ingreso sin contraseña con **enlace o código de 6 dígitos**, invitación de usuarios por correo. SMTP con cualquier proveedor. |
+| **Portal de herramientas** | Al ingresar, un portal abre la consola, el **kiosco / triage** o el **panel TV** con un clic, copia enlaces o muestra el QR. Las TVs y tablets se **vinculan con un código de 6 dígitos** desde `/vincular`, sin escribir URLs largas; el equipo recuerda su pantalla. |
+| **Sonidos y audio** | 19 sonidos de llamado incluidos (escuchar y descargar), subida de audios propios (MP3, WAV, OGG, M4A) como tono de llamado o voz grabada, **música ambiental** y radios por streaming con atenuación en cada llamado, y guía para instalar más voces. |
 
-Create project:
+Funciona en **cualquier dispositivo con navegador**: Smart TV, Android TV/Google TV, mini PC, Raspberry Pi, tablets, celulares, Windows, macOS y Linux.
 
-    composer create-project "novosga/novosga:^2.0" novosga2
+## Arquitectura
 
-Run app installation command and follow instructions:
+```
+apps/
+  api/        API REST + tiempo real (Node.js 22, Fastify 5, Drizzle ORM, PostgreSQL, Socket.IO)
+  web/        Panel, consola, pantallas, kioscos y seguimiento (React 19, Vite, Tailwind CSS 4)
+packages/
+  shared/     Tipos, esquemas de configuración, detección de plataformas y plantillas
+legacy/       Sistema anterior (solo referencia)
+docs/         Guías de integración y despliegue
+```
 
-    export APP_ENV=prod
-    export LANGUAGE=pt_BR
-    export DATABASE_URL="mysql://user:pass@localhost:5432/novosgadb"
-    
-    bin/console novosga:install
+- Multi-tenant por columna `tenant_id` con verificación en cada consulta.
+- Numeración de turnos atómica (`INSERT … ON CONFLICT`) y llamado concurrente seguro (`FOR UPDATE SKIP LOCKED`).
+- Las pantallas y kioscos reciben eventos **sin datos personales**; el personal recibe los datos completos.
+- Configuración validada con Zod y combinada con valores por defecto: nada se rompe si falta un campo.
 
+## Inicio rápido (Docker)
 
-### Via Docker
+```bash
+cp .env.example .env        # defina al menos JWT_SECRET y PUBLIC_URL
+docker compose up -d
+```
 
-Documentation in the Novo SGA official [docker repository](https://github.com/novosga/docker/tree/master/novosga-2.0).
+Abra <http://localhost:3000>, cree su organización y listo: se generan una sucursal, servicios, puestos, una pantalla y un kiosco de ejemplo.
 
+## Desarrollo local
 
-### Via Git
+Requisitos: Node.js 22+ y PostgreSQL 14+.
 
-Clone repository:
+```bash
+npm install
+cp .env.example .env         # ajuste DATABASE_URL
+npm run db:migrate           # crea las tablas (también se ejecuta al iniciar la API)
+npm run db:seed              # opcional: organización demo (demo@gestioncolas.local / demo1234)
+npm run dev                  # API en :3000 y web en :5173 (con proxy a la API)
+```
 
-    git clone https://github.com/novosga/novosga.git novosga2
+Sin SMTP configurado, los correos (verificación, recuperación, códigos, demos) se imprimen en la consola de la API con sus enlaces, para poder probar todos los flujos en desarrollo.
 
-Then follow Composer install instruction.
+| Comando | Qué hace |
+| --- | --- |
+| `npm run dev:api` / `npm run dev:web` | Levanta solo la API o solo el frontend |
+| `npm test` | Tests del paquete compartido y de integración de la API (usa `TEST_DATABASE_URL`, por defecto `gestion_colas_test`) |
+| `npm run typecheck` | Verificación de tipos de todo el monorepo |
+| `npm run build` | Compila web y API (`apps/api/dist`, `apps/web/dist`) |
+| `npm start` | Inicia la API compilada; si existe `apps/web/dist`, también sirve el frontend |
+| `npm run db:generate` | Genera una migración a partir de cambios en `apps/api/src/db/schema.ts` |
+| `npm run e2e` | Prueba de punta a punta en Chromium (requiere `npm run build`) |
+| `node apps/web/scripts/generate-sounds.mjs` | Regenera los sonidos de llamado sintetizados |
 
+## Rutas principales
 
-### Automated installation
+| Ruta | Uso |
+| --- | --- |
+| `/` | Página pública del producto |
+| `/registro`, `/login`, `/demo` | Alta de organización, inicio de sesión y demo por correo |
+| `/ingresar-con-correo`, `/olvide-contrasena` | Acceso con código por correo y recuperación de contraseña |
+| `/app` | Portal de herramientas (consola, kiosco, panel TV, administración) |
+| `/vincular` | Se abre en la TV o tablet para vincularla con un código |
+| `/app/atencion` | Consola del operador |
+| `/pantalla/:token` | Pantalla de TV (enlace por pantalla) |
+| `/kiosco/:token` | Kiosco táctil · `?modo=movil` para fila virtual |
+| `/t/:token` | Seguimiento del turno del cliente |
+| `/plataforma` | Superadministrador (organizaciones y planes) |
+| `/api/docs` | Documentación interactiva de la API |
 
-To automated installation you need to set up the following environment variables before run `novosga:install` command:
+## Documentación
 
-**Database**
-
-- DATABASE_URL
-
-**Default administrator user**
-
-- NOVOSGA_ADMIN_USERNAME
-- NOVOSGA_ADMIN_PASSWORD
-- NOVOSGA_ADMIN_FIRSTNAME
-- NOVOSGA_ADMIN_LASTNAME
-
-**Default unity**
-
-- NOVOSGA_UNITY_NAME
-- NOVOSGA_UNITY_CODE
-
-**Default priority 0**
-
-- NOVOSGA_NOPRIORITY_NAME
-- NOVOSGA_NOPRIORITY_DESCRIPTION
-
-**Default priority 1**
-
-- NOVOSGA_PRIORITY_NAME
-- NOVOSGA_PRIORITY_DESCRIPTION
-
-**Default attendance place**
-
-- NOVOSGA_PLACE_NAME
+- [Integración con otros sistemas](docs/INTEGRACION.md): API keys, endpoints, webhooks, tiempo real, embebido.
+- [Despliegue y dispositivos](docs/DESPLIEGUE.md): producción, S3, TV, kioscos e impresoras.
+- [Migración desde la versión anterior](docs/MIGRACION.md).

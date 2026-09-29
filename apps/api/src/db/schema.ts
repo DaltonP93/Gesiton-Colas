@@ -1,0 +1,497 @@
+import {
+  bigint,
+  boolean,
+  date,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  real,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
+import type {
+  ApiKeyScope,
+  CustomerData,
+  DisplayConfig,
+  KioskConfig,
+  MediaKind,
+  MediaProvider,
+  PlanId,
+  Role,
+  Schedule,
+  TenantSettings,
+  TicketChannel,
+  TicketStatus,
+  WebhookEvent,
+} from '@gc/shared';
+
+const id = () => uuid('id').primaryKey().defaultRandom();
+const createdAt = () => timestamp('created_at', { withTimezone: true }).defaultNow().notNull();
+const updatedAt = () =>
+  timestamp('updated_at', { withTimezone: true })
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date());
+const tenantId = () =>
+  uuid('tenant_id')
+    .notNull()
+    .references(() => tenants.id, { onDelete: 'cascade' });
+
+export const tenants = pgTable('tenants', {
+  id: id(),
+  slug: text('slug').notNull().unique(),
+  name: text('name').notNull(),
+  plan: text('plan').$type<PlanId>().notNull().default('free'),
+  status: text('status').$type<'active' | 'suspended'>().notNull().default('active'),
+  settings: jsonb('settings').$type<TenantSettings>().notNull(),
+  storageBytes: bigint('storage_bytes', { mode: 'number' }).notNull().default(0),
+  /** Organización de demostración (se crea desde "Probar demo" y vence). */
+  isDemo: boolean('is_demo').notNull().default(false),
+  demoExpiresAt: timestamp('demo_expires_at', { withTimezone: true }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+export const users = pgTable(
+  'users',
+  {
+    id: id(),
+    tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }),
+    email: text('email').notNull(),
+    passwordHash: text('password_hash').notNull(),
+    name: text('name').notNull(),
+    role: text('role').$type<Role>().notNull().default('agent'),
+    active: boolean('active').notNull().default(true),
+    locale: text('locale'),
+    emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
+    /** Invitado por correo que todavía no definió su contraseña. */
+    invitePending: boolean('invite_pending').notNull().default(false),
+    /** Falso para cuentas creadas por invitación o demo que aún no eligieron contraseña. */
+    hasPassword: boolean('has_password').notNull().default(true),
+    /** Los tokens de sesión emitidos antes de esta fecha dejan de valer (cambio de contraseña). */
+    sessionsValidAfter: timestamp('sessions_valid_after', { withTimezone: true }),
+    lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex('users_email_idx').on(t.email), index('users_tenant_idx').on(t.tenantId)],
+);
+
+export const branches = pgTable(
+  'branches',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    name: text('name').notNull(),
+    code: text('code').notNull(),
+    address: text('address').notNull().default(''),
+    timezone: text('timezone'),
+    active: boolean('active').notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex('branches_tenant_code_idx').on(t.tenantId, t.code)],
+);
+
+export const departments = pgTable(
+  'departments',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    name: text('name').notNull(),
+    description: text('description').notNull().default(''),
+    active: boolean('active').notNull().default(true),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [index('departments_tenant_idx').on(t.tenantId)],
+);
+
+export const services = pgTable(
+  'services',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    departmentId: uuid('department_id').references(() => departments.id, { onDelete: 'set null' }),
+    name: text('name').notNull(),
+    description: text('description').notNull().default(''),
+    prefix: text('prefix').notNull().default(''),
+    color: text('color').notNull().default('#2563eb'),
+    icon: text('icon').notNull().default('ticket'),
+    active: boolean('active').notNull().default(true),
+    sortOrder: integer('sort_order').notNull().default(0),
+    estimatedMinutes: integer('estimated_minutes').notNull().default(5),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index('services_tenant_idx').on(t.tenantId)],
+);
+
+export const branchServices = pgTable(
+  'branch_services',
+  {
+    tenantId: tenantId(),
+    branchId: uuid('branch_id')
+      .notNull()
+      .references(() => branches.id, { onDelete: 'cascade' }),
+    serviceId: uuid('service_id')
+      .notNull()
+      .references(() => services.id, { onDelete: 'cascade' }),
+    enabled: boolean('enabled').notNull().default(true),
+    prefix: text('prefix'),
+  },
+  (t) => [primaryKey({ columns: [t.branchId, t.serviceId] })],
+);
+
+export const priorities = pgTable(
+  'priorities',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    name: text('name').notNull(),
+    description: text('description').notNull().default(''),
+    weight: integer('weight').notNull().default(0),
+    color: text('color').notNull().default('#64748b'),
+    active: boolean('active').notNull().default(true),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [index('priorities_tenant_idx').on(t.tenantId)],
+);
+
+export const counters = pgTable(
+  'counters',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    branchId: uuid('branch_id')
+      .notNull()
+      .references(() => branches.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    active: boolean('active').notNull().default(true),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [index('counters_branch_idx').on(t.branchId)],
+);
+
+export const userBranches = pgTable(
+  'user_branches',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    branchId: uuid('branch_id')
+      .notNull()
+      .references(() => branches.id, { onDelete: 'cascade' }),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.branchId] })],
+);
+
+export const userServices = pgTable(
+  'user_services',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    serviceId: uuid('service_id')
+      .notNull()
+      .references(() => services.id, { onDelete: 'cascade' }),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.serviceId] })],
+);
+
+export const tickets = pgTable(
+  'tickets',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    branchId: uuid('branch_id')
+      .notNull()
+      .references(() => branches.id, { onDelete: 'cascade' }),
+    serviceId: uuid('service_id')
+      .notNull()
+      .references(() => services.id, { onDelete: 'cascade' }),
+    priorityId: uuid('priority_id')
+      .notNull()
+      .references(() => priorities.id, { onDelete: 'restrict' }),
+    number: integer('number').notNull(),
+    code: text('code').notNull(),
+    status: text('status').$type<TicketStatus>().notNull().default('waiting'),
+    channel: text('channel').$type<TicketChannel>().notNull().default('web'),
+    customer: jsonb('customer').$type<CustomerData>().notNull().default({}),
+    notes: text('notes').notNull().default(''),
+    counterId: uuid('counter_id').references(() => counters.id, { onDelete: 'set null' }),
+    agentId: uuid('agent_id').references(() => users.id, { onDelete: 'set null' }),
+    callCount: integer('call_count').notNull().default(0),
+    publicToken: text('public_token').notNull(),
+    transferredFromId: uuid('transferred_from_id'),
+    serviceDay: date('service_day').notNull(),
+    createdAt: createdAt(),
+    calledAt: timestamp('called_at', { withTimezone: true }),
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex('tickets_public_token_idx').on(t.publicToken),
+    index('tickets_queue_idx').on(t.branchId, t.status, t.createdAt),
+    index('tickets_tenant_created_idx').on(t.tenantId, t.createdAt),
+    index('tickets_agent_idx').on(t.agentId, t.status),
+  ],
+);
+
+export const ticketEvents = pgTable(
+  'ticket_events',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    ticketId: uuid('ticket_id')
+      .notNull()
+      .references(() => tickets.id, { onDelete: 'cascade' }),
+    type: text('type').notNull(),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    counterId: uuid('counter_id').references(() => counters.id, { onDelete: 'set null' }),
+    data: jsonb('data').$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: createdAt(),
+  },
+  (t) => [index('ticket_events_ticket_idx').on(t.ticketId), index('ticket_events_tenant_idx').on(t.tenantId, t.createdAt)],
+);
+
+export const ticketSequences = pgTable(
+  'ticket_sequences',
+  {
+    tenantId: tenantId(),
+    branchId: uuid('branch_id')
+      .notNull()
+      .references(() => branches.id, { onDelete: 'cascade' }),
+    /** Id del servicio o `*` si la numeración es compartida por la sucursal. */
+    scopeKey: text('scope_key').notNull(),
+    /** Día (YYYY-MM-DD) o `all` si no se reinicia. */
+    period: text('period').notNull(),
+    value: integer('value').notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.branchId, t.scopeKey, t.period] })],
+);
+
+export const agentWorkstations = pgTable('agent_workstations', {
+  userId: uuid('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  tenantId: tenantId(),
+  branchId: uuid('branch_id').references(() => branches.id, { onDelete: 'set null' }),
+  counterId: uuid('counter_id').references(() => counters.id, { onDelete: 'set null' }),
+  serviceIds: jsonb('service_ids').$type<string[]>().notNull().default([]),
+  paused: boolean('paused').notNull().default(false),
+  updatedAt: updatedAt(),
+});
+
+export const media = pgTable(
+  'media',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    name: text('name').notNull(),
+    kind: text('kind').$type<MediaKind>().notNull(),
+    provider: text('provider').$type<MediaProvider>().notNull(),
+    url: text('url').notNull(),
+    embedUrl: text('embed_url'),
+    externalId: text('external_id'),
+    storageKey: text('storage_key'),
+    mimeType: text('mime_type'),
+    sizeBytes: bigint('size_bytes', { mode: 'number' }).notNull().default(0),
+    duration: integer('duration'),
+    thumbnailUrl: text('thumbnail_url'),
+    text: jsonb('text').$type<{ content: string; subtitle?: string; background: string; color: string }>(),
+    tags: jsonb('tags').$type<string[]>().notNull().default([]),
+    createdAt: createdAt(),
+  },
+  (t) => [index('media_tenant_idx').on(t.tenantId, t.createdAt)],
+);
+
+export const playlists = pgTable(
+  'playlists',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    name: text('name').notNull(),
+    description: text('description').notNull().default(''),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index('playlists_tenant_idx').on(t.tenantId)],
+);
+
+export const playlistItems = pgTable(
+  'playlist_items',
+  {
+    id: id(),
+    playlistId: uuid('playlist_id')
+      .notNull()
+      .references(() => playlists.id, { onDelete: 'cascade' }),
+    mediaId: uuid('media_id')
+      .notNull()
+      .references(() => media.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull().default(0),
+    duration: integer('duration'),
+    muted: boolean('muted').notNull().default(false),
+    volume: real('volume'),
+    schedule: jsonb('schedule').$type<Schedule | null>(),
+    active: boolean('active').notNull().default(true),
+  },
+  (t) => [index('playlist_items_playlist_idx').on(t.playlistId, t.position)],
+);
+
+export const displays = pgTable(
+  'displays',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    branchId: uuid('branch_id')
+      .notNull()
+      .references(() => branches.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    token: text('token').notNull(),
+    config: jsonb('config').$type<DisplayConfig>().notNull(),
+    playlistId: uuid('playlist_id').references(() => playlists.id, { onDelete: 'set null' }),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex('displays_token_idx').on(t.token), index('displays_tenant_idx').on(t.tenantId)],
+);
+
+export const kiosks = pgTable(
+  'kiosks',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    branchId: uuid('branch_id')
+      .notNull()
+      .references(() => branches.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    token: text('token').notNull(),
+    config: jsonb('config').$type<KioskConfig>().notNull(),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex('kiosks_token_idx').on(t.token), index('kiosks_tenant_idx').on(t.tenantId)],
+);
+
+export const apiKeys = pgTable(
+  'api_keys',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    name: text('name').notNull(),
+    prefix: text('prefix').notNull(),
+    keyHash: text('key_hash').notNull(),
+    scopes: jsonb('scopes').$type<ApiKeyScope[]>().notNull().default([]),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  },
+  (t) => [uniqueIndex('api_keys_hash_idx').on(t.keyHash), index('api_keys_tenant_idx').on(t.tenantId)],
+);
+
+export const webhooks = pgTable(
+  'webhooks',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    name: text('name').notNull(),
+    url: text('url').notNull(),
+    secret: text('secret').notNull(),
+    events: jsonb('events').$type<WebhookEvent[]>().notNull().default([]),
+    active: boolean('active').notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index('webhooks_tenant_idx').on(t.tenantId)],
+);
+
+export const webhookDeliveries = pgTable(
+  'webhook_deliveries',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    webhookId: uuid('webhook_id')
+      .notNull()
+      .references(() => webhooks.id, { onDelete: 'cascade' }),
+    event: text('event').notNull(),
+    payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
+    status: text('status').$type<'pending' | 'success' | 'failed'>().notNull().default('pending'),
+    attempts: integer('attempts').notNull().default(0),
+    responseStatus: integer('response_status'),
+    error: text('error'),
+    nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).defaultNow(),
+    deliveredAt: timestamp('delivered_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('webhook_deliveries_due_idx').on(t.status, t.nextAttemptAt),
+    index('webhook_deliveries_webhook_idx').on(t.webhookId, t.createdAt),
+  ],
+);
+
+export type AuthTokenPurpose = 'verify_email' | 'reset_password' | 'email_login' | 'invite';
+
+/** Enlaces y códigos de un solo uso enviados por correo (se guardan con hash). */
+export const authTokens = pgTable(
+  'auth_tokens',
+  {
+    id: id(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    purpose: text('purpose').$type<AuthTokenPurpose>().notNull(),
+    tokenHash: text('token_hash').notNull(),
+    /** Código numérico alternativo al enlace (acceso por código). */
+    codeHash: text('code_hash'),
+    attempts: integer('attempts').notNull().default(0),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('auth_tokens_hash_idx').on(t.tokenHash), index('auth_tokens_user_idx').on(t.userId, t.purpose)],
+);
+
+/** Vinculación de TVs / tablets con un código de 6 dígitos (sin escribir URLs largas). */
+export const devicePairings = pgTable(
+  'device_pairings',
+  {
+    id: id(),
+    code: text('code').notNull(),
+    secretHash: text('secret_hash').notNull(),
+    tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }),
+    targetType: text('target_type').$type<'display' | 'kiosk'>(),
+    targetId: uuid('target_id'),
+    userAgent: text('user_agent').notNull().default(''),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    claimedAt: timestamp('claimed_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index('device_pairings_code_idx').on(t.code, t.expiresAt)],
+);
+
+export type Tenant = typeof tenants.$inferSelect;
+export type User = typeof users.$inferSelect;
+export type Branch = typeof branches.$inferSelect;
+export type Department = typeof departments.$inferSelect;
+export type Service = typeof services.$inferSelect;
+export type Priority = typeof priorities.$inferSelect;
+export type Counter = typeof counters.$inferSelect;
+export type Ticket = typeof tickets.$inferSelect;
+export type Display = typeof displays.$inferSelect;
+export type Kiosk = typeof kiosks.$inferSelect;
+export type Media = typeof media.$inferSelect;
+export type Playlist = typeof playlists.$inferSelect;
+export type PlaylistItem = typeof playlistItems.$inferSelect;
+export type ApiKey = typeof apiKeys.$inferSelect;
+export type Webhook = typeof webhooks.$inferSelect;
+export type WebhookDelivery = typeof webhookDeliveries.$inferSelect;

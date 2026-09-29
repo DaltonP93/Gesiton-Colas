@@ -1,0 +1,57 @@
+import {
+  Baby,
+  Banknote,
+  Briefcase,
+  Building2,
+  CalendarCheck,
+  ClipboardList,
+  CreditCard,
+  FileText,
+  HeartPulse,
+  HelpCircle,
+  Landmark,
+  Package,
+  Pill,
+  Receipt,
+  ShieldCheck,
+  ShoppingCart,
+  Stethoscope,
+  Ticket,
+  Truck,
+  UserRound,
+  Users,
+  Wallet,
+  Wrench,
+  type LucideIcon,
+} from 'lucide-react';
+
+export const SERVICE_ICONS: Record<string, LucideIcon> = {
+  ticket: Ticket,
+  users: Users,
+  user: UserRound,
+  wallet: Wallet,
+  cash: Banknote,
+  card: CreditCard,
+  bank: Landmark,
+  receipt: Receipt,
+  file: FileText,
+  clipboard: ClipboardList,
+  calendar: CalendarCheck,
+  health: HeartPulse,
+  doctor: Stethoscope,
+  pharmacy: Pill,
+  baby: Baby,
+  shield: ShieldCheck,
+  cart: ShoppingCart,
+  package: Package,
+  truck: Truck,
+  tools: Wrench,
+  briefcase: Briefcase,
+  building: Building2,
+  help: HelpCircle,
+};
+
+export function ServiceIcon({ name, className }: { name: string; className?: string }) {
+  const Icon = SERVICE_ICONS[name] ?? Ticket;
+  return <Icon className={className} />;
+}
