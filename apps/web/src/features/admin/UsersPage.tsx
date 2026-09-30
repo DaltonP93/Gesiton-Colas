@@ -1,6 +1,7 @@
 import { Pencil, Plus, Send, ShieldCheck, Trash2, Users } from 'lucide-react';
 import { useId, useState, type FormEvent, type ReactNode } from 'react';
-import type { Role, UserDTO } from '@gc/shared';
+import type { InviteResultDTO, Role, UserDTO } from '@gc/shared';
+import { InviteResultModal } from '../../components/InviteResult';
 import {
   Badge,
   Button,
@@ -87,6 +88,7 @@ export default function UsersPage() {
   const services = useServices();
   const remove = useRemove('users', ['users']);
   const [editing, setEditing] = useState<UserForm | null>(null);
+  const [invited, setInvited] = useState<{ result: InviteResultDTO; name: string; email: string } | null>(null);
   const roleDescriptions = useRoleDescriptions();
 
   const list = users.data ?? [];
@@ -95,8 +97,8 @@ export default function UsersPage() {
 
   async function resendInvite(user: UserDTO) {
     try {
-      await api.post(`/users/${user.id}/invite`);
-      toast(`Invitación reenviada a ${user.email}.`);
+      const result = await api.post<InviteResultDTO>(`/users/${user.id}/invite`);
+      setInvited({ result, name: user.name, email: user.email });
     } catch (err) {
       toast(errorMessage(err), 'error');
     }
@@ -247,6 +249,16 @@ export default function UsersPage() {
           branchOptions={(branches.data ?? []).map((b) => ({ value: b.id, label: b.name }))}
           serviceOptions={(services.data ?? []).map((s) => ({ value: s.id, label: s.name, color: s.color }))}
           onClose={() => setEditing(null)}
+          onInvited={(result, name, email) => setInvited({ result, name, email })}
+        />
+      )}
+      {invited && (
+        <InviteResultModal
+          result={invited.result}
+          name={invited.name}
+          email={invited.email}
+          mailSettingsPath={me?.user.role === 'admin' || me?.user.role === 'superadmin' ? '/app/configuracion/correo' : undefined}
+          onClose={() => setInvited(null)}
         />
       )}
     </div>
@@ -274,16 +286,18 @@ function UserFormModal({
   branchOptions,
   serviceOptions,
   onClose,
+  onInvited,
 }: {
   initial: UserForm;
   isSelf: boolean;
   branchOptions: { value: string; label: string }[];
   serviceOptions: { value: string; label: string; color: string }[];
   onClose: () => void;
+  onInvited: (result: InviteResultDTO, name: string, email: string) => void;
 }) {
   const { terms } = useAuth();
   const { toast } = useFeedback();
-  const save = useSave<UserDTO>('users', ['users']);
+  const save = useSave<UserDTO & { invitation?: InviteResultDTO | null }>('users', ['users']);
   const roleDescriptions = useRoleDescriptions();
   const [form, setForm] = useState(initial);
   const [invite, setInvite] = useState(true);
@@ -296,7 +310,7 @@ function UserFormModal({
     e.preventDefault();
     setLimitError(null);
     try {
-      await save.mutateAsync({
+      const saved = await save.mutateAsync({
         id: form.id,
         name: form.name.trim(),
         email: form.email.trim(),
@@ -305,13 +319,11 @@ function UserFormModal({
         branchIds: form.branchIds,
         serviceIds: form.serviceIds,
       });
-      toast(
-        isNew && invite
-          ? `Le enviamos una invitación a ${form.email.trim()} para que elija su contraseña.`
-          : isNew
-            ? `Se creó el usuario «${form.name.trim()}».`
-            : 'Cambios guardados.',
-      );
+      if (isNew && invite && saved.invitation) {
+        onInvited(saved.invitation, saved.name, saved.email);
+      } else {
+        toast(isNew ? `Se creó el usuario «${form.name.trim()}».` : 'Cambios guardados.');
+      }
       onClose();
     } catch (err) {
       if (err instanceof ApiError && err.status === 402) setLimitError(err.message);

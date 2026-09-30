@@ -15,6 +15,7 @@ import {
 } from '@gc/shared';
 import { CopyField } from '../../components/CopyField';
 import { ImageField } from '../../components/ImageField';
+import { OverlaysEditor } from '../../components/Overlays';
 import { QrCode, useQrDataUrl } from '../../components/QrCode';
 import {
   Button,
@@ -39,7 +40,7 @@ import {
 import { api, assetUrl, errorMessage } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { formatDateTime } from '../../lib/format';
-import { useBranches, useKiosks, useServices } from '../../lib/queries';
+import { useBranches, useKiosks, usePlaylists, useServices } from '../../lib/queries';
 import { FONT_OPTIONS, readableOn } from '../../lib/theme';
 import { buildTicketHtml, printTicket } from '../kiosk/printTicket';
 
@@ -330,17 +331,35 @@ function KioskEditor({ kiosk, onClose }: { kiosk: KioskDTO; onClose: () => void 
             <Field label="Texto al pie" hint="Horarios, avisos o un mensaje de bienvenida. Opcional.">
               <Input value={config.footerText} maxLength={300} onChange={(e) => set({ footerText: e.target.value })} placeholder="Ej.: Horario de atención de lunes a viernes de 7 a 19 h" />
             </Field>
-            <Card title="Pantalla de espera" description="Tras un tiempo sin uso, el tótem muestra su logo, la hora y una invitación a tocar la pantalla.">
+            <Card title="Pantalla de espera" description="Tras un tiempo sin uso, el tótem muestra su logo y la hora, o una galería de imágenes y videos promocionales, con una invitación a tocar la pantalla.">
               <div className="space-y-4">
                 <Toggle checked={config.idle.enabled} onChange={(enabled) => set({ idle: { ...config.idle, enabled } })} label="Activar pantalla de espera" />
                 {config.idle.enabled && (
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Mensaje">
-                      <Input value={config.idle.title} maxLength={120} onChange={(e) => set({ idle: { ...config.idle, title: e.target.value } })} />
-                    </Field>
-                    <RangeInput label="Aparece después de" value={config.idle.seconds} min={10} max={600} step={10} onChange={(seconds) => set({ idle: { ...config.idle, seconds } })} format={(v) => (v >= 60 ? `${Math.round(v / 6) / 10} min` : `${v} s`)} />
-                    <Toggle checked={config.idle.showClock} onChange={(showClock) => set({ idle: { ...config.idle, showClock } })} label="Mostrar la hora" />
-                  </div>
+                  <>
+                    <Segmented
+                      label="Qué se muestra"
+                      value={config.idle.mode}
+                      onChange={(mode) => set({ idle: { ...config.idle, mode } })}
+                      options={[
+                        { value: 'message', label: 'Logo, hora y mensaje' },
+                        { value: 'playlist', label: 'Galería o video promocional' },
+                      ]}
+                    />
+                    {config.idle.mode === 'playlist' && <IdlePlaylistPicker config={config} set={set} />}
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field label="Mensaje">
+                        <Input value={config.idle.title} maxLength={120} onChange={(e) => set({ idle: { ...config.idle, title: e.target.value } })} />
+                      </Field>
+                      <RangeInput label="Aparece después de" value={config.idle.seconds} min={10} max={600} step={10} onChange={(seconds) => set({ idle: { ...config.idle, seconds } })} format={(v) => (v >= 60 ? `${Math.round(v / 6) / 10} min` : `${v} s`)} />
+                      <Toggle checked={config.idle.showClock} onChange={(showClock) => set({ idle: { ...config.idle, showClock } })} label="Mostrar la hora" />
+                      {config.idle.mode === 'playlist' && (
+                        <>
+                          <Toggle checked={config.idle.showMessage} onChange={(showMessage) => set({ idle: { ...config.idle, showMessage } })} label="Mostrar el mensaje sobre las imágenes" />
+                          <Toggle checked={config.idle.sound} onChange={(sound) => set({ idle: { ...config.idle, sound } })} label="Videos con sonido" hint="Si no, se reproducen en silencio." />
+                        </>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
             </Card>
@@ -402,6 +421,36 @@ function KioskEditor({ kiosk, onClose }: { kiosk: KioskDTO; onClose: () => void 
                     <Toggle checked={config.theme.serviceColors} onChange={(serviceColors) => set({ theme: { ...config.theme, serviceColors } })} label={`Un color por ${terms.service.toLowerCase()}`} hint={`Cada botón usa el color de su ${terms.service.toLowerCase()}.`} />
                     <Toggle checked={config.theme.showIcons} onChange={(showIcons) => set({ theme: { ...config.theme, showIcons } })} label="Mostrar íconos" />
                   </div>
+                  {config.theme.showIcons && (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Segmented
+                        label="Ubicación del ícono"
+                        value={config.theme.buttonStyle === 'tile' ? 'top' : config.theme.iconPosition}
+                        disabled={config.theme.buttonStyle === 'tile'}
+                        hint={config.theme.buttonStyle === 'tile' ? 'En el mosaico el ícono va siempre arriba.' : undefined}
+                        onChange={(iconPosition) => set({ theme: { ...config.theme, iconPosition } })}
+                        options={[
+                          { value: 'left', label: 'Izquierda' },
+                          { value: 'top', label: 'Arriba' },
+                          { value: 'right', label: 'Derecha' },
+                        ]}
+                      />
+                      <Segmented
+                        label="Tamaño del ícono"
+                        value={config.theme.iconSize}
+                        onChange={(iconSize) => set({ theme: { ...config.theme, iconSize } })}
+                        options={[
+                          { value: 'sm', label: 'Chico' },
+                          { value: 'md', label: 'Mediano' },
+                          { value: 'lg', label: 'Grande' },
+                          { value: 'xl', label: 'Enorme' },
+                        ]}
+                      />
+                      <p className="text-xs text-muted sm:col-span-2">
+                        Cada {terms.service.toLowerCase()} puede tener un ícono de la biblioteca o una imagen propia: se elige en Configuración → {terms.services}.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </Card>
               <Card title="Colores">
@@ -415,13 +464,16 @@ function KioskEditor({ kiosk, onClose }: { kiosk: KioskDTO; onClose: () => void 
               </Card>
               <Card title="Fondo">
                 <div className="space-y-4">
-                  <Field label="Tipo de fondo">
-                    <Select value={config.theme.backgroundStyle} onChange={(e) => set({ theme: { ...config.theme, backgroundStyle: e.target.value as KioskConfig['theme']['backgroundStyle'] } })}>
-                      <option value="solid">Color liso</option>
-                      <option value="gradient">Degradado</option>
-                      <option value="image">Imagen</option>
-                    </Select>
-                  </Field>
+                  <Segmented
+                    label="Tipo de fondo"
+                    value={config.theme.backgroundStyle}
+                    onChange={(backgroundStyle) => set({ theme: { ...config.theme, backgroundStyle } })}
+                    options={[
+                      { value: 'solid', label: 'Color liso' },
+                      { value: 'gradient', label: 'Degradado' },
+                      { value: 'image', label: 'Imagen o foto' },
+                    ]}
+                  />
                   {config.theme.backgroundStyle === 'gradient' && (
                     <ColorInput label="Segundo color del degradado" value={config.theme.backgroundTo} onChange={(backgroundTo) => set({ theme: { ...config.theme, backgroundTo } })} />
                   )}
@@ -445,6 +497,11 @@ function KioskEditor({ kiosk, onClose }: { kiosk: KioskDTO; onClose: () => void 
                       />
                     </>
                   )}
+                </div>
+              </Card>
+              <Card title="Logos e imágenes en pantalla" description="Sume logos de convenios, un sello, un ícono o una mascota y ubíquelos donde quiera. No bloquean los botones.">
+                <div className="@container">
+                  <OverlaysEditor value={config.overlays} onChange={(overlays) => set({ overlays })} aspect="3 / 4" />
                 </div>
               </Card>
               <Card title="Logo y textos">
@@ -705,5 +762,82 @@ function TicketThumb({ html }: { html: string }) {
         style={{ transform: 'translateX(-50%) scale(0.42)' }}
       />
     </span>
+  );
+}
+
+/** Grupo de opciones excluyentes con botones (más visible que un desplegable). */
+function Segmented<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+  disabled,
+  hint,
+}: {
+  label: string;
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (value: T) => void;
+  disabled?: boolean;
+  hint?: string;
+}) {
+  return (
+    <div>
+      <span className="mb-1.5 block text-sm font-medium">{label}</span>
+      <div role="radiogroup" aria-label={label} className={cx('inline-flex flex-wrap gap-1 rounded-ui bg-subtle p-1', disabled && 'opacity-60')}>
+        {options.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            role="radio"
+            aria-checked={value === o.value}
+            disabled={disabled}
+            onClick={() => onChange(o.value)}
+            className={cx(
+              'rounded-[calc(var(--gc-radius)*0.6)] px-3 py-1.5 text-sm font-medium transition',
+              value === o.value ? 'bg-surface text-fg shadow-sm ring-1 ring-border' : 'text-muted hover:text-fg',
+            )}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+      {hint && <p className="mt-1 text-xs text-muted">{hint}</p>}
+    </div>
+  );
+}
+
+/** Lista de Publicidad que se muestra en la pantalla de espera del kiosco. */
+function IdlePlaylistPicker({ config, set }: { config: KioskConfig; set: (patch: Partial<KioskConfig>) => void }) {
+  const playlists = usePlaylists();
+  const list = playlists.data ?? [];
+  const selected = list.find((p) => p.id === config.idle.playlistId);
+  return (
+    <div className="rounded-ui border border-border bg-subtle/50 p-3">
+      <Field
+        label="Lista de imágenes y videos"
+        hint={
+          <>
+            Use una lista de Publicidad: fotos, un video promocional, YouTube o anuncios de texto.{' '}
+            <Link to="/app/listas" className="font-medium text-primary-text hover:underline">
+              Crear o editar listas
+            </Link>
+          </>
+        }
+      >
+        <Select value={config.idle.playlistId ?? ''} onChange={(e) => set({ idle: { ...config.idle, playlistId: e.target.value || null } })}>
+          <option value="">Elija una lista…</option>
+          {list.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name} ({p.items.length} {p.items.length === 1 ? 'elemento' : 'elementos'})
+            </option>
+          ))}
+        </Select>
+      </Field>
+      {!playlists.isLoading && list.length === 0 && (
+        <p className="mt-2 text-xs text-amber-700">Todavía no hay listas. Cree una en Publicidad → Listas y súbale imágenes o un video.</p>
+      )}
+      {selected && selected.items.length === 0 && <p className="mt-2 text-xs text-amber-700">La lista está vacía: agréguele imágenes o videos.</p>}
+    </div>
   );
 }

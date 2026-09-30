@@ -8,7 +8,10 @@ export interface EmailBrand {
   publicUrl: string;
 }
 
-export function brandFrom(branding: Branding | null | undefined, publicUrl: string): EmailBrand {
+export function brandFrom(
+  branding: Pick<Branding, 'appName' | 'logoUrl' | 'primaryColor'> | null | undefined,
+  publicUrl: string,
+): EmailBrand {
   const base = publicUrl.replace(/\/$/, '');
   const logo = branding?.logoUrl ? (/^https?:/.test(branding.logoUrl) ? branding.logoUrl : `${base}${branding.logoUrl}`) : null;
   return {
@@ -71,7 +74,7 @@ export function verifyEmailMail(to: string, name: string, url: string, brand: Em
     cta: { label: 'Confirmar mi correo', url },
     outro: ['El enlace vence en 3 días. Si usted no creó esta cuenta, ignore este mensaje.'],
   });
-  return { to, subject: `Confirme su correo · ${brand.appName}`, html, text, tag: 'verify_email' };
+  return { to, subject: `Confirme su correo · ${brand.appName}`, html, text, fromName: brand.appName, tag: 'verify_email' };
 }
 
 export function resetPasswordMail(to: string, name: string, url: string, brand: EmailBrand): MailMessage {
@@ -82,7 +85,7 @@ export function resetPasswordMail(to: string, name: string, url: string, brand: 
     cta: { label: 'Elegir nueva contraseña', url },
     outro: ['El enlace vence en 1 hora y solo puede usarse una vez. Si usted no lo pidió, puede ignorar este correo: su contraseña no cambiará.'],
   });
-  return { to, subject: `Restablecer contraseña · ${brand.appName}`, html, text, tag: 'reset_password' };
+  return { to, subject: `Restablecer contraseña · ${brand.appName}`, html, text, fromName: brand.appName, tag: 'reset_password' };
 }
 
 export function emailLoginMail(to: string, name: string, url: string, code: string, brand: EmailBrand): MailMessage {
@@ -94,7 +97,7 @@ export function emailLoginMail(to: string, name: string, url: string, code: stri
     code,
     outro: ['El enlace y el código vencen en 15 minutos. Si usted no intentó ingresar, ignore este correo.'],
   });
-  return { to, subject: `Código de acceso ${code} · ${brand.appName}`, html, text, tag: 'email_login' };
+  return { to, subject: `Código de acceso ${code} · ${brand.appName}`, html, text, fromName: brand.appName, tag: 'email_login' };
 }
 
 export function inviteMail(to: string, name: string, inviter: string, organization: string, url: string, brand: EmailBrand): MailMessage {
@@ -105,7 +108,7 @@ export function inviteMail(to: string, name: string, inviter: string, organizati
     cta: { label: 'Aceptar invitación', url },
     outro: ['La invitación vence en 7 días.'],
   });
-  return { to, subject: `Invitación a ${organization} · ${brand.appName}`, html, text, tag: 'invite' };
+  return { to, subject: `Invitación a ${organization} · ${brand.appName}`, html, text, fromName: brand.appName, tag: 'invite' };
 }
 
 export function demoMail(to: string, name: string, url: string, code: string, days: number, brand: EmailBrand): MailMessage {
@@ -122,5 +125,17 @@ export function demoMail(to: string, name: string, url: string, code: string, da
       'Dentro de la demo puede definir una contraseña desde su perfil. Si luego quiere seguir usándola, contáctenos para pasarla a un plan sin perder la configuración.',
     ],
   });
-  return { to, subject: `Su demo de ${brand.appName} está lista`, html, text, tag: 'demo' };
+  return { to, subject: `Su demo de ${brand.appName} está lista`, html, text, fromName: brand.appName, tag: 'demo' };
+}
+
+export function testMail(to: string, server: string, brand: EmailBrand): MailMessage {
+  const { html, text } = layout({
+    brand,
+    title: 'Correo de prueba',
+    intro: [
+      `Este mensaje confirma que ${brand.appName} puede enviar correos con el servidor ${server}.`,
+      'Las invitaciones, los códigos de acceso y la recuperación de contraseña saldrán por este servidor.',
+    ],
+  });
+  return { to, subject: `Prueba de correo · ${brand.appName}`, html, text, fromName: brand.appName, tag: 'test' };
 }

@@ -10,8 +10,11 @@ import {
   deepMerge,
   detectMedia,
   displayConfigSchema,
+  defaultPlatformSettings,
   formatTicketCode,
+  isImageIcon,
   isScheduleActive,
+  platformSettingsSchema,
   normalizeConfig,
   renderTemplate,
   tenantSettingsSchema,
@@ -182,3 +185,37 @@ describe('personalización ampliada', () => {
   });
 });
 
+describe('imágenes, íconos y ajustes de plataforma', () => {
+  it('ubica logos e imágenes en la TV y el kiosco, descartando posiciones inválidas', () => {
+    const display = normalizeConfig(displayConfigSchema, {
+      overlays: [
+        { id: 'a', url: '/uploads/t/logo.png', position: 'bottom-right', size: 20 },
+        { id: 'b', url: '/uploads/t/sello.png', position: 'en-cualquier-lado' },
+      ],
+    });
+    expect(display.overlays[0]).toMatchObject({ position: 'bottom-right', size: 20, opacity: 1, margin: 2, front: true });
+    expect(display.overlays[1]!.position).toBe('top-right');
+    expect(defaultDisplayConfig().overlays).toEqual([]);
+
+    const kiosk = normalizeConfig(kioskConfigSchema, { idle: { enabled: true, mode: 'playlist', playlistId: 'x' }, theme: { iconPosition: 'top', iconSize: 'xl' } });
+    expect(kiosk.idle).toMatchObject({ mode: 'playlist', playlistId: 'x', showMessage: true, sound: false, title: 'Toque la pantalla para sacar su turno' });
+    expect(kiosk.theme).toMatchObject({ iconPosition: 'top', iconSize: 'xl' });
+    expect(kiosk.overlays).toEqual([]);
+  });
+
+  it('distingue íconos de la biblioteca de imágenes propias', () => {
+    expect(isImageIcon('ticket')).toBe(false);
+    expect(isImageIcon('/uploads/t/icono.svg')).toBe(true);
+    expect(isImageIcon('https://cdn.test/icono.png')).toBe(true);
+    expect(isImageIcon('javascript:alert(1)')).toBe(false);
+  });
+
+  it('los ajustes de plataforma tienen valores seguros por defecto', () => {
+    const defaults = defaultPlatformSettings();
+    expect(defaults).toMatchObject({ homePage: 'landing', allowSignup: true, allowDemo: true, allowEmailLogin: true });
+    expect(defaults.brand.appName).toBe('Gestión de Colas');
+    const saved = normalizeConfig(platformSettingsSchema, { homePage: 'login', brand: { primaryColor: 'rojo', appName: 'Turnos SAA' } });
+    expect(saved.homePage).toBe('login');
+    expect(saved.brand).toMatchObject({ appName: 'Turnos SAA', primaryColor: '#2563eb' });
+  });
+});

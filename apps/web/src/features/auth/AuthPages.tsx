@@ -1,9 +1,9 @@
 import { ArrowLeft, CheckCircle2, KeyRound, Mail, MailCheck, Sparkles } from 'lucide-react';
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router';
 import type { MeDTO } from '@gc/shared';
-import { Button, Field, Input, Loading } from '../../components/ui';
-import { ApiError, api, errorMessage } from '../../lib/api';
+import { Button, Field, Input, Loading, cx } from '../../components/ui';
+import { ApiError, api, assetUrl, errorMessage } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { usePublicConfig } from '../../lib/queries';
 
@@ -14,32 +14,86 @@ type Session = MeDTO & { token: string };
 /* ------------------------------------------------------------------ */
 
 function AuthShell({ title, subtitle, children, footer }: { title: string; subtitle?: ReactNode; children: ReactNode; footer?: ReactNode }) {
-  const { settings } = useAuth();
+  const { platformBrand: brand } = useAuth();
+  const { data: config } = usePublicConfig();
+  // Solo se ofrece volver a la página principal cuando es la presentación del producto.
+  const showHome = config?.homePage === 'landing';
+  const logo = brand.logoUrl ? assetUrl(brand.logoUrl) : null;
+  const mark = (onColor: boolean) =>
+    logo ? (
+      <span className={cx('inline-flex max-w-56 items-center rounded-ui', onColor && 'bg-white px-3 py-2 shadow-sm')}>
+        <img src={logo} alt={brand.appName} className="h-8 max-w-full object-contain" />
+      </span>
+    ) : (
+      <span className="inline-flex items-center gap-2 text-base font-bold">
+        <span className={cx('grid size-9 place-items-center rounded-ui text-lg', onColor ? 'bg-white/20' : 'bg-primary text-primary-fg')}>
+          {brand.appName.charAt(0)}
+        </span>
+        {brand.appName}
+      </span>
+    );
+  const panelStyle: CSSProperties | undefined = brand.loginImageUrl
+    ? {
+        backgroundImage: `linear-gradient(160deg, color-mix(in srgb, var(--gc-primary) 92%, transparent), color-mix(in srgb, var(--gc-primary) 82%, #000 18%)), url("${assetUrl(brand.loginImageUrl)}")`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }
+    : undefined;
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
-      <div className="relative hidden overflow-hidden bg-primary p-12 text-primary-fg lg:flex lg:flex-col lg:justify-between">
-        <div className="absolute -top-32 -right-32 size-96 rounded-full bg-white/10" />
-        <div className="absolute -bottom-40 -left-20 size-[28rem] rounded-full bg-black/10" />
-        <Link to="/" className="relative flex items-center gap-2 text-sm opacity-90 hover:opacity-100">
-          <ArrowLeft className="size-4" /> {settings.branding.appName}
-        </Link>
-        <div className="relative max-w-md">
-          <p className="text-4xl leading-tight font-bold">Turnos, pantallas y publicidad en un solo lugar.</p>
-          <p className="mt-4 text-lg opacity-85">
-            Organice la atención de todas sus sucursales, muestre contenido en las salas de espera e intégrelo con sus sistemas.
-          </p>
+      <div className="relative hidden overflow-hidden bg-primary p-12 text-primary-fg lg:flex lg:flex-col lg:justify-between" style={panelStyle}>
+        {!brand.loginImageUrl && (
+          <>
+            <div className="absolute -top-32 -right-32 size-96 rounded-full bg-white/10" />
+            <div className="absolute -bottom-40 -left-20 size-[28rem] rounded-full bg-black/10" />
+          </>
+        )}
+        <div className="relative flex items-center justify-between gap-4">
+          {mark(true)}
+          {showHome && (
+            <Link to="/" className="flex items-center gap-1.5 text-sm opacity-85 hover:opacity-100">
+              <ArrowLeft className="size-4" /> Inicio
+            </Link>
+          )}
         </div>
-        <p className="relative text-sm opacity-70">© {new Date().getFullYear()} {settings.branding.appName}</p>
+        <div className="relative max-w-md">
+          <p className="text-4xl leading-tight font-bold text-balance">{brand.loginTitle}</p>
+          {brand.loginText && <p className="mt-4 text-lg opacity-85">{brand.loginText}</p>}
+        </div>
+        <p className="relative text-sm opacity-75">
+          © {new Date().getFullYear()} {brand.appName}
+          {brand.supportEmail && (
+            <>
+              {' · '}
+              <a href={`mailto:${brand.supportEmail}`} className="underline-offset-2 hover:underline">
+                {brand.supportEmail}
+              </a>
+            </>
+          )}
+        </p>
       </div>
       <div className="flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm">
-          <Link to="/" className="mb-8 inline-flex items-center gap-2 text-sm text-muted hover:text-fg lg:hidden">
-            <ArrowLeft className="size-4" /> {settings.branding.appName}
-          </Link>
+          <div className="mb-8 flex items-center justify-between gap-3 lg:hidden">
+            {mark(false)}
+            {showHome && (
+              <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg">
+                <ArrowLeft className="size-4" /> Inicio
+              </Link>
+            )}
+          </div>
           <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
           {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
           <div className="mt-8">{children}</div>
           {footer && <div className="mt-6 space-y-2 text-center text-sm text-muted">{footer}</div>}
+          {brand.supportEmail && (
+            <p className="mt-8 text-center text-xs text-muted lg:hidden">
+              ¿Problemas para ingresar?{' '}
+              <a href={`mailto:${brand.supportEmail}`} className="font-medium text-primary hover:underline">
+                {brand.supportEmail}
+              </a>
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -102,6 +156,39 @@ function useTokenOnce<T>(run: (token: string) => Promise<T>) {
 /* Iniciar sesión                                                      */
 /* ------------------------------------------------------------------ */
 
+/** Quien abre el ingreso con una sesión ya iniciada elige seguir o cambiar de cuenta (no se lo redirige sin avisar). */
+function SignedInNotice({ me }: { me: MeDTO }) {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+  const initials = me.user.name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w.charAt(0).toUpperCase())
+    .join('');
+  const where = me.tenant ? me.tenant.name : 'Administración de la plataforma';
+  const support = me.user.role === 'superadmin' && me.tenant;
+  return (
+    <AuthShell title="Ya inició sesión" subtitle="Puede seguir con esta cuenta o entrar con otra.">
+      <div className="flex items-center gap-3 rounded-ui border border-border bg-surface p-4">
+        <span className="grid size-11 shrink-0 place-items-center rounded-full bg-primary/10 font-semibold text-primary-text">{initials}</span>
+        <span className="min-w-0">
+          <span className="block truncate font-semibold">{me.user.name}</span>
+          <span className="block truncate text-sm text-muted">{me.user.email}</span>
+          <span className="block truncate text-xs text-muted">{support ? `Modo soporte en «${where}»` : where}</span>
+        </span>
+      </div>
+      <div className="mt-6 space-y-3">
+        <Button size="lg" className="w-full" onClick={() => navigate(landingFor(me), { replace: true })}>
+          Continuar como {me.user.name.split(' ')[0]}
+        </Button>
+        <Button size="lg" variant="secondary" className="w-full" onClick={logout}>
+          Cerrar sesión y usar otra cuenta
+        </Button>
+      </div>
+    </AuthShell>
+  );
+}
+
 export function LoginPage() {
   const { me, login } = useAuth();
   const { data: config } = usePublicConfig();
@@ -113,8 +200,10 @@ export function LoginPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  if (me) return <Navigate to={params.get('next') ?? landingFor(me)} replace />;
+  if (me && params.get('next')) return <Navigate to={params.get('next')!} replace />;
+  if (me) return <SignedInNotice me={me} />;
   const q = email ? `?email=${encodeURIComponent(email)}` : '';
+  const emailLogin = config?.allowEmailLogin !== false && config?.emailEnabled !== false;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -182,7 +271,7 @@ export function LoginPage() {
                 Reenviar correo de verificación
               </button>
             )}
-            {error.code === 'no_password' && (
+            {error.code === 'no_password' && emailLogin && (
               <Link to={`/ingresar-con-correo${q}${q ? '&' : '?'}enviar=1`} className="mt-2 inline-block font-semibold underline">
                 Enviarme un código de acceso
               </Link>
@@ -194,12 +283,16 @@ export function LoginPage() {
           Ingresar
         </Button>
       </form>
-      <Or />
-      <Link to={`/ingresar-con-correo${q}`}>
-        <Button variant="secondary" size="lg" className="w-full" icon={<Mail className="size-4" />}>
-          Ingresar con un código por correo
-        </Button>
-      </Link>
+      {emailLogin && (
+        <>
+          <Or />
+          <Link to={`/ingresar-con-correo${q}`}>
+            <Button variant="secondary" size="lg" className="w-full" icon={<Mail className="size-4" />}>
+              Ingresar con un código por correo
+            </Button>
+          </Link>
+        </>
+      )}
     </AuthShell>
   );
 }
@@ -353,6 +446,8 @@ export function MagicLinkPage() {
 /* ------------------------------------------------------------------ */
 
 export function ForgotPasswordPage() {
+  const { platformBrand } = useAuth();
+  const { data: config } = usePublicConfig();
   const [params] = useSearchParams();
   const [email, setEmail] = useState(params.get('email') ?? '');
   const [sent, setSent] = useState(false);
@@ -383,7 +478,23 @@ export function ForgotPasswordPage() {
         </Link>
       }
     >
-      {sent ? (
+      {config?.emailEnabled === false ? (
+        <Alert tone="info">
+          <p className="font-medium">Esta instalación todavía no envía correos.</p>
+          <p className="mt-1">
+            Pida al administrador de su organización que le defina una nueva contraseña desde Configuración → Usuarios
+            {platformBrand.supportEmail ? (
+              <>
+                {' '}o escriba a{' '}
+                <a href={`mailto:${platformBrand.supportEmail}`} className="font-semibold underline">
+                  {platformBrand.supportEmail}
+                </a>
+              </>
+            ) : null}
+            .
+          </p>
+        </Alert>
+      ) : sent ? (
         <Done icon={<MailCheck />} title="Revise su correo">
           Si <strong>{email}</strong> está registrado, recibirá un enlace para restablecer la contraseña. El enlace vence en 1 hora.
         </Done>

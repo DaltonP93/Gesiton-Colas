@@ -40,7 +40,8 @@ const serviceBody = z.object({
   departmentId: z.uuid().nullable().default(null),
   prefix: z.string().trim().max(5).default(''),
   color: hexColor.default('#2563eb'),
-  icon: z.string().max(40).default('ticket'),
+  /** Clave de la biblioteca de íconos o imagen propia (/uploads/... o URL). */
+  icon: z.string().max(2048).default('ticket'),
   active: z.boolean().default(true),
   sortOrder: z.number().int().default(0),
   estimatedMinutes: z.number().int().min(1).max(600).default(5),

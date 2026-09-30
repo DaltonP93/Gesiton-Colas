@@ -10,6 +10,7 @@ import type {
   MediaDTO,
   PlaylistDTO,
   PriorityDTO,
+  PublicConfigDTO,
   QueueSnapshotDTO,
   ServiceDTO,
   UserDTO,
@@ -96,14 +97,8 @@ export function useStaffRealtime(branchId: string | null | undefined, onEvent?: 
   }, [branchId, qc]);
 }
 
-export interface PublicConfig {
-  allowSignup: boolean;
-  allowDemo: boolean;
-  demoDays: number;
-  emailVerification: 'required' | 'optional' | 'off';
-  emailEnabled: boolean;
-}
+export type PublicConfig = PublicConfigDTO;
 
-/** Opciones públicas de la instalación (si el registro o la demo están habilitados). */
+/** Opciones públicas de la instalación: página de inicio, registro, demo y marca de la pantalla de ingreso. */
 export const usePublicConfig = () =>
-  useQuery({ queryKey: ['public-config'], queryFn: () => api.public<PublicConfig>('/public/config'), staleTime: 10 * 60_000 });
+  useQuery({ queryKey: ['public-config'], queryFn: () => api.public<PublicConfig>('/public/config'), staleTime: 5 * 60_000 });

@@ -269,6 +269,8 @@ export interface KioskBootstrapDTO {
   services: (ServiceDTO & { effectivePrefix: string; waiting: number })[];
   priorities: PriorityDTO[];
   customerFields: CustomerField[];
+  /** Lista de publicidad de la pantalla de espera (si el kiosco la usa). */
+  idlePlaylist: PlaylistDTO | null;
 }
 
 export interface IssuedTicketDTO {
@@ -366,4 +368,21 @@ export interface ApiErrorBody {
   error: string;
   message: string;
   details?: unknown;
+}
+
+/** Resultado de crear o reenviar una invitación. */
+export interface InviteResultDTO {
+  /** Enlace para aceptar la invitación (se puede copiar y enviar por WhatsApp si no hay correo). */
+  inviteUrl: string;
+  emailSent: boolean;
+  /** Motivo por el que no salió el correo (sin servidor, contraseña incorrecta...). */
+  emailError: string | null;
+}
+
+/** Usuario de una organización visto desde la plataforma. */
+export type PlatformUserDTO = UserDTO;
+
+export interface AccessLinkDTO {
+  url: string;
+  expiresAt: ISODate;
 }

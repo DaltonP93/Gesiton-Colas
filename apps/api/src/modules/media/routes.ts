@@ -11,7 +11,7 @@ import { AppError, badRequest, notFound, planLimit } from '../../lib/errors';
 import { hexColor, idParam, updateSchema } from '../../lib/schemas';
 import { loadPlaylist } from '../public/routes';
 
-const EXTENSIONS: Record<string, string> = {
+export const EXTENSIONS: Record<string, string> = {
   'video/mp4': 'mp4',
   'video/webm': 'webm',
   'video/ogg': 'ogv',
