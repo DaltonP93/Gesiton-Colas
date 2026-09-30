@@ -6,6 +6,7 @@ import { Link, useParams, useSearchParams } from 'react-router';
 import {
   RT,
   defaultDisplayConfig,
+  formatMoney,
   isImageIcon,
   type CustomerField,
   type IssuedTicketDTO,
@@ -88,7 +89,7 @@ export default function KioskPage() {
 }
 
 function Kiosk({ boot, token, refetch }: { boot: KioskBootstrapDTO; token: string; refetch: () => void }) {
-  const { kiosk, tenant, services, priorities, departments, customerFields } = boot;
+  const { kiosk, tenant, services, priorities, departments, customerFields, prices } = boot;
   const config = kiosk.config;
   const theme = config.theme;
   const t = translator(tenant.locale, tenant.terminology);
@@ -270,6 +271,7 @@ function Kiosk({ boot, token, refetch }: { boot: KioskBootstrapDTO; token: strin
             services={services}
             departments={departments}
             config={config}
+            prices={prices}
             t={t}
             onChoose={chooseService}
           />
@@ -451,12 +453,14 @@ function ServicesStep({
   services,
   departments,
   config,
+  prices,
   t,
   onChoose,
 }: {
   services: Service[];
   departments: KioskBootstrapDTO['departments'];
   config: KioskBootstrapDTO['kiosk']['config'];
+  prices: KioskBootstrapDTO['prices'];
   t: ReturnType<typeof translator>;
   onChoose: (s: Service) => void;
 }) {
@@ -520,6 +524,7 @@ function ServicesStep({
                           {service.name}
                         </span>
                         {service.description && <span className="mt-1 block text-[0.95em] opacity-80">{service.description}</span>}
+                        {prices && service.price ? <span className="mt-1 block text-[1.05em] font-bold tabular-nums">{formatMoney(service.price, prices.currency)}</span> : null}
                       </span>
                       {config.showWaitingCount && (
                         <span className="shrink-0 rounded-full bg-black/15 px-3 py-1 text-[0.9em] font-semibold tabular-nums">

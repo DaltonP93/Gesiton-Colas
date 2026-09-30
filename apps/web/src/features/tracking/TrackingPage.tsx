@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { BellRing, CheckCircle2, ChevronRight, Clock, Heart, Loader2, MapPin, MessageCircle, Star, Users, XCircle } from 'lucide-react';
+import { BadgeCheck, BellRing, CheckCircle2, ChevronRight, Clock, CreditCard, Heart, Loader2, MapPin, MessageCircle, Star, Users, XCircle } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router';
-import { RT, type PublicTicketDTO } from '@gc/shared';
+import { RT, formatMoney, type PublicTicketDTO } from '@gc/shared';
 import { ApiError, api, assetUrl } from '../../lib/api';
 import { translator } from '../../lib/i18n';
 import { connectSocket } from '../../lib/socket';
@@ -165,6 +165,8 @@ export default function TrackingPage() {
           </p>
         </div>
 
+        {ticket.charge && <ChargeCard token={token} charge={ticket.charge} active={active} t={t} />}
+
         {ticket.survey && (
           <div className="mt-4">
             {ticket.survey.answered ? (
@@ -281,5 +283,59 @@ function PhoneOptIn({ token, phone, t, onSaved }: { token: string; phone: string
         </p>
       )}
     </form>
+  );
+}
+
+/** Importe del turno y pago en línea (módulo «Pagos»). */
+function ChargeCard({ token, charge, active, t }: { token: string; charge: NonNullable<PublicTicketDTO['charge']>; active: boolean; t: ReturnType<typeof translator> }) {
+  const [paying, setPaying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const amount = formatMoney(charge.amount, charge.currency);
+
+  async function pay() {
+    setPaying(true);
+    setError(null);
+    try {
+      const { url } = await api.public<{ url: string }>(`/public/tickets/${token}/pay`, {});
+      window.location.assign(url);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'No se pudo iniciar el pago');
+      setPaying(false);
+    }
+  }
+
+  return (
+    <div className="mt-4 rounded-2xl bg-surface p-4 shadow">
+      <div className="flex items-center gap-3">
+        <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+          <CreditCard className="size-6" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-muted">{t('track.charge')}</p>
+          <p className="text-2xl font-extrabold tabular-nums">{amount}</p>
+        </div>
+        {charge.status === 'paid' && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-3 py-1 text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+            <BadgeCheck className="size-4" /> {t('track.paid')}
+          </span>
+        )}
+      </div>
+      {charge.status === 'pending' && active && (
+        <div className="mt-3">
+          {charge.online ? (
+            <button type="button" onClick={() => void pay()} disabled={paying} className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 font-bold text-primary-fg disabled:opacity-60">
+              {paying ? <Loader2 className="size-5 animate-spin" /> : <CreditCard className="size-5" />} {t('track.payNow')}
+            </button>
+          ) : (
+            <p className="text-sm text-muted">{t('track.payAtCounter')}</p>
+          )}
+          {error && (
+            <p role="alert" className="mt-2 text-sm text-red-600">
+              {error}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

@@ -3,6 +3,7 @@ import {
   BarChart3,
   ChevronsLeft,
   ChevronsRight,
+  CreditCard,
   Headset,
   LayoutGrid,
   LogOut,
@@ -10,6 +11,7 @@ import {
   Menu,
   MonitorPlay,
   Music,
+  Receipt,
   Settings,
   Shield,
   Sparkles,
@@ -20,7 +22,7 @@ import {
   X,
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
+import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import type { Role, ModuleId } from '@gc/shared';
 import { cx } from '../../components/ui';
 import { api, assetUrl } from '../../lib/api';
@@ -36,6 +38,8 @@ interface NavItem {
   also?: string[];
   /** Se muestra si la organización tiene alguno de estos módulos activos. */
   module?: ModuleId[];
+  /** Condición adicional para mostrarlo. */
+  when?: boolean;
 }
 
 const COLLAPSED_KEY = 'gc.nav.collapsed';
@@ -61,6 +65,7 @@ export function AdminLayout() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const branding = settings.branding;
+  const billingSuspended = me?.user.role !== 'superadmin' && me?.tenant?.status === 'suspended' && me.tenant.suspendedReason === 'billing';
 
   const setCollapsed = (value: boolean) => {
     setCollapsedState(value);
@@ -80,6 +85,7 @@ export function AdminLayout() {
         { to: '/app/monitor', label: 'Monitor en vivo', icon: <Activity />, role: 'manager' },
         { to: '/app/reportes', label: 'Reportes', icon: <BarChart3 />, role: 'manager', also: ['/app/resumen'], module: ['reports'] },
         { to: '/app/encuestas', label: 'Encuestas', icon: <Star />, role: 'manager', module: ['surveys'] },
+        { to: '/app/cobros', label: 'Cobros', icon: <CreditCard />, role: 'manager', module: ['payments'] },
       ],
     },
     {
@@ -93,12 +99,15 @@ export function AdminLayout() {
     },
     {
       title: 'Administración',
-      items: [{ to: '/app/configuracion', label: 'Configuración', icon: <Settings />, role: 'admin', also: ['/app/bienvenida'] }],
+      items: [
+        { to: '/app/configuracion', label: 'Configuración', icon: <Settings />, role: 'admin', also: ['/app/bienvenida'] },
+        { to: '/app/facturacion', label: 'Plan y facturación', icon: <Receipt />, role: 'admin', when: Boolean(me?.billing) },
+      ],
     },
   ];
 
   const visibleGroups = groups
-    .map((g) => ({ ...g, items: g.items.filter((i) => can(i.role) && (!i.module || i.module.some(hasModule))) }))
+    .map((g) => ({ ...g, items: g.items.filter((i) => can(i.role) && (!i.module || i.module.some(hasModule)) && i.when !== false) }))
     .filter((g) => g.items.length > 0);
 
   // En el menú del celular siempre se muestran los textos.
@@ -307,7 +316,8 @@ export function AdminLayout() {
           <span className="truncate font-semibold">{branding.appName}</span>
         </header>
         <main className="mx-auto w-full max-w-[96rem] flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-          <Outlet />
+          {/* Suspendida por falta de pago: solo queda disponible «Plan y facturación». */}
+          {billingSuspended && pathname !== '/app/facturacion' ? <Navigate to="/app/facturacion" replace /> : <Outlet />}
         </main>
       </div>
     </div>

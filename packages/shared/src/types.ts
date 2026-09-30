@@ -1,3 +1,4 @@
+import type { Currency } from './currency';
 import type { TicketChargeDTO } from './payments';
 import type { DisplayConfig, KioskConfig, TenantSettings, Branding, Terminology, CustomerField } from './config';
 import type {
@@ -59,6 +60,8 @@ export interface MeDTO {
   limits: PlanLimits | null;
   /** Módulos activos de la organización (vacío sin organización). */
   modules: ModuleId[];
+  /** La plataforma factura los planes (muestra «Plan y facturación» a los administradores). */
+  billing: boolean;
 }
 
 export interface BranchDTO {
@@ -281,6 +284,8 @@ export interface KioskBootstrapDTO {
   customerFields: CustomerField[];
   /** Lista de publicidad de la pantalla de espera (si el kiosco la usa). */
   idlePlaylist: PlaylistDTO | null;
+  /** Mostrar el precio de los servicios (módulo «Pagos»). */
+  prices: { currency: Currency } | null;
 }
 
 export interface IssuedTicketDTO {
