@@ -144,3 +144,8 @@ export const ALERT_SOUND_LABELS: Record<AlertSound, { label: string; category: '
 export function isAlertSound(value: string): value is AlertSound {
   return (ALERT_SOUNDS as readonly string[]).includes(value);
 }
+
+/** Un ícono de servicio puede ser uno de la biblioteca (clave) o una imagen propia (/uploads/... o URL). */
+export function isImageIcon(icon: string | null | undefined): icon is string {
+  return Boolean(icon && (icon.startsWith('/uploads/') || /^https?:\/\//i.test(icon) || icon.startsWith('data:image/')));
+}

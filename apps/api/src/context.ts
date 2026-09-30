@@ -2,9 +2,12 @@ import type { FastifyBaseLogger } from 'fastify';
 import { RT, type TicketDTO, type WebhookEvent } from '@gc/shared';
 import type { AppConfig } from './config';
 import type { Database } from './db/client';
+import type { Tenant } from './db/schema';
 import { createAuth, type Auth } from './lib/auth';
-import { toCallDTO } from './lib/dto';
+import { tenantSettings, toCallDTO } from './lib/dto';
+import { brandFrom, type EmailBrand } from './lib/emails';
 import { createMailer, type Mailer } from './lib/mailer';
+import { createPlatformSettings, type PlatformSettingsStore } from './lib/platformSettings';
 import { createStorage, type Storage } from './lib/storage';
 import { WebhookDispatcher } from './modules/webhooks/dispatcher';
 import { Realtime, rooms } from './realtime';
@@ -17,7 +20,11 @@ export interface AppContext {
   rt: Realtime;
   webhooks: WebhookDispatcher;
   mailer: Mailer;
+  /** Ajustes globales del superadministrador (página de inicio, registro, marca del ingreso). */
+  platform: PlatformSettingsStore;
   log: FastifyBaseLogger;
+  /** Marca de los correos: la de la organización o, sin organización, la de la plataforma. */
+  emailBrand(tenant: Tenant | null | undefined): Promise<EmailBrand>;
   /** Notifica un cambio de turno a pantallas, operadores, seguimiento público y webhooks. */
   publishTicket(
     tenantId: string,
@@ -51,7 +58,9 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
   const rt = new Realtime(db, auth, log, config.CORS_ORIGINS);
   const webhooks = new WebhookDispatcher(db, log, config.WEBHOOKS_ALLOW_PRIVATE);
   const storage = createStorage(config);
-  const mailer = createMailer(config, log);
+  const mailer = createMailer(config, db, log);
+  const platform = createPlatformSettings(db);
+  const publicUrl = config.PUBLIC_URL.replace(/\/$/, '');
 
   return {
     config,
@@ -61,7 +70,13 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
     rt,
     webhooks,
     mailer,
+    platform,
     log,
+    async emailBrand(tenant) {
+      if (tenant) return brandFrom(tenantSettings(tenant).branding, publicUrl);
+      const { brand } = await platform.get();
+      return brandFrom({ appName: brand.appName, logoUrl: brand.logoUrl, primaryColor: brand.primaryColor }, publicUrl);
+    },
     publishTicket(tenantId, event, ticket, extra = {}, options = {}) {
       const call = toCallDTO(ticket);
       if (!options.announceName) call.customerName = null;

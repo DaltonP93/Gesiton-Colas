@@ -7,8 +7,9 @@ import { createDemoOrganization } from '../../db/demo';
 import { createTenantWithDefaults } from '../../db/seed';
 import { tenants, users, type Tenant, type User } from '../../db/schema';
 import { assertTenantAvailable, hashPassword, sessionsResetNow, verifyPassword } from '../../lib/auth';
-import { tenantSettings, toTenantDTO, toUserDTO } from '../../lib/dto';
-import { brandFrom, demoMail, emailLoginMail, resetPasswordMail, verifyEmailMail } from '../../lib/emails';
+import { toTenantDTO, toUserDTO } from '../../lib/dto';
+import { demoMail, emailLoginMail, resetPasswordMail, verifyEmailMail } from '../../lib/emails';
+import { MailError, type MailMessage } from '../../lib/mailer';
 import { AppError, badRequest, conflict, forbidden, unauthorized } from '../../lib/errors';
 import { consumeCode, consumeToken, issueToken, peekToken } from '../../lib/tokens';
 import { userScope } from '../tickets/queue';
@@ -60,7 +61,19 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
     return row;
   }
 
-  const brandOf = (tenant: Tenant | null) => brandFrom(tenant ? tenantSettings(tenant).branding : null, base);
+  const brandOf = (tenant: Tenant | null) => ctx.emailBrand(tenant);
+
+  /** Envía con el servidor de la organización (o el de la plataforma) sin exponer detalles técnicos. */
+  async function mail(message: MailMessage, tenantId: string | null) {
+    try {
+      await ctx.mailer.send(message, { tenantId });
+    } catch (error) {
+      if (error instanceof MailError) {
+        throw new AppError(502, 'mail_failed', 'No pudimos enviar el correo en este momento. Intente más tarde o contacte al administrador.');
+      }
+      throw error;
+    }
+  }
 
   /** Verifica que la cuenta pueda iniciar sesión y devuelve el token + datos de sesión. */
   async function startSession(user: User, tenant: Tenant | null, options: { markVerified?: boolean } = {}) {
@@ -75,7 +88,7 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
 
   async function sendVerification(user: User, tenant: Tenant | null) {
     const { token: link } = await issueToken(ctx.db, user.id, 'verify_email');
-    await ctx.mailer.send(verifyEmailMail(user.email, user.name, `${base}/verificar?token=${link}`, brandOf(tenant)));
+    await mail(verifyEmailMail(user.email, user.name, `${base}/verificar?token=${link}`, await brandOf(tenant)), user.tenantId);
   }
 
   /* ------------------------------ Registro ---------------------------- */
@@ -99,7 +112,9 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
       },
     },
     async (request, reply) => {
-      if (!ctx.config.ALLOW_SIGNUP) throw forbidden('El registro de nuevas organizaciones está deshabilitado');
+      if (!ctx.config.ALLOW_SIGNUP || !(await ctx.platform.get()).allowSignup) {
+        throw forbidden('El registro de nuevas organizaciones está deshabilitado');
+      }
       const body = request.body;
       const [exists] = await ctx.db.select({ id: users.id }).from(users).where(eq(users.email, body.email)).limit(1);
       if (exists) throw conflict('Ya existe una cuenta con ese email. Inicie sesión o recupere su contraseña.');
@@ -115,7 +130,10 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
           emailVerified: verification === 'off',
         }),
       );
-      if (verification !== 'off') await sendVerification(admin, tenant);
+      if (verification !== 'off') {
+        // La cuenta ya existe: si el correo falla se puede reenviar la verificación después.
+        await sendVerification(admin, tenant).catch((error) => request.log.warn({ err: error }, 'No se pudo enviar la verificación'));
+      }
       if (verification === 'required') {
         return reply.code(201).send({ verificationRequired: true, email: admin.email });
       }
@@ -142,14 +160,14 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
       },
     },
     async (request) => {
-      if (!ctx.config.ALLOW_DEMO) throw forbidden('Las demos están deshabilitadas en esta instalación');
+      if (!ctx.config.ALLOW_DEMO || !(await ctx.platform.get()).allowDemo) throw forbidden('Las demos están deshabilitadas en esta instalación');
       const body = request.body;
       const existing = await findUser(body.email);
       if (existing) {
         // Ya tiene cuenta: se le envía un acceso por correo en lugar de crear otra demo.
         if (existing.user.active) {
           const { token: link, code } = await issueToken(ctx.db, existing.user.id, 'email_login', { withCode: true });
-          await ctx.mailer.send(emailLoginMail(existing.user.email, existing.user.name, `${base}/acceso?token=${link}`, code!, brandOf(existing.tenant)));
+          await mail(emailLoginMail(existing.user.email, existing.user.name, `${base}/acceso?token=${link}`, code!, await brandOf(existing.tenant)), existing.user.tenantId);
         }
         return { ok: true, message: 'Le enviamos un correo con el acceso a su demo.' };
       }
@@ -158,7 +176,7 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
         createDemoOrganization(tx, { email: body.email, name: body.name, organizationName: body.organizationName, timezone: body.timezone, days }),
       );
       const { token: link, code } = await issueToken(ctx.db, admin.id, 'email_login', { withCode: true, ttlMs: 7 * 24 * 3600 * 1000 });
-      await ctx.mailer.send(demoMail(admin.email, admin.name, `${base}/acceso?token=${link}`, code!, days, brandOf(tenant)));
+      await mail(demoMail(admin.email, admin.name, `${base}/acceso?token=${link}`, code!, days, await brandOf(tenant)), tenant.id);
       return { ok: true, message: 'Le enviamos un correo con el acceso a su demo.' };
     },
   );
@@ -192,10 +210,11 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
       schema: { tags, summary: 'Enviar un enlace y un código de acceso por correo (sin contraseña)', security: [], body: z.object({ email }) },
     },
     async (request) => {
+      if (!(await ctx.platform.get()).allowEmailLogin) throw forbidden('El ingreso con código por correo está deshabilitado');
       const found = await findUser(request.body.email);
       if (found?.user.active) {
         const { token: link, code } = await issueToken(ctx.db, found.user.id, 'email_login', { withCode: true });
-        await ctx.mailer.send(emailLoginMail(found.user.email, found.user.name, `${base}/acceso?token=${link}`, code!, brandOf(found.tenant)));
+        await mail(emailLoginMail(found.user.email, found.user.name, `${base}/acceso?token=${link}`, code!, await brandOf(found.tenant)), found.user.tenantId);
       }
       return SENT;
     },
@@ -270,7 +289,7 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
       const found = await findUser(request.body.email);
       if (found?.user.active) {
         const { token: link } = await issueToken(ctx.db, found.user.id, 'reset_password');
-        await ctx.mailer.send(resetPasswordMail(found.user.email, found.user.name, `${base}/restablecer?token=${link}`, brandOf(found.tenant)));
+        await mail(resetPasswordMail(found.user.email, found.user.name, `${base}/restablecer?token=${link}`, await brandOf(found.tenant)), found.user.tenantId);
       }
       return SENT;
     },
@@ -304,7 +323,7 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
     async (request) => {
       const row = await peekToken(ctx.db, request.params.token, 'invite');
       const { user, tenant } = await loadUser(row.userId);
-      return { email: user.email, name: user.name, organization: tenant?.name ?? '', appName: brandOf(tenant).appName };
+      return { email: user.email, name: user.name, organization: tenant?.name ?? '', appName: (await brandOf(tenant)).appName };
     },
   );
 

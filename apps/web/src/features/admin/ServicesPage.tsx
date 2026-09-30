@@ -1,7 +1,8 @@
 import { ClipboardList, FolderTree, Pencil, Plus, Star, Trash2 } from 'lucide-react';
 import { useId, useState, type FormEvent, type ReactNode } from 'react';
 import type { DepartmentDTO, PriorityDTO, ServiceDTO } from '@gc/shared';
-import { SERVICE_ICONS, ServiceIcon } from '../../components/ServiceIcon';
+import { IconPicker } from '../../components/IconPicker';
+import { ServiceIcon } from '../../components/ServiceIcon';
 import {
   Badge,
   Button,
@@ -30,31 +31,6 @@ import { readableOn } from '../../lib/theme';
 
 type TabId = 'services' | 'departments' | 'priorities';
 
-const ICON_LABELS: Record<string, string> = {
-  ticket: 'Turno',
-  users: 'Personas',
-  user: 'Persona',
-  wallet: 'Billetera',
-  cash: 'Efectivo',
-  card: 'Tarjeta',
-  bank: 'Banco',
-  receipt: 'Recibo',
-  file: 'Documento',
-  clipboard: 'Planilla',
-  calendar: 'Agenda',
-  health: 'Salud',
-  doctor: 'Consulta médica',
-  pharmacy: 'Farmacia',
-  baby: 'Maternidad',
-  shield: 'Seguros',
-  cart: 'Compras',
-  package: 'Paquetes',
-  truck: 'Envíos',
-  tools: 'Soporte técnico',
-  briefcase: 'Negocios',
-  building: 'Institución',
-  help: 'Ayuda',
-};
 
 const toInt = (value: string, fallback: number) => {
   const n = Number.parseInt(value, 10);
@@ -385,29 +361,7 @@ function ServiceFormModal({ initial, departments, onClose }: { initial: ServiceF
           <span id={`${formId}-icon`} className="mb-1.5 block text-sm font-medium">
             Ícono
           </span>
-          <div role="radiogroup" aria-labelledby={`${formId}-icon`} className="grid grid-cols-6 gap-2 sm:grid-cols-8 md:grid-cols-12">
-            {Object.entries(SERVICE_ICONS).map(([key, Icon]) => {
-              const selected = form.icon === key;
-              const label = ICON_LABELS[key] ?? key;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  aria-label={label}
-                  title={label}
-                  onClick={() => set('icon', key)}
-                  className={cx(
-                    'grid aspect-square place-items-center rounded-ui border transition',
-                    selected ? 'border-primary bg-primary text-primary-fg shadow-sm' : 'border-border bg-surface text-fg hover:bg-subtle',
-                  )}
-                >
-                  <Icon className="size-5" />
-                </button>
-              );
-            })}
-          </div>
+          <IconPicker value={form.icon} onChange={(icon) => set('icon', icon)} labelledBy={`${formId}-icon`} />
         </div>
 
         <div className="grid gap-4 sm:grid-cols-3">

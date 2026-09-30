@@ -142,6 +142,16 @@ describe('publicidad', () => {
     await api(app, orgA, 'DELETE', `/media/${uploaded.id}`);
     const after = await api(app, orgA, 'GET', `/playlists/${playlist.body.id}`);
     expect(after.body.items).toHaveLength(2);
+
+    // La pantalla de espera del kiosco puede mostrar la lista como galería / video promocional.
+    const kiosk = (await api(app, orgA, 'GET', '/kiosks')).body[0];
+    await api(app, orgA, 'PUT', `/kiosks/${kiosk.id}`, { config: { idle: { enabled: true, mode: 'playlist', playlistId: playlist.body.id } } });
+    const kioskBoot = await api(app, null, 'GET', `/public/kiosks/${kiosk.token}`);
+    expect(kioskBoot.body.idlePlaylist.items).toHaveLength(2);
+    // Una lista de otra organización nunca se expone.
+    const kioskB = (await api(app, orgB, 'GET', '/kiosks')).body[0];
+    await api(app, orgB, 'PUT', `/kiosks/${kioskB.id}`, { config: { idle: { enabled: true, mode: 'playlist', playlistId: playlist.body.id } } });
+    expect((await api(app, null, 'GET', `/public/kiosks/${kioskB.token}`)).body.idlePlaylist).toBeNull();
   });
 });
 

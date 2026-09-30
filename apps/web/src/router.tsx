@@ -1,7 +1,8 @@
-import { lazy, Suspense, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, type ReactNode } from 'react';
 import { createBrowserRouter, Navigate, useLocation, useSearchParams } from 'react-router';
 import { Loading } from './components/ui';
 import { useAuth } from './lib/auth';
+import { usePublicConfig } from './lib/queries';
 import type { Role } from '@gc/shared';
 import { AdminLayout } from './features/admin/AdminLayout';
 import {
@@ -51,10 +52,20 @@ function RequireAuth({ children, role }: { children: ReactNode; role?: Role }) {
   return <>{children}</>;
 }
 
+/** Redirige a otro sitio (página principal configurada como redirección). */
+function ExternalRedirect({ url }: { url: string }) {
+  useEffect(() => window.location.replace(url), [url]);
+  return <Loading label="Redirigiendo…" />;
+}
+
+/** Dirección principal: lo que elija el superadministrador (presentación, ingreso o redirección). */
 function Home() {
   const { me, loading } = useAuth();
-  if (loading) return <Loading />;
+  const config = usePublicConfig();
+  if (loading || config.isLoading) return <Loading />;
   if (me) return <Navigate to={me.tenant ? '/app' : '/plataforma'} replace />;
+  if (config.data?.homePage === 'login') return <Navigate to="/login" replace />;
+  if (config.data?.homePage === 'redirect' && config.data.homeRedirectUrl) return <ExternalRedirect url={config.data.homeRedirectUrl} />;
   return <LandingPage />;
 }
 

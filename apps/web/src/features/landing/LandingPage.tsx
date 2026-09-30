@@ -13,7 +13,9 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router';
 import { Button } from '../../components/ui';
+import { assetUrl } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
+import { usePublicConfig } from '../../lib/queries';
 
 const features = [
   { icon: <MonitorPlay />, title: 'Pantallas inteligentes', text: 'Llamados con voz y sonido, historial, reloj y diseños intercambiables para cualquier TV, Smart TV o Android TV.' },
@@ -28,28 +30,41 @@ const features = [
 ];
 
 export function LandingPage() {
-  const { settings } = useAuth();
-  const name = settings.branding.appName;
+  const { platformBrand } = useAuth();
+  const { data: config } = usePublicConfig();
+  const name = platformBrand.appName;
+  const signup = config?.allowSignup !== false;
+  const demo = config?.allowDemo !== false;
   return (
     <div className="min-h-screen bg-bg">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
         <div className="flex items-center gap-2 text-lg font-bold">
-          <span className="grid size-9 place-items-center rounded-ui bg-primary text-primary-fg">{name.charAt(0)}</span>
-          {name}
+          {platformBrand.logoUrl ? (
+            <img src={assetUrl(platformBrand.logoUrl)} alt={name} className="h-9 max-w-44 object-contain" />
+          ) : (
+            <>
+              <span className="grid size-9 place-items-center rounded-ui bg-primary text-primary-fg">{name.charAt(0)}</span>
+              {name}
+            </>
+          )}
         </div>
         <nav className="flex items-center gap-2">
           <a href="/api/docs" className="hidden text-sm text-muted hover:text-fg sm:inline">
             API
           </a>
-          <Link to="/demo" className="hidden sm:block">
-            <Button variant="ghost">Ver demo</Button>
-          </Link>
+          {demo && (
+            <Link to="/demo" className="hidden sm:block">
+              <Button variant="ghost">Ver demo</Button>
+            </Link>
+          )}
           <Link to="/login">
-            <Button variant="ghost">Ingresar</Button>
+            <Button variant={signup ? 'ghost' : 'primary'}>Ingresar</Button>
           </Link>
-          <Link to="/registro">
-            <Button>Probar gratis</Button>
-          </Link>
+          {signup && (
+            <Link to="/registro">
+              <Button>Probar gratis</Button>
+            </Link>
+          )}
         </nav>
       </header>
 
@@ -65,14 +80,22 @@ export function LandingPage() {
             {name} organiza los turnos de todas sus sucursales, muestra publicidad en las salas de espera y se integra con cualquier sistema.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link to="/registro">
-              <Button size="lg">Crear mi organización</Button>
-            </Link>
-            <Link to="/demo">
-              <Button size="lg" variant="secondary" icon={<Sparkles className="size-5" />}>
-                Recibir una demo por correo
-              </Button>
-            </Link>
+            {signup ? (
+              <Link to="/registro">
+                <Button size="lg">Crear mi organización</Button>
+              </Link>
+            ) : (
+              <Link to="/login">
+                <Button size="lg">Ingresar</Button>
+              </Link>
+            )}
+            {demo && (
+              <Link to="/demo">
+                <Button size="lg" variant="secondary" icon={<Sparkles className="size-5" />}>
+                  Recibir una demo por correo
+                </Button>
+              </Link>
+            )}
           </div>
           <p className="mt-4 text-sm text-muted">
             ¿Ya tiene cuenta?{' '}

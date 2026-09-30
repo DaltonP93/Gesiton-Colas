@@ -10,6 +10,8 @@ import {
   type DisplayBootstrapDTO,
   type IssuedTicketDTO,
   type KioskBootstrapDTO,
+  type KioskConfig,
+  type PublicConfigDTO,
   type PublicTicketDTO,
 } from '@gc/shared';
 import type { AppContext } from '../../context';
@@ -78,14 +80,22 @@ export const publicRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
 
   app.get(
     '/public/config',
-    { schema: { tags, summary: 'Opciones públicas de la instalación (registro, demo, verificación)', security: [] } },
-    async () => ({
-      allowSignup: ctx.config.ALLOW_SIGNUP,
-      allowDemo: ctx.config.ALLOW_DEMO,
-      demoDays: ctx.config.DEMO_DAYS,
-      emailVerification: ctx.config.EMAIL_VERIFICATION,
-      emailEnabled: ctx.mailer.driver === 'smtp',
-    }),
+    { schema: { tags, summary: 'Opciones públicas de la instalación: página de inicio, registro, demo y marca del ingreso', security: [] } },
+    async (): Promise<PublicConfigDTO> => {
+      const [settings, mail] = await Promise.all([ctx.platform.get(), ctx.mailer.resolve(null)]);
+      return {
+        homePage: settings.homePage,
+        homeRedirectUrl: settings.homeRedirectUrl,
+        allowSignup: ctx.config.ALLOW_SIGNUP && settings.allowSignup,
+        allowDemo: ctx.config.ALLOW_DEMO && settings.allowDemo,
+        allowEmailLogin: settings.allowEmailLogin,
+        demoDays: ctx.config.DEMO_DAYS,
+        emailVerification: ctx.config.EMAIL_VERIFICATION,
+        // Con DEV_OUTBOX (pruebas) los correos se leen del buzón de desarrollo: cuentan como enviados.
+        emailEnabled: mail.source !== 'none' || ctx.config.DEV_OUTBOX,
+        brand: settings.brand,
+      };
+    },
   );
 
   /* ------------------------------ Pantalla ---------------------------- */
@@ -147,6 +157,18 @@ export const publicRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
     return { kiosk, tenant, config };
   }
 
+  /** Galería o video promocional de la pantalla de espera del kiosco (solo listas de la misma organización). */
+  async function idlePlaylist(tenantId: string, config: KioskConfig) {
+    const { idle } = config;
+    if (!idle.enabled || idle.mode !== 'playlist' || !idle.playlistId) return null;
+    const [own] = await ctx.db
+      .select({ id: playlists.id })
+      .from(playlists)
+      .where(and(eq(playlists.id, idle.playlistId), eq(playlists.tenantId, tenantId)))
+      .limit(1);
+    return own ? loadPlaylist(ctx.db, own.id) : null;
+  }
+
   app.get(
     '/public/kiosks/:token',
     { schema: { tags, summary: 'Configuración de un kiosco: servicios, prioridades y campos', params: tokenParam, security: [] } },
@@ -188,6 +210,7 @@ export const publicRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
         })),
         priorities: prios.map(toPriorityDTO),
         customerFields: [...BUILTIN_CUSTOMER_FIELDS, ...settings.customerFields],
+        idlePlaylist: await idlePlaylist(tenant.id, config),
       };
     },
   );

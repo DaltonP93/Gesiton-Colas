@@ -1,8 +1,9 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Building2, HardDrive, LogIn, LogOut, MonitorPlay, Plus, Search, Shield, ShieldCheck, Ticket, Users } from 'lucide-react';
+import { Building2, HardDrive, LogIn, LogOut, MonitorPlay, Plus, Search, Settings2, Shield, ShieldCheck, Ticket, UserCog, Users } from 'lucide-react';
 import { useEffect, useId, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
-import { PLAN_IDS, PLANS, defaultTenantSettings, type PlanId, type TenantDTO } from '@gc/shared';
+import { PLAN_IDS, PLANS, type InviteResultDTO, type PlanId, type TenantDTO } from '@gc/shared';
+import { InviteResultModal } from '../../components/InviteResult';
 import {
   Badge,
   Button,
@@ -17,9 +18,15 @@ import {
   Spinner,
   Stat,
   Table,
+  Tabs,
+  Toggle,
   cx,
   useFeedback,
 } from '../../components/ui';
+import { assetUrl } from '../../lib/api';
+import { AdminsTab } from './AdminsTab';
+import { PlatformSettingsTab } from './PlatformSettingsTab';
+import { TenantUsersModal } from './TenantUsersModal';
 import { api, errorMessage } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { formatBytes, formatDateTime } from '../../lib/format';
@@ -40,7 +47,7 @@ type PlatformTenant = TenantDTO & {
 
 type TenantPatch = { id: string; name?: string; plan?: PlanId; status?: TenantDTO['status']; isDemo?: boolean; extendDemoDays?: number };
 
-const PLATFORM_NAME = defaultTenantSettings().branding.appName;
+type PlatformTab = 'organizaciones' | 'administradores' | 'ajustes';
 
 const PLAN_COLORS: Record<PlanId, string> = {
   free: '#64748b',
@@ -60,19 +67,37 @@ function useDebounced<T>(value: T, delay = 300): T {
 }
 
 export default function PlatformPage() {
-  const { me, logout, impersonate } = useAuth();
+  const { me, logout, impersonate, platformBrand } = useAuth();
   const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
+  const [tab, setTab] = useState<PlatformTab>(() => {
+    const hash = window.location.hash.slice(1);
+    return hash === 'administradores' || hash === 'ajustes' ? hash : 'organizaciones';
+  });
+  const changeTab = (next: PlatformTab) => {
+    setTab(next);
+    window.history.replaceState(null, '', next === 'organizaciones' ? window.location.pathname : `#${next}`);
+  };
+
+  const titles: Record<PlatformTab, { title: string; description: string }> = {
+    organizaciones: { title: 'Organizaciones', description: 'Administre las organizaciones (clientes) de la plataforma: planes, estado, usuarios y soporte.' },
+    administradores: { title: 'Superadministradores', description: 'Personas con acceso total a la plataforma: todas las organizaciones, planes y ajustes.' },
+    ajustes: { title: 'Ajustes de la plataforma', description: 'Qué se ve en la dirección principal, quién puede registrarse, la marca del ingreso y el correo saliente.' },
+  };
 
   return (
     <div className="min-h-screen bg-bg text-fg">
       <header className="sticky top-0 z-30 border-b border-border bg-surface/90 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
-          <div className="grid size-9 shrink-0 place-items-center rounded-ui bg-primary text-primary-fg">
-            <Shield className="size-5" />
-          </div>
+          {platformBrand.logoUrl ? (
+            <img src={assetUrl(platformBrand.logoUrl)} alt="" className="h-9 max-w-32 shrink-0 object-contain" />
+          ) : (
+            <div className="grid size-9 shrink-0 place-items-center rounded-ui bg-primary text-primary-fg">
+              <Shield className="size-5" />
+            </div>
+          )}
           <div className="min-w-0">
-            <p className="truncate text-sm font-bold">{PLATFORM_NAME}</p>
+            <p className="truncate text-sm font-bold">{platformBrand.appName}</p>
             <p className="truncate text-xs text-muted">Plataforma</p>
           </div>
           <div className="ml-auto flex items-center gap-3">
@@ -109,16 +134,35 @@ export default function PlatformPage() {
 
       <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <PageHeader
-          title="Organizaciones"
-          description="Administre las organizaciones (clientes) de la plataforma: planes, estado y soporte."
+          title={titles[tab].title}
+          description={titles[tab].description}
           actions={
-            <Button icon={<Plus className="size-4" />} onClick={() => setCreating(true)}>
-              Nueva organización
-            </Button>
+            tab === 'organizaciones' ? (
+              <Button icon={<Plus className="size-4" />} onClick={() => setCreating(true)}>
+                Nueva organización
+              </Button>
+            ) : undefined
           }
         />
-        <StatsGrid />
-        <TenantsCard onCreate={() => setCreating(true)} />
+        <div className="mb-6">
+          <Tabs<PlatformTab>
+            value={tab}
+            onChange={changeTab}
+            tabs={[
+              { value: 'organizaciones', label: 'Organizaciones', icon: <Building2 className="size-4" /> },
+              { value: 'administradores', label: 'Superadministradores', icon: <UserCog className="size-4" /> },
+              { value: 'ajustes', label: 'Ajustes', icon: <Settings2 className="size-4" /> },
+            ]}
+          />
+        </div>
+        {tab === 'organizaciones' && (
+          <>
+            <StatsGrid />
+            <TenantsCard onCreate={() => setCreating(true)} />
+          </>
+        )}
+        {tab === 'administradores' && <AdminsTab />}
+        {tab === 'ajustes' && <PlatformSettingsTab />}
       </main>
 
       {creating && <CreateTenantModal onClose={() => setCreating(false)} />}
@@ -171,6 +215,7 @@ function TenantsCard({ onCreate }: { onCreate: () => void }) {
   const [search, setSearch] = useState('');
   const q = useDebounced(search.trim());
   const [entering, setEntering] = useState<string | null>(null);
+  const [viewingUsers, setViewingUsers] = useState<PlatformTenant | null>(null);
 
   const tenants = useQuery({
     queryKey: ['platform', 'tenants', q],
@@ -363,7 +408,10 @@ function TenantsCard({ onCreate }: { onCreate: () => void }) {
                   <td className="text-right whitespace-nowrap tabular-nums text-muted">{formatBytes(tenant.storageBytes)}</td>
                   <td className="whitespace-nowrap text-muted">{formatDateTime(tenant.createdAt)}</td>
                   <td>
-                    <div className="flex justify-end">
+                    <div className="flex justify-end gap-1.5">
+                      <Button size="sm" variant="ghost" icon={<Users className="size-4" />} onClick={() => setViewingUsers(tenant)}>
+                        Usuarios
+                      </Button>
                       <Button size="sm" variant="secondary" icon={<LogIn className="size-4" />} loading={entering === tenant.id} onClick={() => enter(tenant)}>
                         Entrar
                       </Button>
@@ -375,6 +423,7 @@ function TenantsCard({ onCreate }: { onCreate: () => void }) {
           </tbody>
         </Table>
       )}
+      {viewingUsers && <TenantUsersModal tenant={viewingUsers} onClose={() => setViewingUsers(null)} onEnter={() => enter(viewingUsers)} />}
     </Card>
   );
 }
@@ -442,6 +491,8 @@ function CreateTenantModal({ onClose }: { onClose: () => void }) {
     plan: 'free' as PlanId,
     timezone: browserTimezone(),
   });
+  const [invite, setInvite] = useState(false);
+  const [invitation, setInvitation] = useState<InviteResultDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
   const timezones = useMemo(() => {
     try {
@@ -454,11 +505,11 @@ function CreateTenantModal({ onClose }: { onClose: () => void }) {
 
   const create = useMutation({
     mutationFn: (body: typeof form) =>
-      api.post<TenantDTO>('/platform/tenants', {
+      api.post<TenantDTO & { invitation: InviteResultDTO | null }>('/platform/tenants', {
         organizationName: body.organizationName.trim(),
         adminName: body.adminName.trim(),
         adminEmail: body.adminEmail.trim(),
-        adminPassword: body.adminPassword,
+        ...(invite ? {} : { adminPassword: body.adminPassword }),
         plan: body.plan,
         ...(body.timezone.trim() ? { timezone: body.timezone.trim() } : {}),
       }),
@@ -470,11 +521,19 @@ function CreateTenantModal({ onClose }: { onClose: () => void }) {
     setError(null);
     try {
       const tenant = await create.mutateAsync(form);
-      toast(`Se creó «${tenant.name}». El administrador ya puede iniciar sesión.`);
+      if (tenant.invitation) {
+        setInvitation(tenant.invitation);
+        return;
+      }
+      toast(`Se creó «${tenant.name}». El administrador ya puede iniciar sesión con ${form.adminEmail.trim()}.`);
       onClose();
     } catch (err) {
       setError(errorMessage(err));
     }
+  }
+
+  if (invitation) {
+    return <InviteResultModal result={invitation} name={form.adminName} email={form.adminEmail.trim()} onClose={onClose} />;
   }
 
   return (
@@ -542,17 +601,27 @@ function CreateTenantModal({ onClose }: { onClose: () => void }) {
             <Field label="Email" required>
               <Input type="email" required value={form.adminEmail} onChange={(e) => set('adminEmail', e.target.value)} autoComplete="off" />
             </Field>
-            <Field label="Contraseña" required hint="Mínimo 8 caracteres. Compártala de forma segura." className="sm:col-span-2">
-              <Input
-                type="password"
-                required
-                minLength={8}
-                maxLength={200}
-                value={form.adminPassword}
-                onChange={(e) => set('adminPassword', e.target.value)}
-                autoComplete="new-password"
+            <div className="sm:col-span-2">
+              <Toggle
+                checked={invite}
+                onChange={setInvite}
+                label="Enviar una invitación para que elija su contraseña"
+                hint={invite ? 'Recibirá un enlace por correo; si no hay correo configurado, le mostramos el enlace para compartirlo.' : 'Usted define la contraseña y se la comparte.'}
               />
-            </Field>
+            </div>
+            {!invite && (
+              <Field label="Contraseña" required hint="Mínimo 8 caracteres. Compártala de forma segura." className="sm:col-span-2">
+                <Input
+                  type="password"
+                  required
+                  minLength={8}
+                  maxLength={200}
+                  value={form.adminPassword}
+                  onChange={(e) => set('adminPassword', e.target.value)}
+                  autoComplete="new-password"
+                />
+              </Field>
+            )}
           </div>
         </div>
 
