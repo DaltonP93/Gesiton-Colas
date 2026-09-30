@@ -1,3 +1,4 @@
+import type { TicketChargeDTO } from './payments';
 import type { DisplayConfig, KioskConfig, TenantSettings, Branding, Terminology, CustomerField } from './config';
 import type {
   ApiKeyScope,
@@ -22,6 +23,8 @@ export interface TenantDTO {
   name: string;
   plan: PlanId;
   status: 'active' | 'suspended';
+  /** `billing`: por falta de pago (se reactiva al pagar). */
+  suspendedReason: 'billing' | 'manual' | null;
   settings: TenantSettings;
   /** Organización de demostración creada desde "Probar demo". */
   isDemo: boolean;
@@ -90,6 +93,8 @@ export interface ServiceDTO {
   sortOrder: number;
   /** Minutos estimados por atención (para calcular la espera). */
   estimatedMinutes: number;
+  /** Precio en la unidad mínima de la moneda de la organización (módulo «Pagos»); null = sin cobro. */
+  price: number | null;
 }
 
 export interface PriorityDTO {
@@ -301,6 +306,8 @@ export interface PublicTicketDTO {
   notify: { available: boolean; phone: string | null };
   /** Encuesta de satisfacción del turno (cuando terminó la atención). */
   survey: { url: string; answered: boolean } | null;
+  /** Cobro del turno (módulo «Pagos»). */
+  charge: TicketChargeDTO | null;
 }
 
 export interface PairingDTO {

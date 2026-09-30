@@ -43,6 +43,13 @@
       "when": 1790797066086,
       "tag": "0005_surveys",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790798382199,
+      "tag": "0006_payments",
+      "breakpoints": true
     }
   ]
 }

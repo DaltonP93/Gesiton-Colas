@@ -8,7 +8,7 @@ const DEMO_RETENTION_DAYS = 30;
 const WEBHOOK_RETENTION_DAYS = 30;
 
 /** Limpieza periódica: enlaces vencidos, vinculaciones viejas y demos abandonadas. */
-export async function runMaintenance(ctx: Pick<AppContext, 'db' | 'log'>) {
+export async function runMaintenance(ctx: Pick<AppContext, 'db' | 'log'> & Partial<Pick<AppContext, 'payments'>>) {
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 24 * 3600 * 1000);
   await ctx.db.delete(authTokens).where(or(lt(authTokens.expiresAt, weekAgo), and(isNotNull(authTokens.usedAt), lt(authTokens.usedAt, weekAgo))));
@@ -28,9 +28,11 @@ export async function runMaintenance(ctx: Pick<AppContext, 'db' | 'log'>) {
       AND t.customer <> '{}'::jsonb
       AND t.created_at < now() - make_interval(days => (o.settings->'privacy'->>'retentionDays')::int)`);
   if (anonymized.rowCount) ctx.log.info({ count: anonymized.rowCount }, 'mantenimiento: datos personales vencidos borrados');
+  // Facturación: factura del mes y suspensión por falta de pago (si el superadministrador lo activó).
+  await ctx.payments?.runCycle();
 }
 
-export function startMaintenance(ctx: Pick<AppContext, 'db' | 'log'>, intervalMs = 6 * 3600 * 1000) {
+export function startMaintenance(ctx: Pick<AppContext, 'db' | 'log' | 'payments'>, intervalMs = 6 * 3600 * 1000) {
   const run = () => runMaintenance(ctx).catch((error) => ctx.log.error({ err: error }, 'mantenimiento: error'));
   const first = setTimeout(run, 60_000);
   const timer = setInterval(run, intervalMs);

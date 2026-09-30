@@ -33,6 +33,8 @@ import { notificationRoutes } from './modules/notifications/routes';
 import { numberingRoutes } from './modules/numbering/routes';
 import { privacyRoutes } from './modules/privacy/routes';
 import { surveyRoutes } from './modules/surveys/routes';
+import { billingRoutes } from './modules/billing/routes';
+import { paymentRoutes } from './modules/payments/routes';
 import { pairingRoutes } from './modules/pairing/routes';
 import { platformRoutes } from './modules/platform/routes';
 import { publicRoutes } from './modules/public/routes';
@@ -54,7 +56,8 @@ declare module 'fastify' {
  */
 const WEB_CSP = [
   "default-src 'self'",
-  "script-src 'self' https://www.youtube.com https://s.ytimg.com",
+  // YouTube (reproductor) y Bancard (checkout de pagos en un iframe).
+  "script-src 'self' https://www.youtube.com https://s.ytimg.com https://vpos.infonet.com.py https://vpos.infonet.com.py:8888",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com",
   'img-src * data: blob:',
@@ -185,6 +188,8 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
       await api.register(privacyRoutes(ctx));
       await api.register(notificationRoutes(ctx));
       await api.register(surveyRoutes(ctx));
+      await api.register(billingRoutes(ctx));
+      await api.register(paymentRoutes(ctx));
       await api.register(agentRoutes(ctx));
       await api.register(deviceRoutes(ctx));
       await api.register(mediaRoutes(ctx));

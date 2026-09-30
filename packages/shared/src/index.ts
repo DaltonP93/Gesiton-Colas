@@ -10,3 +10,5 @@ export * from './notifications';
 export * from './platform';
 export * from './types';
 export * from './surveys';
+export * from './currency';
+export * from './payments';

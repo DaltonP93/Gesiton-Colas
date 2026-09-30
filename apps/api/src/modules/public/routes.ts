@@ -49,6 +49,7 @@ import {
 import { assertModuleActive, assertTenantAvailable } from '../../lib/auth';
 import { badRequest, notFound } from '../../lib/errors';
 import { dayInTimezone } from '../../lib/tz';
+import { ticketCharge } from '../payments/routes';
 import { ticketSurveyInfo } from '../surveys/routes';
 import { customerSchema } from '../tickets/routes';
 import { cancelTicket, countAhead, findTickets, issueTicket, loadTicket } from '../tickets/queue';
@@ -309,6 +310,7 @@ export const publicRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
       return {
         notify: await notifyOffer(tenant, row.customer as Record<string, string | null>),
         survey: await ticketSurveyInfo(ctx, tenant, row),
+        charge: await ticketCharge(ctx, tenant, row),
         code: ticket.code,
         status: ticket.status,
         service: ticket.service?.name ?? '',

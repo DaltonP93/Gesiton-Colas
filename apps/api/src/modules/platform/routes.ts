@@ -3,7 +3,16 @@ import { and, asc, count, desc, eq, ne, sql } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { CURRENCIES, HOME_PAGES, MODULE_IDS, PLAN_IDS, UPLOAD_MIME_TYPES, type AccessLinkDTO, type ModuleOverrides, type PlatformSettings } from '@gc/shared';
+import {
+  CURRENCIES,
+  HOME_PAGES,
+  MODULE_IDS,
+  PLAN_IDS,
+  UPLOAD_MIME_TYPES,
+  type AccessLinkDTO,
+  type ModuleOverrides,
+  type PlatformSettings,
+} from '@gc/shared';
 import type { AppContext } from '../../context';
 import { createTenantWithDefaults } from '../../db/seed';
 import { tenants, users } from '../../db/schema';
@@ -51,6 +60,20 @@ const settingsBody = z.object({
         currency: z.enum(CURRENCIES).optional(),
       }),
     )
+    .optional(),
+  // Sin valores por defecto: lo que no se envía queda como está.
+  billing: z
+    .object({
+      enabled: z.boolean(),
+      autoGenerate: z.boolean(),
+      dueDays: z.number().int().min(0).max(90),
+      autoSuspend: z.boolean(),
+      graceDays: z.number().int().min(0).max(120),
+      issuerName: z.string().trim().max(160),
+      issuerTaxId: z.string().trim().max(40),
+      instructions: z.string().trim().max(1000),
+    })
+    .partial()
     .optional(),
 });
 
@@ -174,6 +197,7 @@ export const platformRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async 
       const [current] = await ctx.db.select().from(tenants).where(eq(tenants.id, request.params.id));
       if (!current) throw notFound('Organización');
       const patch: Partial<typeof tenants.$inferInsert> = { ...rest };
+      if (rest.status) patch.suspendedReason = rest.status === 'suspended' ? 'manual' : null;
       if (modules) {
         const next: ModuleOverrides = { ...(current.modules ?? {}) };
         for (const [id, value] of Object.entries(modules) as [keyof ModuleOverrides, boolean | null][]) {

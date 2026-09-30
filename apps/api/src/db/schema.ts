@@ -8,6 +8,7 @@ import {
   pgTable,
   primaryKey,
   real,
+  serial,
   text,
   timestamp,
   uniqueIndex,
@@ -28,6 +29,11 @@ import type {
   PlatformSettings,
   Role,
   Schedule,
+  Currency,
+  InvoiceStatus,
+  PaymentGateway,
+  PaymentProvider,
+  PaymentStatus,
   SurveyAnswers,
   SurveyQuestion,
   TenantSettings,
@@ -54,6 +60,8 @@ export const tenants = pgTable('tenants', {
   name: text('name').notNull(),
   plan: text('plan').$type<PlanId>().notNull().default('free'),
   status: text('status').$type<'active' | 'suspended'>().notNull().default('active'),
+  /** Por qué se suspendió: `billing` (falta de pago, se reactiva sola al pagar) o `manual`. */
+  suspendedReason: text('suspended_reason').$type<'billing' | 'manual'>(),
   settings: jsonb('settings').$type<TenantSettings>().notNull(),
   storageBytes: bigint('storage_bytes', { mode: 'number' }).notNull().default(0),
   /** Organización de demostración (se crea desde "Probar demo" y vence). */
@@ -134,6 +142,8 @@ export const services = pgTable(
     active: boolean('active').notNull().default(true),
     sortOrder: integer('sort_order').notNull().default(0),
     estimatedMinutes: integer('estimated_minutes').notNull().default(5),
+    /** Precio en la unidad mínima de la moneda de la organización (módulo «Pagos»). */
+    price: bigint('price', { mode: 'number' }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -612,6 +622,97 @@ export const surveyResponses = pgTable(
   ],
 );
 
+/** Facturas de la plataforma a las organizaciones (planes). */
+export const invoices = pgTable(
+  'invoices',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    /** Número correlativo de la plataforma (F-000001). */
+    seq: serial('seq').notNull(),
+    /** Mes facturado (YYYY-MM) en las facturas del plan. */
+    period: text('period'),
+    description: text('description').notNull(),
+    amount: bigint('amount', { mode: 'number' }).notNull(),
+    currency: text('currency').$type<Currency>().notNull(),
+    status: text('status').$type<InvoiceStatus>().notNull().default('pending'),
+    dueDate: date('due_date').notNull(),
+    issuedAt: timestamp('issued_at', { withTimezone: true }).defaultNow().notNull(),
+    paidAt: timestamp('paid_at', { withTimezone: true }),
+    method: text('method'),
+    reference: text('reference'),
+    notes: text('notes').notNull().default(''),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex('invoices_seq_idx').on(t.seq),
+    // Una factura del plan por mes y organización.
+    uniqueIndex('invoices_period_idx').on(t.tenantId, t.period),
+    index('invoices_status_idx').on(t.status, t.dueDate),
+  ],
+);
+
+/** Pagos: de facturas (a la plataforma) y de turnos (a la organización). */
+export const payments = pgTable(
+  'payments',
+  {
+    id: id(),
+    /** Número correlativo (lo usan Bancard y PagoPar como id del pedido). */
+    seq: serial('seq').notNull(),
+    tenantId: tenantId(),
+    kind: text('kind').$type<'invoice' | 'ticket'>().notNull(),
+    invoiceId: uuid('invoice_id').references(() => invoices.id, { onDelete: 'cascade' }),
+    ticketId: uuid('ticket_id').references(() => tickets.id, { onDelete: 'set null' }),
+    description: text('description').notNull().default(''),
+    amount: bigint('amount', { mode: 'number' }).notNull(),
+    currency: text('currency').$type<Currency>().notNull(),
+    status: text('status').$type<PaymentStatus>().notNull().default('pending'),
+    provider: text('provider').$type<PaymentProvider>().notNull(),
+    /** Forma de pago (efectivo, tarjeta…) o la que informa la pasarela. */
+    method: text('method'),
+    reference: text('reference'),
+    /** Identificador en la pasarela (sesión de Stripe, hash de PagoPar, proceso de Bancard). */
+    providerRef: text('provider_ref'),
+    checkoutUrl: text('checkout_url'),
+    /** Token de la página pública del pago. */
+    publicToken: text('public_token').notNull(),
+    returnUrl: text('return_url'),
+    recordedBy: uuid('recorded_by').references(() => users.id, { onDelete: 'set null' }),
+    raw: jsonb('raw').$type<Record<string, unknown>>(),
+    paidAt: timestamp('paid_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex('payments_seq_idx').on(t.seq),
+    uniqueIndex('payments_public_token_idx').on(t.publicToken),
+    index('payments_tenant_idx').on(t.tenantId, t.createdAt),
+    index('payments_ticket_idx').on(t.ticketId),
+    index('payments_invoice_idx').on(t.invoiceId),
+    index('payments_provider_ref_idx').on(t.provider, t.providerRef),
+  ],
+);
+
+/** Pasarela de pagos de la plataforma (`platform`) o de cada organización (su id). */
+export const paymentGateways = pgTable(
+  'payment_gateways',
+  {
+    scope: text('scope').primaryKey(),
+    tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }),
+    provider: text('provider').$type<PaymentGateway>().notNull(),
+    enabled: boolean('enabled').notNull().default(false),
+    sandbox: boolean('sandbox').notNull().default(true),
+    config: jsonb('config').$type<{ publicKey?: string; apiUrl?: string }>().notNull().default({}),
+    secretEnc: text('secret_enc').notNull().default(''),
+    webhookSecretEnc: text('webhook_secret_enc').notNull().default(''),
+    /** Parte secreta de la URL de confirmaciones. */
+    webhookToken: text('webhook_token').notNull(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex('payment_gateways_webhook_idx').on(t.webhookToken)],
+);
+
 export type Tenant = typeof tenants.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Branch = typeof branches.$inferSelect;
@@ -633,3 +734,6 @@ export type NotifyProviderRow = typeof notifyProviders.$inferSelect;
 export type NotifyMessageRow = typeof notifyMessages.$inferSelect;
 export type Survey = typeof surveys.$inferSelect;
 export type SurveyResponse = typeof surveyResponses.$inferSelect;
+export type Invoice = typeof invoices.$inferSelect;
+export type Payment = typeof payments.$inferSelect;
+export type PaymentGatewayRow = typeof paymentGateways.$inferSelect;
