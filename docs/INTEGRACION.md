@@ -156,3 +156,18 @@ Las pantallas, kioscos y el seguimiento son páginas web normales: pueden abrirs
 ```html
 <iframe src="https://colas.ejemplo.com/kiosco/TOKEN?modo=movil" style="width:100%;height:720px;border:0" allow="autoplay"></iframe>
 ```
+
+## Avisos por WhatsApp y SMS
+
+Módulo **Avisos** (se activa por plan o por organización desde la Plataforma). Se configura en
+**Configuración → Avisos por WhatsApp y SMS** (o, para todas las organizaciones, en Plataforma → Ajustes).
+
+| Canal | Qué hace falta | Notas |
+| --- | --- | --- |
+| **WAHA** (WhatsApp local) | Una instalación de [WAHA](https://waha.devlike.pro/) con una sesión vinculada por QR: `docker run -d -p 3000:3000 -e WAHA_API_KEY=su-clave devlikeapro/waha`. En el panel: dirección (`http://10.0.0.5:3000`), sesión y API key. | Se usa `POST /api/sendText` con `chatId = 595981123456@c.us`. WhatsApp no permite oficialmente cuentas automatizadas no Business: use un número dedicado. |
+| **WhatsApp oficial (Meta)** | Cuenta de WhatsApp Business Platform: *Phone number ID* y un token permanente de usuario del sistema. | Los mensajes que inicia la empresa deben ser **plantillas aprobadas**. Cree una por aviso en Meta y escriba su nombre en la pestaña Mensajes. Variables en orden: al sacar turno `{{1}}` número, `{{2}}` servicio, `{{3}}` personas antes, `{{4}}` enlace; cuando se acerca `{{1}}` número, `{{2}}` turnos que faltan, `{{3}}` sucursal; al llamar `{{1}}` número, `{{2}}` puesto; al terminar `{{1}}` organización, `{{2}}` enlace de la encuesta. Sin plantilla se envía texto (solo llega dentro de las 24 h desde el último mensaje del cliente). |
+| **SMS por HTTP** | La URL del proveedor. Use `{{phone}}` y `{{message}}` en la URL o en el cuerpo; el encabezado de autenticación es opcional. | Los valores se codifican según el tipo de contenido (JSON, formulario o texto). Sirve también para gateways locales (módems GSM, Kannel, Android SMS Gateway…). |
+
+- El teléfono sale del dato «Teléfono» del turno (kiosco, panel o API) o lo escribe el cliente en su página de seguimiento. Los números locales se completan con el código de país configurado (595 por defecto): `0981 123 456` → `595981123456`.
+- Los envíos pasan por una cola con 3 intentos (al minuto y a los 5 minutos) y quedan en el **Historial**, donde se pueden reintentar.
+- Por seguridad, el proveedor de una organización no puede apuntar a la red interna del servidor. Si WAHA o el gateway de SMS están en la red local, configúrelos como **proveedor de la plataforma** o active `WEBHOOKS_ALLOW_PRIVATE=true` en una instalación con organizaciones de confianza.

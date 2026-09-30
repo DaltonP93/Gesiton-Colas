@@ -27,6 +27,10 @@ Plataforma **SaaS** de gestión de turnos, pantallas y publicidad digital. Organ
 | **Acceso por correo** | **Demo por correo** (organización de ejemplo con historial, operadores, publicidad y turnos, con vencimiento), verificación de email, **olvidé mi contraseña**, ingreso sin contraseña con **enlace o código de 6 dígitos**, invitación de usuarios por correo. SMTP con cualquier proveedor. |
 | **Portal de herramientas** | Al ingresar, un portal abre la consola, el **kiosco / triage** o el **panel TV** con un clic, copia enlaces o muestra el QR. Las TVs y tablets se **vinculan con un código de 6 dígitos** desde `/vincular`, sin escribir URLs largas; el equipo recuerda su pantalla. |
 | **Sonidos y audio** | 19 sonidos de llamado incluidos (escuchar y descargar), subida de audios propios (MP3, WAV, OGG, M4A) como tono de llamado o voz grabada, **música ambiental** y radios por streaming con atenuación en cada llamado, y guía para instalar más voces. |
+| **Módulos activables** | Pantallas, kioscos, publicidad, reportes, integraciones, avisos, encuestas y pagos son **módulos**: el superadministrador define qué incluye cada plan y puede **activar o desactivar cada módulo por organización**. Un módulo apagado desaparece del menú y la API responde `403 module_disabled`. |
+| **Numeración de turnos** | Prefijo por servicio, 1 a 6 dígitos, número inicial, reinicio **diario, semanal, mensual, anual o nunca**, y qué pasa al llegar al máximo (A999 → A001 o A1000). Estado del contador y **reinicio manual** en Configuración → Numeración. |
+| **Avisos por WhatsApp y SMS** | Mensajes al **sacar el turno**, **cuando se acerca** (faltan N), **cuando lo llaman** y **al terminar** (con la encuesta). Canales: **WhatsApp oficial (Meta Cloud API)** con plantillas, **WAHA** u otra API local de WhatsApp y **cualquier proveedor de SMS por HTTP** (URL y cuerpo con `{{phone}}` y `{{message}}`). Proveedor de la plataforma o propio de cada organización, clave cifrada, mensaje de prueba, historial con reintentos y alta del teléfono desde la página de seguimiento. |
+| **Privacidad** | Plazo de conservación de datos personales, borrado a pedido del titular y exportación de datos personales solo para administradores (ver [docs/SEGURIDAD.md](docs/SEGURIDAD.md)). |
 
 Funciona en **cualquier dispositivo con navegador**: Smart TV, Android TV/Google TV, mini PC, Raspberry Pi, tablets, celulares, Windows, macOS y Linux.
 
@@ -107,6 +111,7 @@ docker compose exec app node apps/api/dist/db/admin-cli.js superadmin correo@emp
 | `/t/:token` | Seguimiento del turno del cliente |
 | `/plataforma` | Superadministrador: organizaciones, planes, superadministradores, página principal, marca y correo |
 | `/app/configuracion/correo` | Servidor de correo propio de la organización |
+| `/app/configuracion/avisos` | Avisos por WhatsApp y SMS: canal, mensajes e historial |
 | `/api/docs` | Documentación interactiva de la API |
 
 ## Documentación

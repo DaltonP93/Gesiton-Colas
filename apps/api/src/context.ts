@@ -8,6 +8,7 @@ import { createAuth, type Auth } from './lib/auth';
 import { tenantSettings, toCallDTO } from './lib/dto';
 import { brandFrom, type EmailBrand } from './lib/emails';
 import { createMailer, type Mailer } from './lib/mailer';
+import { Notifier } from './lib/notifier';
 import { createPlatformSettings, type PlatformSettingsStore } from './lib/platformSettings';
 import { createStorage, type Storage } from './lib/storage';
 import { WebhookDispatcher } from './modules/webhooks/dispatcher';
@@ -28,6 +29,8 @@ export interface AppContext {
   emailBrand(tenant: Tenant | null | undefined): Promise<EmailBrand>;
   /** Módulos activos de una organización: los de su plan con los ajustes del superadministrador. */
   modulesOf(tenant: Pick<Tenant, 'plan' | 'modules'>): Promise<ModuleId[]>;
+  /** Avisos al cliente por WhatsApp / SMS. */
+  notifier: Notifier;
   /** Notifica un cambio de turno a pantallas, operadores, seguimiento público y webhooks. */
   publishTicket(
     tenantId: string,
@@ -70,6 +73,7 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
   });
   const storage = createStorage(config);
   const mailer = createMailer(config, db, log);
+  const notifier = new Notifier({ config, db, log, modulesOf });
   const publicUrl = config.PUBLIC_URL.replace(/\/$/, '');
 
   return {
@@ -82,6 +86,7 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
     mailer,
     platform,
     modulesOf,
+    notifier,
     log,
     async emailBrand(tenant) {
       if (tenant) return brandFrom(tenantSettings(tenant).branding, publicUrl);
@@ -108,6 +113,7 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
       webhooks
         .dispatch(tenantId, event, { ticket, ...extra })
         .catch((error) => log.error({ err: error }, 'webhooks: dispatch'));
+      notifier.onTicketEvent(tenantId, event, ticket).catch((error) => log.error({ err: error }, 'avisos: evento'));
     },
     refreshDevices(tenantId, target) {
       if (target?.displayId) rt.emit(rooms.display(target.displayId), RT.displayConfig, {});

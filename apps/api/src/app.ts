@@ -29,6 +29,7 @@ import { catalogRoutes } from './modules/catalog/routes';
 import { deviceRoutes } from './modules/devices/routes';
 import { integrationRoutes } from './modules/integrations/routes';
 import { mediaRoutes } from './modules/media/routes';
+import { notificationRoutes } from './modules/notifications/routes';
 import { numberingRoutes } from './modules/numbering/routes';
 import { privacyRoutes } from './modules/privacy/routes';
 import { pairingRoutes } from './modules/pairing/routes';
@@ -181,6 +182,7 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
       await api.register(ticketRoutes(ctx));
       await api.register(numberingRoutes(ctx));
       await api.register(privacyRoutes(ctx));
+      await api.register(notificationRoutes(ctx));
       await api.register(agentRoutes(ctx));
       await api.register(deviceRoutes(ctx));
       await api.register(mediaRoutes(ctx));
@@ -225,12 +227,16 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
 
   ctx.rt.attach(app.server);
   const stopMaintenance = config.NODE_ENV !== 'test' ? startMaintenance(ctx) : () => undefined;
-  if (config.NODE_ENV !== 'test') ctx.webhooks.start();
+  if (config.NODE_ENV !== 'test') {
+    ctx.webhooks.start();
+    ctx.notifier.start();
+  }
   await ensureSuperadmin(ctx);
 
   app.addHook('onClose', async () => {
     stopMaintenance();
     ctx.webhooks.stop();
+    ctx.notifier.stop();
     ctx.rt.close();
     await pool?.pool.end();
   });

@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { CURRENCIES, MODULE_IDS, MODULES, PLAN_IDS, PLANS, type Currency, type HomePage, type ModuleId, type PlanId, type PlatformSettings } from '@gc/shared';
 import { ImageField } from '../../components/ImageField';
 import { MailSettingsForm } from '../../components/MailSettingsForm';
+import { NotifyProviderForm } from '../../components/NotifyProviderForm';
 import { Button, Checkbox, ColorInput, Field, Input, Loading, Select, Textarea, Toggle, cx, useFeedback } from '../../components/ui';
 import { api, assetUrl, errorMessage } from '../../lib/api';
 
@@ -182,6 +183,14 @@ export function PlatformSettingsTab() {
       <section className="space-y-4">
         <SectionHead title="Correo saliente (SMTP)" description="Servidor por el que salen las invitaciones, los códigos de acceso y la recuperación de contraseñas." />
         <MailSettingsForm scope="platform" />
+      </section>
+
+      <section className="space-y-4">
+        <SectionHead
+          title="Avisos por WhatsApp y SMS"
+          description="Canal compartido para las organizaciones con el módulo «Avisos» que no configuren uno propio. Cada organización define sus mensajes."
+        />
+        <NotifyProviderForm scope="platform" />
       </section>
     </div>
   );

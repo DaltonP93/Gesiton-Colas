@@ -51,6 +51,12 @@ const dict = {
     'track.service': '{service}',
     'track.issuedAt': 'Emitido a las',
     'track.live': 'Actualización en vivo',
+    'track.phoneTitle': 'Avisos por WhatsApp o SMS',
+    'track.phoneHint': 'Deje su número y le avisamos cuando se acerque su {ticket} y cuando lo llamen.',
+    'track.phonePlaceholder': 'Su número de celular',
+    'track.phoneSave': 'Recibir avisos',
+    'track.phoneOn': 'Le avisaremos al {phone}',
+    'track.phoneChange': 'Cambiar número',
   },
   en: {
     'kiosk.choosePriority': 'Select the type of service',
@@ -98,6 +104,12 @@ const dict = {
     'track.service': 'Service',
     'track.issuedAt': 'Issued at',
     'track.live': 'Live updates',
+    'track.phoneTitle': 'WhatsApp or SMS alerts',
+    'track.phoneHint': 'Leave your number and we will let you know when your turn is near and when you are called.',
+    'track.phonePlaceholder': 'Your mobile number',
+    'track.phoneSave': 'Get alerts',
+    'track.phoneOn': 'We will notify {phone}',
+    'track.phoneChange': 'Change number',
   },
   pt: {
     'kiosk.choosePriority': 'Selecione o tipo de atendimento',
@@ -145,6 +157,12 @@ const dict = {
     'track.service': 'Serviço',
     'track.issuedAt': 'Emitida às',
     'track.live': 'Atualização ao vivo',
+    'track.phoneTitle': 'Avisos por WhatsApp ou SMS',
+    'track.phoneHint': 'Deixe seu número e avisaremos quando sua vez estiver próxima e quando for chamado.',
+    'track.phonePlaceholder': 'Seu número de celular',
+    'track.phoneSave': 'Receber avisos',
+    'track.phoneOn': 'Vamos avisar o {phone}',
+    'track.phoneChange': 'Trocar número',
   },
 } satisfies Record<Locale, Record<string, string>>;
 

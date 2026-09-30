@@ -297,6 +297,8 @@ export interface PublicTicketDTO {
   calledAt: ISODate | null;
   finishedAt: ISODate | null;
   tenant: PublicTenantDTO;
+  /** Avisos por WhatsApp/SMS: si se ofrecen y el teléfono anotado (enmascarado). */
+  notify: { available: boolean; phone: string | null };
 }
 
 export interface PairingDTO {

@@ -6,6 +6,7 @@ import {
   displayConfigSchema,
   kioskConfigSchema,
   normalizeConfig,
+  normalizePhone,
   type CallDTO,
   type DisplayBootstrapDTO,
   type IssuedTicketDTO,
@@ -30,6 +31,7 @@ import {
   services,
   tenants,
   tickets,
+  type Tenant,
 } from '../../db/schema';
 import {
   tenantSettings,
@@ -266,6 +268,16 @@ export const publicRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
   );
 
   /* --------------------------- Seguimiento ---------------------------- */
+
+  /** ¿Puede el cliente anotarse para recibir avisos? (módulo activo, proveedor configurado y algún aviso encendido) */
+  async function notifyOffer(tenant: Tenant, customer: Record<string, string | null>): Promise<PublicTicketDTO['notify']> {
+    const events = tenantSettings(tenant).notifications.events;
+    const anyEvent = events.created.enabled || events.near.enabled || events.called.enabled;
+    const available = anyEvent && (await ctx.modulesOf(tenant)).includes('notifications') && (await ctx.notifier.resolve(tenant.id)).source !== 'none';
+    const digits = normalizePhone(customer.phone, tenantSettings(tenant).notifications.countryCode);
+    return { available, phone: digits ? `+${digits.slice(0, 4)}${'•'.repeat(Math.max(0, digits.length - 6))}${digits.slice(-2)}` : null };
+  }
+
   async function trackedTicket(token: string) {
     const [row] = await ctx.db.select().from(tickets).where(eq(tickets.publicToken, token)).limit(1);
     if (!row) throw notFound('Turno');
@@ -294,6 +306,7 @@ export const publicRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
         estimatedMinutes = Math.ceil(((waitingAhead + 1) * (service?.estimatedMinutes ?? 5)) / activeAgents);
       }
       return {
+        notify: await notifyOffer(tenant, row.customer as Record<string, string | null>),
         code: ticket.code,
         status: ticket.status,
         service: ticket.service?.name ?? '',
