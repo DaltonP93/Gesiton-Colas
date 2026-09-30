@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ALERT_SOUNDS, DISPLAY_LAYOUTS, LOCALES } from './enums';
 import { notificationSettingsSchema } from './notifications';
+import { tenantPaymentSettingsSchema } from './payments';
 
 const color = z.string().regex(/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i, 'Color hexadecimal inválido');
 /** CSS propio: no puede contener «<» (evita cerrar la etiqueta <style> e inyectar HTML). */
@@ -123,6 +124,7 @@ export const tenantSettingsSchema = z.object({
   privacy: privacySettingsSchema.prefault({}),
   /** Avisos por WhatsApp / SMS (módulo «notifications»). */
   notifications: notificationSettingsSchema.prefault({}),
+  payments: tenantPaymentSettingsSchema.prefault({}),
 });
 export type TenantSettings = z.infer<typeof tenantSettingsSchema>;
 

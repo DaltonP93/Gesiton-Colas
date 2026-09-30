@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { DEFAULT_PLAN_MODULES, MODULE_IDS } from './modules';
 import { PLAN_IDS, type PlanId } from './plans';
+import { CURRENCIES } from './currency';
+import { billingSettingsSchema } from './payments';
 
 const color = z.string().regex(/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i, 'Color hexadecimal inválido');
 
@@ -36,8 +38,6 @@ export const platformBrandSchema = z.object({
 export type PlatformBrand = z.infer<typeof platformBrandSchema>;
 
 /** Monedas para precios de planes y cobros. */
-export const CURRENCIES = ['PYG', 'USD', 'ARS', 'BRL', 'EUR'] as const;
-export type Currency = (typeof CURRENCIES)[number];
 
 /** Configuración comercial de un plan: módulos incluidos y precio mensual. */
 const planConfig = (id: PlanId) =>
@@ -64,6 +64,8 @@ export const platformSettingsSchema = z.object({
   brand: platformBrandSchema.prefault({}),
   /** Módulos y precio de cada plan. */
   plans: platformPlansSchema.prefault({}),
+  /** Facturación de los planes a las organizaciones. */
+  billing: billingSettingsSchema.prefault({}),
 });
 export type PlatformSettings = z.infer<typeof platformSettingsSchema>;
 

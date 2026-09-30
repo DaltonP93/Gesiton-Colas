@@ -86,7 +86,8 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
   /** Verifica que la cuenta pueda iniciar sesión y devuelve el token + datos de sesión. */
   async function startSession(user: User, tenant: Tenant | null, options: { markVerified?: boolean } = {}) {
     if (!user.active) throw forbidden('El usuario está deshabilitado');
-    if (tenant && user.role !== 'superadmin') assertTenantAvailable(tenant);
+    // Suspendida por falta de pago: el administrador puede entrar para pagar.
+    if (tenant && user.role !== 'superadmin') assertTenantAvailable(tenant, { allowBilling: user.role === 'admin' });
     const patch: Partial<typeof users.$inferInsert> = { lastLoginAt: new Date() };
     if (options.markVerified && !user.emailVerifiedAt) patch.emailVerifiedAt = new Date();
     await ctx.db.update(users).set(patch).where(eq(users.id, user.id));
@@ -383,7 +384,7 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
 
   /* ---------------------------- Perfil propio ------------------------- */
 
-  app.get('/auth/me', { preHandler: ctx.auth.require(), schema: { tags, summary: 'Usuario actual, organización y límites del plan' } }, async (request) => {
+  app.get('/auth/me', { preHandler: ctx.auth.require({ allowBillingSuspended: true }), schema: { tags, summary: 'Usuario actual, organización y límites del plan' } }, async (request) => {
     if (request.auth?.kind !== 'user') throw badRequest('Disponible solo para usuarios');
     return me(request.auth.userId, request.auth.tenantId);
   });

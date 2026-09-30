@@ -3,12 +3,13 @@ import { RT, effectiveModules, type ModuleId, type TicketDTO, type WebhookEvent 
 import type { AppConfig } from './config';
 import type { Database } from './db/client';
 import { eq } from 'drizzle-orm';
-import { tenants, type Tenant } from './db/schema';
+import { tenants, tickets, type Tenant } from './db/schema';
 import { createAuth, type Auth } from './lib/auth';
 import { tenantSettings, toCallDTO } from './lib/dto';
 import { brandFrom, type EmailBrand } from './lib/emails';
 import { createMailer, type Mailer } from './lib/mailer';
 import { Notifier } from './lib/notifier';
+import { Payments } from './lib/payments/service';
 import { surveyLinkFor } from './lib/surveys';
 import { createPlatformSettings, type PlatformSettingsStore } from './lib/platformSettings';
 import { createStorage, type Storage } from './lib/storage';
@@ -32,6 +33,8 @@ export interface AppContext {
   modulesOf(tenant: Pick<Tenant, 'plan' | 'modules'>): Promise<ModuleId[]>;
   /** Avisos al cliente por WhatsApp / SMS. */
   notifier: Notifier;
+  /** Pasarelas, cobros y facturación de la plataforma. */
+  payments: Payments;
   /** Notifica un cambio de turno a pantallas, operadores, seguimiento público y webhooks. */
   publishTicket(
     tenantId: string,
@@ -77,6 +80,37 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
   const notifier = new Notifier({ config, db, log, modulesOf });
   notifier.surveyLink = async (tenant, ticket) => ((await modulesOf(tenant)).includes('surveys') ? surveyLinkFor(db, config.PUBLIC_URL, tenant, ticket) : null);
   const publicUrl = config.PUBLIC_URL.replace(/\/$/, '');
+  const emailBrand = async (tenant: Tenant | null | undefined) => {
+    if (tenant) return brandFrom(tenantSettings(tenant).branding, publicUrl);
+    const { brand } = await platform.get();
+    return brandFrom({ appName: brand.appName, logoUrl: brand.logoUrl, primaryColor: brand.primaryColor }, publicUrl);
+  };
+  const payments = new Payments({
+    config,
+    db,
+    log,
+    mailer,
+    platformSettings: () => platform.get(),
+    emailBrand,
+    onTicketPaid(payment) {
+      void webhooks
+        .dispatch(payment.tenantId, 'payment.paid', {
+          payment: { id: payment.id, amount: payment.amount, currency: payment.currency, provider: payment.provider, method: payment.method, reference: payment.reference, paidAt: payment.paidAt },
+          ticketId: payment.ticketId,
+        })
+        .catch((error) => log.error({ err: error }, 'webhooks: pago'));
+      if (!payment.ticketId) return;
+      void db
+        .select({ token: tickets.publicToken, branchId: tickets.branchId })
+        .from(tickets)
+        .where(eq(tickets.id, payment.ticketId))
+        .then(([t]) => {
+          if (!t) return;
+          rt.emit(rooms.track(t.token), RT.ticketUpdated, { event: 'payment.paid', status: 'paid' });
+          rt.emit(rooms.staff(t.branchId), RT.ticketUpdated, { event: 'payment.paid', ticket: { id: payment.ticketId } });
+        });
+    },
+  });
 
   return {
     config,
@@ -89,12 +123,9 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
     platform,
     modulesOf,
     notifier,
+    payments,
     log,
-    async emailBrand(tenant) {
-      if (tenant) return brandFrom(tenantSettings(tenant).branding, publicUrl);
-      const { brand } = await platform.get();
-      return brandFrom({ appName: brand.appName, logoUrl: brand.logoUrl, primaryColor: brand.primaryColor }, publicUrl);
-    },
+    emailBrand,
     publishTicket(tenantId, event, ticket, extra = {}, options = {}) {
       const call = toCallDTO(ticket);
       if (!options.announceName) call.customerName = null;

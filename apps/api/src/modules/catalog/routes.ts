@@ -45,6 +45,8 @@ const serviceBody = z.object({
   active: z.boolean().default(true),
   sortOrder: z.number().int().default(0),
   estimatedMinutes: z.number().int().min(1).max(600).default(5),
+  /** Precio en la unidad mínima de la moneda (guaraníes, centavos). null = sin cobro. */
+  price: z.number().int().min(0).max(1_000_000_000_000).nullable().default(null),
 });
 
 const priorityBody = z.object({
