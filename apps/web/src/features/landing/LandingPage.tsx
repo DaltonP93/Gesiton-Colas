@@ -151,7 +151,10 @@ export function LandingPage() {
       </section>
 
       <footer className="py-10 text-center text-sm text-muted">
-        © {new Date().getFullYear()} {name} · <a href="/api/docs" className="hover:text-fg">Documentación de la API</a>
+        © {new Date().getFullYear()} {name} · <a href="/api/docs" className="hover:text-fg">Documentación de la API</a> ·{' '}
+        <a href="/licencias-de-terceros.txt" className="hover:text-fg">
+          Licencias de terceros
+        </a>
       </footer>
     </div>
   );

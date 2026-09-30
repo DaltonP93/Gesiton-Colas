@@ -5,6 +5,7 @@ import { BUILTIN_CUSTOMER_FIELDS, type CustomerField } from '@gc/shared';
 import { Badge, Button, Checkbox, EmptyState, Field, IconButton, Input, Select } from '../../../components/ui';
 import { useAuth } from '../../../lib/auth';
 import { Callout, SaveBar, Section, sameJson, useReportDirty, useSaveTenant, type TabProps } from './common';
+import { PrivacySection } from './PrivacySection';
 import { FIELD_TYPES } from './presets';
 
 const MAX_FIELDS = 30;
@@ -67,7 +68,7 @@ function slugKey(label: string): string {
 }
 
 export function CustomerFieldsTab({ onDirtyChange }: TabProps) {
-  const { settings, terms } = useAuth();
+  const { settings, terms, can } = useAuth();
   const { save, saving } = useSaveTenant();
   const source = settings.customerFields;
   const [rows, setRows] = useState<Row[]>(() => source.map(toRow));
@@ -243,6 +244,8 @@ export function CustomerFieldsTab({ onDirtyChange }: TabProps) {
           </Button>
         )}
       </Section>
+
+      {can('admin') && <PrivacySection />}
 
       <SaveBar
         dirty={dirty}

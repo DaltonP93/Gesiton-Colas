@@ -1,16 +1,19 @@
 import type { Server as HttpServer } from 'node:http';
 import { and, eq } from 'drizzle-orm';
 import { Server, type Socket } from 'socket.io';
+import { hasRole } from '@gc/shared';
 import type { FastifyBaseLogger } from 'fastify';
 import type { Auth } from '../lib/auth';
 import type { Database } from '../db/client';
-import { branches, displays, kiosks, tickets } from '../db/schema';
+import { branches, displays, kiosks, tickets, userBranches } from '../db/schema';
 
 export const rooms = {
   tenant: (id: string) => `tenant:${id}`,
   devices: (tenantId: string) => `devices:${tenantId}`,
   /** Sala pública de la sucursal (pantallas y kioscos): sin datos personales. */
   branch: (id: string) => `branch:${id}`,
+  /** Kioscos de una sucursal: solo reciben cambios de la cola, nunca los llamados (con nombres). */
+  kioskBranch: (id: string) => `kiosk-branch:${id}`,
   /** Sala del personal de la sucursal: datos completos. */
   staff: (id: string) => `staff:${id}`,
   display: (id: string) => `display:${id}`,
@@ -70,7 +73,7 @@ export class Realtime {
     if (kind === 'kiosk') {
       const [kiosk] = await this.db.select().from(kiosks).where(eq(kiosks.token, token)).limit(1);
       if (!kiosk) throw new Error('kiosco inválido');
-      await socket.join([rooms.branch(kiosk.branchId), rooms.kiosk(kiosk.id), rooms.devices(kiosk.tenantId)]);
+      await socket.join([rooms.kioskBranch(kiosk.branchId), rooms.kiosk(kiosk.id), rooms.devices(kiosk.tenantId)]);
       await this.db.update(kiosks).set({ lastSeenAt: new Date() }).where(eq(kiosks.id, kiosk.id));
       socket.emit('ready', { kind: 'kiosk', id: kiosk.id });
       return;
@@ -91,6 +94,10 @@ export class Realtime {
     const found = await this.auth.userFromToken(token);
     if (!found || !found.user.tenantId) throw new Error('usuario inválido');
     const tenantId = found.user.tenantId;
+    // Un operador asignado a ciertas sucursales solo recibe los datos (con nombres y documentos) de esas.
+    const restrictedTo = hasRole(found.user.role, 'manager')
+      ? null
+      : (await this.db.select({ id: userBranches.branchId }).from(userBranches).where(eq(userBranches.userId, found.user.id))).map((r) => r.id);
     await socket.join(rooms.tenant(tenantId));
     socket.on('subscribe:branch', async (branchId: unknown, ack?: (ok: boolean) => void) => {
       if (typeof branchId !== 'string') return ack?.(false);
@@ -101,6 +108,7 @@ export class Realtime {
         .limit(1)
         .catch(() => []);
       if (!branch) return ack?.(false);
+      if (restrictedTo && restrictedTo.length > 0 && !restrictedTo.includes(branch.id)) return ack?.(false);
       for (const room of socket.rooms) if (room.startsWith('staff:')) await socket.leave(room);
       await socket.join(rooms.staff(branch.id));
       ack?.(true);

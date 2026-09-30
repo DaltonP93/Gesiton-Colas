@@ -96,8 +96,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [me?.tenant, platformBrand]);
 
   useEffect(() => {
-    applyBranding(settings.branding, { title: settings.branding.appName });
-  }, [settings.branding]);
+    // El CSS propio de una organización no se aplica en la sesión del superadministrador (modo soporte).
+    applyBranding(settings.branding, { title: settings.branding.appName, applyCustomCss: me?.user.role !== 'superadmin' });
+  }, [settings.branding, me?.user.role]);
 
   const value = useMemo<AuthState>(
     () => ({

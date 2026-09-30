@@ -102,7 +102,7 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
         rt.emit(deviceRoom, RT.ticketCreated, { ticket: publicTicket });
         rt.emit(staffRoom, RT.ticketCreated, { ticket });
       }
-      rt.emit(deviceRoom, RT.ticketUpdated, { event, ticket: publicTicket });
+      rt.emit([deviceRoom, rooms.kioskBranch(ticket.branchId)], RT.ticketUpdated, { event, ticket: publicTicket });
       rt.emit(staffRoom, RT.ticketUpdated, { event, ticket });
       rt.emit(rooms.track(ticket.publicToken), RT.ticketUpdated, { event, status: ticket.status });
       webhooks
