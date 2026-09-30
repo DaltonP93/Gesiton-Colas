@@ -2,7 +2,7 @@ import { randomInt } from 'node:crypto';
 import { and, desc, eq, gt, isNull, isNotNull, sql } from 'drizzle-orm';
 import type { DbOrTx } from '../db/client';
 import { authTokens, type AuthTokenPurpose } from '../db/schema';
-import { randomToken, sha256 } from './crypto';
+import { randomToken, safeEqual, sha256 } from './crypto';
 import { badRequest } from './errors';
 
 const MINUTE = 60_000;
@@ -84,14 +84,15 @@ export async function consumeCode(db: DbOrTx, userId: string, code: string, purp
     )
     .orderBy(desc(authTokens.createdAt))
     .limit(1);
-  if (!row || row.attempts >= MAX_CODE_ATTEMPTS) throw badRequest('El código no es válido o venció. Solicite uno nuevo.');
-  if (row.codeHash !== codeHash(userId, code.trim())) {
-    await db
-      .update(authTokens)
-      .set({ attempts: sql`${authTokens.attempts} + 1` })
-      .where(eq(authTokens.id, row.id));
-    throw badRequest('El código es incorrecto.');
-  }
+  if (!row) throw badRequest('El código no es válido o venció. Solicite uno nuevo.');
+  // Se cuenta el intento antes de comparar y de forma atómica: pedidos en paralelo no superan el máximo.
+  const [counted] = await db
+    .update(authTokens)
+    .set({ attempts: sql`${authTokens.attempts} + 1` })
+    .where(and(eq(authTokens.id, row.id), sql`${authTokens.attempts} < ${MAX_CODE_ATTEMPTS}`))
+    .returning({ id: authTokens.id });
+  if (!counted) throw badRequest('El código no es válido o venció. Solicite uno nuevo.');
+  if (!safeEqual(row.codeHash ?? '', codeHash(userId, code.trim()))) throw badRequest('El código es incorrecto.');
   const used = await db
     .update(authTokens)
     .set({ usedAt: new Date() })

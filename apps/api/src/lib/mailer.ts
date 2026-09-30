@@ -6,6 +6,7 @@ import type { AppConfig } from '../config';
 import type { Database } from '../db/client';
 import { mailSettings, type MailSettingsRow } from '../db/schema';
 import { decryptSecret } from './crypto';
+import { resolvePublicHost } from './net';
 
 export interface MailMessage {
   to: string;
@@ -57,7 +58,8 @@ export interface Mailer {
   /** Servidor que se usaría hoy para una organización (o para la plataforma sin `tenantId`). */
   resolve(tenantId?: string | null): Promise<{ source: MailSource; from: string | null }>;
   /** Verifica la conexión con un servidor y envía un correo de prueba. */
-  test(config: SmtpConfig, message: MailMessage): Promise<void>;
+  /** `publicOnly`: solo servidores con IP pública (correo propio de una organización). */
+  test(config: SmtpConfig, message: MailMessage, options?: { publicOnly?: boolean }): Promise<void>;
   /** Descarta la configuración en memoria después de guardarla. */
   invalidate(scope?: string): void;
   /** Últimos correos que no salieron por SMTP (desarrollo y pruebas). */
@@ -89,9 +91,11 @@ export function describeMailError(error: unknown, config?: Pick<SmtpConfig, 'hos
   }
 }
 
-function transportFor(config: SmtpConfig): Transporter {
+/** `ip`: conectar a esa dirección ya validada (el certificado TLS se verifica contra el nombre). */
+function transportFor(config: SmtpConfig, ip?: string): Transporter {
   return nodemailer.createTransport({
-    host: config.host,
+    host: ip ?? config.host,
+    tls: ip ? { servername: config.host } : undefined,
     port: config.port,
     secure: config.security === 'ssl',
     requireTLS: config.security === 'starttls',
@@ -169,12 +173,23 @@ export function createMailer(config: AppConfig, db: Database, log: FastifyBaseLo
     return { source: envTransport ? 'env' : 'none', smtp: null, scope: null };
   }
 
-  function cachedTransport(scope: string, smtp: SmtpConfig) {
-    const key = JSON.stringify(smtp);
+  // El servidor propio de una organización se resuelve y valida en cada envío y se conecta a esa IP:
+  // así no puede apuntar (ni con un cambio de DNS) a la red interna del servidor.
+  async function pinnedIp(scope: string, smtp: SmtpConfig) {
+    if (scope === PLATFORM_MAIL_SCOPE || config.WEBHOOKS_ALLOW_PRIVATE) return undefined;
+    try {
+      return await resolvePublicHost(smtp.host);
+    } catch {
+      throw new MailError(`El servidor ${smtp.host} está en una red privada o no existe.`);
+    }
+  }
+
+  function cachedTransport(scope: string, smtp: SmtpConfig, ip?: string) {
+    const key = JSON.stringify({ smtp, ip });
     const current = transports.get(scope);
     if (current?.key === key) return current.transport;
     current?.transport.close();
-    const transport = transportFor(smtp);
+    const transport = transportFor(smtp, ip);
     transports.set(scope, { key, transport });
     return transport;
   }
@@ -187,7 +202,7 @@ export function createMailer(config: AppConfig, db: Database, log: FastifyBaseLo
       if (smtp && scope) {
         const from = fromAddress(smtp, message);
         try {
-          await cachedTransport(scope, smtp).sendMail({
+          await cachedTransport(scope, smtp, await pinnedIp(scope, smtp)).sendMail({
             from,
             replyTo: smtp.replyTo || undefined,
             to: message.to,
@@ -215,8 +230,11 @@ export function createMailer(config: AppConfig, db: Database, log: FastifyBaseLo
       const mail: SentMail = { ...message, id: `${Date.now()}-${sent.length}`, sentAt: new Date().toISOString() };
       sent.unshift(mail);
       sent.length = Math.min(sent.length, 50);
-      if (config.NODE_ENV !== 'test') {
+      if (config.NODE_ENV === 'development') {
         log.info({ to: message.to, subject: message.subject, tag: message.tag }, `✉️  Correo (sin SMTP configurado):\n${message.text}`);
+      } else if (config.NODE_ENV === 'production') {
+        // En producción no se registran enlaces ni códigos de acceso: quien lea el log no puede usarlos.
+        log.warn({ to: message.to, tag: message.tag }, 'Correo no enviado: no hay servidor de correo configurado');
       }
       return { via: 'none' };
     },
@@ -227,8 +245,16 @@ export function createMailer(config: AppConfig, db: Database, log: FastifyBaseLo
       return { source, from: source === 'env' ? config.MAIL_FROM : null };
     },
 
-    async test(smtp, message) {
-      const transport = transportFor(smtp);
+    async test(smtp, message, options = {}) {
+      let ip: string | undefined;
+      if (options.publicOnly && !config.WEBHOOKS_ALLOW_PRIVATE) {
+        try {
+          ip = await resolvePublicHost(smtp.host);
+        } catch {
+          throw new MailError(`El servidor ${smtp.host} está en una red privada o no existe.`);
+        }
+      }
+      const transport = transportFor(smtp, ip);
       try {
         await transport.verify();
         await transport.sendMail({

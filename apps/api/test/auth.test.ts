@@ -99,8 +99,8 @@ describe('acceso por correo sin contraseña', () => {
     for (let i = 0; i < 5; i++) {
       expect((await api(app, null, 'POST', '/auth/email-login/verify', { email, code: bad })).status).toBe(400);
     }
-    // Tras 5 intentos fallidos el código deja de valer aunque sea correcto.
-    expect((await api(app, null, 'POST', '/auth/email-login/verify', { email, code: good })).status).toBe(400);
+    // Tras 5 intentos fallidos el código deja de valer aunque sea correcto (y la cuenta queda bloqueada un rato).
+    expect([400, 429]).toContain((await api(app, null, 'POST', '/auth/email-login/verify', { email, code: good })).status);
   });
 
   it('ingresa con el enlace del correo', async () => {

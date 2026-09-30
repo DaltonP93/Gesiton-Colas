@@ -86,6 +86,11 @@ function AuthShell({ title, subtitle, children, footer }: { title: string; subti
           {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
           <div className="mt-8">{children}</div>
           {footer && <div className="mt-6 space-y-2 text-center text-sm text-muted">{footer}</div>}
+          <p className="mt-10 text-center text-[11px] text-muted/80">
+            <a href="/licencias-de-terceros.txt" className="hover:text-fg">
+              Licencias de software de terceros
+            </a>
+          </p>
           {brand.supportEmail && (
             <p className="mt-8 text-center text-xs text-muted lg:hidden">
               ¿Problemas para ingresar?{' '}

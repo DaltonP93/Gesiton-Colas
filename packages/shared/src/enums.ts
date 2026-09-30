@@ -95,15 +95,15 @@ export const RT = {
   tenantSettings: 'tenant.settings',
 } as const;
 
-/** Sonidos de alerta incluidos (archivos en /sounds/<id>.wav). */
+/**
+ * Sonidos de alerta incluidos (archivos en /sounds/<id>.wav). Todos permiten uso comercial:
+ * CC0, CC BY 4.0 (con atribución en /sounds/CREDITOS.md) o sintetizados por el proyecto.
+ */
 export const ALERT_SOUNDS = [
   'airport-bingbong',
   'ding-dong',
   'doorbell-bingbong',
-  'ekiga-vm',
   'infobleep',
-  'quito-mariscal-sucre',
-  'toydoorbell',
   'chime-soft',
   'bell-ding',
   'triple-rise',
@@ -123,10 +123,7 @@ export const ALERT_SOUND_LABELS: Record<AlertSound, { label: string; category: '
   'airport-bingbong': { label: 'Aeropuerto', category: 'Clásicos' },
   'ding-dong': { label: 'Ding dong', category: 'Clásicos' },
   'doorbell-bingbong': { label: 'Timbre', category: 'Clásicos' },
-  'ekiga-vm': { label: 'Aviso corto', category: 'Clásicos' },
   infobleep: { label: 'Bip informativo', category: 'Clásicos' },
-  'quito-mariscal-sucre': { label: 'Terminal', category: 'Clásicos' },
-  toydoorbell: { label: 'Campanita', category: 'Clásicos' },
   'chime-soft': { label: 'Campana suave', category: 'Suaves' },
   'bell-ding': { label: 'Campana única', category: 'Suaves' },
   'soft-pop': { label: 'Notificación suave', category: 'Suaves' },

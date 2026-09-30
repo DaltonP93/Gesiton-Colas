@@ -16,6 +16,22 @@ const envSchema = z.object({
   DATABASE_POOL_MAX: z.coerce.number().int().default(10),
   JWT_SECRET: z.string().min(16).default('dev-secret-change-me-please-0123456789'),
   JWT_EXPIRES_IN: z.string().default('7d'),
+  /**
+   * Proxies de confianza para tomar la IP real del cliente (X-Forwarded-For):
+   * `false` (por defecto, la app recibe las conexiones directamente), `true`, la cantidad
+   * de saltos (p. ej. `1` detrás de Nginx/Caddy/Traefik) o IPs/redes separadas por coma.
+   * Mal configurado permite falsificar la IP y evadir los límites de intentos.
+   */
+  TRUST_PROXY: z
+    .string()
+    .optional()
+    .transform((v): boolean | number | string[] => {
+      const value = (v ?? '').trim().toLowerCase();
+      if (!value || value === 'false' || value === '0') return false;
+      if (value === 'true') return true;
+      if (/^\d+$/.test(value)) return Number(value);
+      return value.split(',').map((s) => s.trim()).filter(Boolean);
+    }),
   /** Orígenes permitidos para CORS separados por coma (`*` = todos). */
   CORS_ORIGINS: z.string().default('*'),
   ALLOW_SIGNUP: bool(true),
@@ -69,6 +85,10 @@ export function loadConfig(overrides: Partial<Record<keyof AppConfig, unknown>> 
   const config = envSchema.parse({ ...process.env, ...overrides });
   if (config.NODE_ENV === 'production' && (config.JWT_SECRET.startsWith('dev-secret') || config.JWT_SECRET.startsWith('cambie-este-valor'))) {
     throw new Error('JWT_SECRET debe configurarse con un valor propio en producción');
+  }
+  if (config.NODE_ENV === 'production' && config.JWT_SECRET.length < 32) {
+    // No se detiene el servidor para no dejar sin servicio una instalación existente, pero se avisa.
+    console.warn('⚠️  JWT_SECRET es corto (menos de 32 caracteres). Genere uno nuevo con: openssl rand -hex 32');
   }
   return config;
 }

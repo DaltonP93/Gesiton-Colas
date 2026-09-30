@@ -635,7 +635,7 @@ export async function resetBranchQueue(ctx: AppContext, tenantId: string, branch
     await tx.delete(ticketSequences).where(eq(ticketSequences.branchId, branchId));
     return rows.length;
   });
-  ctx.rt.emit([rooms.branch(branchId), rooms.staff(branchId)], RT.queueChanged, { branchId, reset: true });
+  ctx.rt.emit([rooms.branch(branchId), rooms.kioskBranch(branchId), rooms.staff(branchId)], RT.queueChanged, { branchId, reset: true });
   void ctx.webhooks.dispatch(tenantId, 'queue.reset', { branchId, cancelled });
   return cancelled;
 }

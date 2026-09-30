@@ -1,13 +1,14 @@
 import { and, asc, count, desc, eq, gte, ilike, inArray, lte, or, sql, type SQL } from 'drizzle-orm';
+import type { FastifyRequest } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { TICKET_CHANNELS, TICKET_STATUSES, type Paginated, type TicketDTO } from '@gc/shared';
+import { TICKET_CHANNELS, TICKET_STATUSES, hasRole, type Paginated, type TicketDTO } from '@gc/shared';
 import type { AppContext } from '../../context';
 import { branches, ticketEvents, tickets } from '../../db/schema';
 import { tenantIdOf, userIdOf } from '../../lib/auth';
-import { notFound } from '../../lib/errors';
+import { forbidden, notFound } from '../../lib/errors';
 import { dateOnly, idParam, pagination, uuidList } from '../../lib/schemas';
-import { cancelTicket, countAhead, findTickets, issueTicket, loadTicket, queueSnapshot, resetBranchQueue } from './queue';
+import { cancelTicket, countAhead, findTickets, issueTicket, loadTicket, queueSnapshot, resetBranchQueue, userScope } from './queue';
 
 export const customerSchema = z.record(z.string().max(40), z.union([z.string().max(300), z.null()])).optional();
 
@@ -15,6 +16,17 @@ export const ticketRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
   const tags = ['Turnos'];
   const read = ctx.auth.require({ scope: 'tickets:read' });
   const write = ctx.auth.require({ scope: 'tickets:write' });
+
+  /**
+   * Sucursales que puede ver quien consulta: un operador asignado a sucursales solo ve esas
+   * (con datos personales de los clientes); supervisores, administradores y API keys ven todas.
+   */
+  async function branchScope(request: FastifyRequest): Promise<string[] | null> {
+    const auth = request.auth;
+    if (!auth || auth.kind !== 'user' || hasRole(auth.role, 'manager')) return null;
+    const scope = await userScope(ctx.db, auth.userId);
+    return scope.branchIds.length ? scope.branchIds : null;
+  }
 
   app.post(
     '/tickets',
@@ -75,8 +87,11 @@ export const ticketRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
     async (request): Promise<Paginated<TicketDTO>> => {
       const tenantId = tenantIdOf(request);
       const { page, pageSize, branchId, serviceId, status, from, to, q } = request.query;
+      const allowed = await branchScope(request);
+      if (allowed && branchId && !allowed.includes(branchId)) return { items: [], total: 0, page, pageSize };
       const where = and(
         eq(tickets.tenantId, tenantId),
+        allowed ? inArray(tickets.branchId, allowed) : undefined,
         branchId ? eq(tickets.branchId, branchId) : undefined,
         serviceId ? eq(tickets.serviceId, serviceId) : undefined,
         status.length ? inArray(tickets.status, status) : undefined,
@@ -107,6 +122,8 @@ export const ticketRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
   app.get('/tickets/:id', { preHandler: read, schema: { tags, params: idParam, summary: 'Detalle e historial de un turno' } }, async (request) => {
     const tenantId = tenantIdOf(request);
     const ticket = await loadTicket(ctx.db, tenantId, request.params.id);
+    const allowed = await branchScope(request);
+    if (allowed && !allowed.includes(ticket.branchId)) throw notFound('Turno');
     const events = await ctx.db
       .select()
       .from(ticketEvents)
@@ -135,7 +152,11 @@ export const ticketRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
       preHandler: read,
       schema: { tags, summary: 'Estado de la cola de una sucursal', params: idParam, querystring: z.object({ serviceIds: uuidList }) },
     },
-    async (request) => queueSnapshot(ctx.db, tenantIdOf(request), request.params.id, request.query.serviceIds),
+    async (request) => {
+      const allowed = await branchScope(request);
+      if (allowed && !allowed.includes(request.params.id)) throw forbidden('No tiene acceso a esta sucursal');
+      return queueSnapshot(ctx.db, tenantIdOf(request), request.params.id, request.query.serviceIds);
+    },
   );
 
   app.post(

@@ -19,7 +19,8 @@ export function buildTicketHtml(print: KioskConfig['print'], data: TicketPrintDa
     { html: true, raw: ['qr', 'logo'] },
   );
   const clean = DOMPurify.sanitize(body, { ALLOWED_URI_REGEXP: /^(?:https?:|data:image\/|\/)/i });
-  const css = print.css.replace(/<\/style/gi, '');
+  // El CSS nunca puede cerrar la etiqueta <style>: se escapa todo «<» (en CSS no hace falta).
+  const css = print.css.replace(/</g, '\\3c ');
   const width = print.paperWidthMm;
   return `<!doctype html><html><head><meta charset="utf-8"><style>@page{size:${width}mm auto;margin:0}html,body{margin:0;padding:0;width:${width}mm;background:#fff}${css}</style></head><body>${clean}</body></html>`;
 }
@@ -28,6 +29,8 @@ export function buildTicketHtml(print: KioskConfig['print'], data: TicketPrintDa
 export async function printTicket(print: KioskConfig['print'], data: TicketPrintData): Promise<void> {
   const iframe = document.createElement('iframe');
   iframe.setAttribute('aria-hidden', 'true');
+  // Sin «allow-scripts»: aunque la plantilla trajera código, no se ejecuta. «allow-modals» permite imprimir.
+  iframe.setAttribute('sandbox', 'allow-same-origin allow-modals');
   Object.assign(iframe.style, { position: 'fixed', right: '0', bottom: '0', width: '0', height: '0', border: '0', visibility: 'hidden' });
   const loaded = new Promise<void>((resolve) => (iframe.onload = () => resolve()));
   iframe.srcdoc = buildTicketHtml(print, data);

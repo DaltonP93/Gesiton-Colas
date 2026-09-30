@@ -2,7 +2,11 @@ import { z } from 'zod';
 import { ALERT_SOUNDS, DISPLAY_LAYOUTS, LOCALES } from './enums';
 
 const color = z.string().regex(/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i, 'Color hexadecimal inválido');
-const cssText = z.string().max(50_000);
+/** CSS propio: no puede contener «<» (evita cerrar la etiqueta <style> e inyectar HTML). */
+const cssText = z
+  .string()
+  .max(50_000)
+  .refine((v) => !v.includes('<'), 'El CSS no puede contener el carácter «<»');
 
 /* ------------------------------------------------------------------ */
 /* Configuración de la organización (tenant)                           */
@@ -97,6 +101,16 @@ export const onboardingSchema = z.object({
 });
 export type Onboarding = z.infer<typeof onboardingSchema>;
 
+/** Protección de datos personales de los clientes. */
+export const privacySettingsSchema = z.object({
+  /**
+   * Días que se conservan los datos del cliente (nombre, documento, teléfono, email y campos propios)
+   * en cada turno. Después se borran y queda solo la estadística. 0 = no se borran.
+   */
+  retentionDays: z.number().int().min(0).max(3650).default(0),
+});
+export type PrivacySettings = z.infer<typeof privacySettingsSchema>;
+
 export const tenantSettingsSchema = z.object({
   branding: brandingSchema.prefault({}),
   terminology: terminologySchema.prefault({}),
@@ -105,6 +119,7 @@ export const tenantSettingsSchema = z.object({
   locale: z.enum(LOCALES).default('es'),
   timezone: z.string().max(64).default('UTC'),
   onboarding: onboardingSchema.prefault({}),
+  privacy: privacySettingsSchema.prefault({}),
 });
 export type TenantSettings = z.infer<typeof tenantSettingsSchema>;
 
