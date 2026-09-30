@@ -127,7 +127,7 @@ export default function MonitorPage() {
           icon={<Building2 />}
           title={`No hay ${terms.branches.toLowerCase()}`}
           description={`Cree una ${terms.branch.toLowerCase()} para ver su cola en tiempo real.`}
-          action={<Button onClick={() => navigate('/app/sucursales')}>Ir a {terms.branches}</Button>}
+          action={<Button onClick={() => navigate('/app/configuracion/sucursales')}>Ir a {terms.branches}</Button>}
         />
       </>
     );

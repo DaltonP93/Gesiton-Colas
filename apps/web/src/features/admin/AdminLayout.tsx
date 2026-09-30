@@ -1,30 +1,25 @@
 import {
   Activity,
   BarChart3,
-  Building2,
-  ClipboardList,
+  ChevronsLeft,
+  ChevronsRight,
   Headset,
-  LayoutDashboard,
   LayoutGrid,
-  Link2,
-  ListVideo,
-  Music,
   LogOut,
   MailWarning,
   Menu,
   MonitorPlay,
-  Palette,
-  Plug,
+  Music,
+  Settings,
   Shield,
   Sparkles,
   Tablet,
   UserRound,
-  Users,
   Video,
   X,
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import type { Role } from '@gc/shared';
 import { cx } from '../../components/ui';
 import { api, assetUrl } from '../../lib/api';
@@ -36,124 +31,197 @@ interface NavItem {
   icon: ReactNode;
   role: Role;
   end?: boolean;
+  /** Otras rutas que marcan este ítem como activo. */
+  also?: string[];
+}
+
+const COLLAPSED_KEY = 'gc.nav.collapsed';
+
+function readCollapsed() {
+  try {
+    return localStorage.getItem(COLLAPSED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function isActive(pathname: string, item: NavItem) {
+  const match = (path: string) => pathname === path || pathname.startsWith(`${path}/`);
+  if (item.end) return pathname === item.to;
+  return match(item.to) || (item.also ?? []).some(match);
 }
 
 export function AdminLayout() {
-  const { me, settings, terms, can, logout, impersonate } = useAuth();
+  const { me, settings, can, logout, impersonate } = useAuth();
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsedState] = useState(readCollapsed);
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const branding = settings.branding;
+
+  const setCollapsed = (value: boolean) => {
+    setCollapsedState(value);
+    try {
+      localStorage.setItem(COLLAPSED_KEY, value ? '1' : '0');
+    } catch {
+      /* sin almacenamiento local */
+    }
+  };
 
   const groups: { title: string; items: NavItem[] }[] = [
     {
       title: 'Operación',
       items: [
-        { to: '/app', label: 'Portal', icon: <LayoutGrid />, role: 'agent', end: true },
+        { to: '/app', label: 'Inicio', icon: <LayoutGrid />, role: 'agent', end: true },
         { to: '/app/atencion', label: 'Atención', icon: <Headset />, role: 'agent' },
-        { to: '/app/resumen', label: 'Resumen del día', icon: <LayoutDashboard />, role: 'manager' },
         { to: '/app/monitor', label: 'Monitor en vivo', icon: <Activity />, role: 'manager' },
-        { to: '/app/reportes', label: 'Reportes', icon: <BarChart3 />, role: 'manager' },
+        { to: '/app/reportes', label: 'Reportes', icon: <BarChart3 />, role: 'manager', also: ['/app/resumen'] },
       ],
     },
     {
-      title: 'Pantallas y publicidad',
+      title: 'Pantallas y contenido',
       items: [
-        { to: '/app/pantallas', label: 'Pantallas', icon: <MonitorPlay />, role: 'manager' },
+        { to: '/app/pantallas', label: 'Pantallas', icon: <MonitorPlay />, role: 'manager', also: ['/app/vincular'] },
         { to: '/app/kioscos', label: 'Kioscos', icon: <Tablet />, role: 'manager' },
-        { to: '/app/contenido', label: 'Biblioteca de medios', icon: <Video />, role: 'manager' },
-        { to: '/app/listas', label: 'Listas de reproducción', icon: <ListVideo />, role: 'manager' },
-        { to: '/app/sonidos', label: 'Sonidos de llamado', icon: <Music />, role: 'manager' },
-        { to: '/app/vincular', label: 'Vincular dispositivo', icon: <Link2 />, role: 'manager' },
+        { to: '/app/contenido', label: 'Publicidad', icon: <Video />, role: 'manager', also: ['/app/listas'] },
+        { to: '/app/sonidos', label: 'Sonidos', icon: <Music />, role: 'manager' },
       ],
     },
     {
-      title: 'Configuración',
-      items: [
-        { to: '/app/sucursales', label: terms.branches, icon: <Building2 />, role: 'admin' },
-        { to: '/app/servicios', label: `${terms.services} y prioridades`, icon: <ClipboardList />, role: 'admin' },
-        { to: '/app/usuarios', label: 'Usuarios', icon: <Users />, role: 'admin' },
-        { to: '/app/personalizacion', label: 'Personalización', icon: <Palette />, role: 'admin' },
-        { to: '/app/integraciones', label: 'Integraciones y API', icon: <Plug />, role: 'admin' },
-      ],
+      title: 'Administración',
+      items: [{ to: '/app/configuracion', label: 'Configuración', icon: <Settings />, role: 'admin', also: ['/app/bienvenida'] }],
     },
   ];
 
-  const nav = (
-    <nav className="gc-scroll flex-1 space-y-6 overflow-y-auto px-3 py-4">
-      {groups.map((group) => {
-        const items = group.items.filter((i) => can(i.role));
-        if (items.length === 0) return null;
+  const visibleGroups = groups.map((g) => ({ ...g, items: g.items.filter((i) => can(i.role)) })).filter((g) => g.items.length > 0);
+
+  // En el menú del celular siempre se muestran los textos.
+  const renderNav = (compact: boolean) => (
+    <nav className={cx('gc-scroll flex-1 overflow-y-auto py-4', compact ? 'space-y-3 px-2' : 'space-y-5 px-3')} aria-label="Menú principal">
+      {visibleGroups.map(({ title, items }, index) => {
         return (
-          <div key={group.title}>
-            <p className="mb-1.5 px-3 text-[11px] font-semibold tracking-wider text-muted uppercase">{group.title}</p>
+          <div key={title}>
+            {compact ? (
+              index > 0 && <div className="mx-3 mb-3 border-t border-[var(--gc-nav-border)]" aria-hidden />
+            ) : (
+              <p className="mb-1.5 px-3 text-[11px] font-semibold tracking-wider text-[var(--gc-nav-muted)] uppercase">{title}</p>
+            )}
             <ul className="space-y-0.5">
-              {items.map((item) => (
-                <li key={item.to}>
-                  <NavLink
-                    to={item.to}
-                    end={item.end}
-                    onClick={() => setOpen(false)}
-                    className={({ isActive }) =>
-                      cx(
-                        'flex items-center gap-3 rounded-ui px-3 py-2 text-sm font-medium transition [&_svg]:size-[18px]',
-                        isActive ? 'bg-primary text-primary-fg shadow-sm' : 'text-fg/80 hover:bg-subtle hover:text-fg',
-                      )
-                    }
-                  >
-                    {item.icon}
-                    {item.label}
-                  </NavLink>
-                </li>
-              ))}
+              {items.map((item) => {
+                const active = isActive(pathname, item);
+                return (
+                  <li key={item.to}>
+                    <Link
+                      to={item.to}
+                      onClick={() => setOpen(false)}
+                      aria-current={active ? 'page' : undefined}
+                      title={compact ? item.label : undefined}
+                      className={cx(
+                        'relative flex items-center rounded-ui text-sm font-medium transition [&_svg]:size-[18px] [&_svg]:shrink-0',
+                        compact ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2',
+                        active
+                          ? 'bg-[var(--gc-nav-active-bg)] font-semibold text-[var(--gc-nav-active-fg)] before:absolute before:inset-y-1.5 before:w-1 before:rounded-full before:bg-[var(--gc-nav-indicator)]'
+                          : 'text-[var(--gc-nav-fg)] opacity-80 hover:bg-[var(--gc-nav-hover)] hover:opacity-100',
+                        active && (compact ? 'before:-left-2' : 'before:-left-3'),
+                      )}
+                    >
+                      {item.icon}
+                      <span className={compact ? 'sr-only' : 'truncate'}>{item.label}</span>
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         );
       })}
       {can('superadmin') && (
         <div>
-          <p className="mb-1.5 px-3 text-[11px] font-semibold tracking-wider text-muted uppercase">Plataforma</p>
-          <NavLink to="/plataforma" className="flex items-center gap-3 rounded-ui px-3 py-2 text-sm font-medium text-fg/80 hover:bg-subtle [&_svg]:size-[18px]">
-            <Shield /> Organizaciones
+          {!compact && <p className="mb-1.5 px-3 text-[11px] font-semibold tracking-wider text-[var(--gc-nav-muted)] uppercase">Plataforma</p>}
+          <NavLink
+            to="/plataforma"
+            title={compact ? 'Organizaciones' : undefined}
+            className={cx(
+              'flex items-center rounded-ui text-sm font-medium text-[var(--gc-nav-fg)] opacity-80 hover:bg-[var(--gc-nav-hover)] hover:opacity-100 [&_svg]:size-[18px]',
+              compact ? 'justify-center py-2.5' : 'gap-3 px-3 py-2',
+            )}
+          >
+            <Shield />
+            <span className={compact ? 'sr-only' : undefined}>Organizaciones</span>
           </NavLink>
         </div>
       )}
     </nav>
   );
 
-  const sidebar = (
-    <aside className="flex h-full w-64 flex-col border-r border-border bg-surface">
-      <div className="flex h-16 items-center gap-3 border-b border-border px-5">
-        {branding.logoUrl ? (
-          <img src={assetUrl(branding.logoUrl)} alt="" className="h-9 max-w-[140px] object-contain" />
+  const sidebar = (compact: boolean) => (
+    <aside
+      className={cx(
+        'flex h-full flex-col border-r border-[var(--gc-nav-border)] bg-[var(--gc-nav-bg)] text-[var(--gc-nav-fg)] transition-[width] duration-200',
+        compact ? 'w-[76px]' : 'w-64',
+      )}
+    >
+      <Link to="/app" onClick={() => setOpen(false)} className={cx('flex h-16 shrink-0 items-center gap-3', compact ? 'justify-center px-2' : 'px-5')}>
+        {branding.logoUrl && !compact ? (
+          <span className="grid h-10 max-w-[150px] place-items-center overflow-hidden">
+            <img src={assetUrl(branding.logoUrl)} alt={branding.appName} className="max-h-10 max-w-full object-contain" />
+          </span>
         ) : (
-          <div className="grid size-9 place-items-center rounded-ui bg-primary text-lg font-bold text-primary-fg">{branding.appName.charAt(0)}</div>
+          <span className="grid size-10 shrink-0 place-items-center rounded-ui bg-primary text-lg font-bold text-primary-fg shadow-sm">
+            {branding.appName.charAt(0).toUpperCase()}
+          </span>
         )}
-        <div className="min-w-0">
-          <p className="truncate text-sm font-bold">{branding.appName}</p>
-          <p className="truncate text-xs text-muted">{me?.tenant?.name}</p>
-        </div>
-      </div>
-      {nav}
-      <div className="border-t border-border p-3">
-        <NavLink to="/app/perfil" onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-ui px-3 py-2 hover:bg-subtle">
-          <div className="grid size-8 place-items-center rounded-full bg-subtle text-muted">
-            <UserRound className="size-4" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium">{me?.user.name}</p>
-            <p className="truncate text-xs text-muted">{me?.user.email}</p>
-          </div>
-        </NavLink>
-        <button
-          type="button"
-          onClick={() => {
-            logout();
-            navigate('/login');
-          }}
-          className="mt-1 flex w-full items-center gap-3 rounded-ui px-3 py-2 text-sm text-muted hover:bg-subtle hover:text-fg"
+        {!compact && !branding.logoUrl && (
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-bold">{branding.appName}</span>
+            <span className="block truncate text-xs text-[var(--gc-nav-muted)]">{me?.tenant?.name}</span>
+          </span>
+        )}
+      </Link>
+      {renderNav(compact)}
+      <div className={cx('shrink-0 border-t border-[var(--gc-nav-border)]', compact ? 'space-y-1 p-2' : 'p-3')}>
+        <NavLink
+          to="/app/perfil"
+          onClick={() => setOpen(false)}
+          title={compact ? me?.user.name : undefined}
+          className={cx('flex items-center rounded-ui hover:bg-[var(--gc-nav-hover)]', compact ? 'justify-center py-2' : 'gap-3 px-3 py-2')}
         >
-          <LogOut className="size-4" /> Cerrar sesión
-        </button>
+          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--gc-nav-hover)]">
+            <UserRound className="size-4" />
+          </span>
+          {!compact && (
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium">{me?.user.name}</span>
+              <span className="block truncate text-xs text-[var(--gc-nav-muted)]">{me?.user.email}</span>
+            </span>
+          )}
+        </NavLink>
+        <div className={cx('flex', compact ? 'flex-col items-center gap-1' : 'mt-1 items-center gap-1')}>
+          <button
+            type="button"
+            title={compact ? 'Cerrar sesión' : undefined}
+            onClick={() => {
+              logout();
+              navigate('/login');
+            }}
+            className={cx(
+              'flex items-center rounded-ui text-sm text-[var(--gc-nav-muted)] hover:bg-[var(--gc-nav-hover)] hover:text-[var(--gc-nav-fg)]',
+              compact ? 'justify-center p-2.5' : 'flex-1 gap-3 px-3 py-2',
+            )}
+          >
+            <LogOut className="size-4" />
+            <span className={compact ? 'sr-only' : undefined}>Cerrar sesión</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setCollapsed(!collapsed)}
+            aria-label={collapsed ? 'Expandir menú' : 'Achicar menú'}
+            title={collapsed ? 'Expandir menú' : 'Achicar menú'}
+            className="hidden rounded-ui p-2.5 text-[var(--gc-nav-muted)] hover:bg-[var(--gc-nav-hover)] hover:text-[var(--gc-nav-fg)] lg:block"
+          >
+            {collapsed ? <ChevronsRight className="size-4" /> : <ChevronsLeft className="size-4" />}
+          </button>
+        </div>
       </div>
     </aside>
   );
@@ -171,12 +239,12 @@ export function AdminLayout() {
   };
 
   return (
-    <div className="flex min-h-screen">
-      <div className="sticky top-0 hidden h-screen lg:block">{sidebar}</div>
+    <div className="gc-app flex min-h-screen">
+      <div className="sticky top-0 hidden h-screen shrink-0 lg:block">{sidebar(collapsed)}</div>
       {open && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
-          <div className="gc-slide-in absolute inset-y-0 left-0">{sidebar}</div>
+          <div className="gc-slide-in absolute inset-y-0 left-0">{sidebar(false)}</div>
           <button type="button" aria-label="Cerrar menú" onClick={() => setOpen(false)} className="absolute top-4 left-[16.5rem] rounded-full bg-surface p-2 shadow">
             <X className="size-4" />
           </button>
@@ -220,19 +288,19 @@ export function AdminLayout() {
             {verifySent ? (
               <span className="font-medium text-emerald-700">Correo reenviado</span>
             ) : (
-              <button type="button" onClick={() => void resendVerification()} className="font-semibold text-primary hover:underline">
+              <button type="button" onClick={() => void resendVerification()} className="font-semibold text-primary-text hover:underline">
                 Reenviar
               </button>
             )}
           </div>
         )}
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-surface/90 px-4 backdrop-blur lg:hidden">
-          <button type="button" aria-label="Abrir menú" onClick={() => setOpen(true)} className="rounded-ui p-2 hover:bg-subtle">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-[var(--gc-nav-border)] bg-[var(--gc-nav-bg)] px-4 text-[var(--gc-nav-fg)] lg:hidden">
+          <button type="button" aria-label="Abrir menú" onClick={() => setOpen(true)} className="rounded-ui p-2 hover:bg-[var(--gc-nav-hover)]">
             <Menu className="size-5" />
           </button>
           <span className="truncate font-semibold">{branding.appName}</span>
         </header>
-        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           <Outlet />
         </main>
       </div>

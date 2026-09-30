@@ -19,6 +19,30 @@ import { fontStack, loadFont, readableOn, setCustomCss } from '../../lib/theme';
 import { printTicket } from './printTicket';
 
 type Service = KioskBootstrapDTO['services'][number];
+type KioskTheme = KioskBootstrapDTO['kiosk']['config']['theme'];
+
+/** Redondeo de los botones según la forma elegida. */
+function shapeClass(theme: KioskTheme) {
+  return { rounded: 'rounded-3xl', pill: 'rounded-full', square: 'rounded-lg', outline: 'rounded-3xl', tile: 'rounded-3xl' }[theme.buttonStyle] ?? 'rounded-3xl';
+}
+
+/** Colores de un botón: sólido o solo contorno. */
+function buttonColors(theme: KioskTheme, color: string, text?: string): CSSProperties {
+  if (theme.buttonStyle === 'outline') {
+    return { background: `color-mix(in srgb, ${color} 10%, transparent)`, color: theme.text, boxShadow: `inset 0 0 0 0.2em ${color}` };
+  }
+  return { background: color, color: text ?? readableOn(color) };
+}
+
+function kioskBackground(theme: KioskTheme): string {
+  if (theme.backgroundStyle === 'gradient') return `linear-gradient(160deg, ${theme.background}, ${theme.backgroundTo})`;
+  if (theme.backgroundStyle === 'image' && theme.backgroundImageUrl) {
+    // Velo claro u oscuro según el color del texto, para que siempre se lea.
+    const veil = readableOn(theme.text) === '#ffffff' ? `rgb(255 255 255 / ${theme.backgroundOverlay})` : `rgb(0 0 0 / ${theme.backgroundOverlay})`;
+    return `linear-gradient(${veil}, ${veil}), url("${assetUrl(theme.backgroundImageUrl).replace(/["\\\n]/g, '')}") center / cover no-repeat, ${theme.background}`;
+  }
+  return theme.background;
+}
 type Step =
   | { name: 'services' }
   | { name: 'priority'; service: Service }
@@ -112,6 +136,28 @@ function Kiosk({ boot, token, refetch }: { boot: KioskBootstrapDTO; token: strin
     };
   }, [step.name, reset]);
 
+  // Pantalla de espera tras un tiempo sin uso (solo en el tótem, en la pantalla inicial).
+  const centered = theme.headerAlign === 'center';
+  const [idle, setIdle] = useState(false);
+  useEffect(() => {
+    if (!config.idle.enabled || mobile || step.name !== 'services') {
+      setIdle(false);
+      return;
+    }
+    let timer = setTimeout(() => setIdle(true), config.idle.seconds * 1000);
+    const bump = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => setIdle(true), config.idle.seconds * 1000);
+    };
+    window.addEventListener('pointerdown', bump);
+    window.addEventListener('keydown', bump);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('pointerdown', bump);
+      window.removeEventListener('keydown', bump);
+    };
+  }, [config.idle.enabled, config.idle.seconds, mobile, step.name]);
+
   const normal = useMemo(() => [...priorities].sort((a, b) => a.weight - b.weight)[0] ?? null, [priorities]);
   const preferential = useMemo(() => priorities.find((p) => p.weight > 0) ?? null, [priorities]);
   const askFields = useMemo(
@@ -148,6 +194,8 @@ function Kiosk({ boot, token, refetch }: { boot: KioskBootstrapDTO; token: strin
             waiting: result.waitingAhead,
             customer: customer.name ?? '',
             trackingUrl,
+            header: config.print.headerText,
+            footer: config.print.footerText,
           },
         }).catch(() => undefined);
       }
@@ -175,7 +223,7 @@ function Kiosk({ boot, token, refetch }: { boot: KioskBootstrapDTO; token: strin
   }, [step, mobile, config.returnSeconds, reset]);
 
   const style = {
-    background: theme.background,
+    background: kioskBackground(theme),
     color: theme.text,
     fontFamily: fontStack(theme.fontFamily),
     fontSize: `${16 * theme.fontScale}px`,
@@ -185,23 +233,25 @@ function Kiosk({ boot, token, refetch }: { boot: KioskBootstrapDTO; token: strin
   } as CSSProperties;
 
   return (
-    <div className="gc-kiosk flex min-h-screen flex-col select-none" style={style}>
-      <header className="flex items-center justify-between gap-4 px-6 pt-6 sm:px-10">
+    <div className="gc-kiosk relative flex min-h-screen flex-col select-none" style={style}>
+      <header className={cx('relative flex gap-4 px-6 pt-6 sm:px-10', centered ? 'flex-col items-center text-center' : 'items-center justify-between')}>
         {tenant.branding.logoUrl ? (
-          <img src={assetUrl(tenant.branding.logoUrl)} alt={tenant.name} className="h-12 max-w-[50%] object-contain sm:h-16" />
+          <img src={assetUrl(tenant.branding.logoUrl)} alt={tenant.name} className={cx('object-contain', LOGO_SIZES[theme.logoSize], centered ? 'max-w-[80%]' : 'max-w-[50%]')} />
         ) : (
-          <p className="text-2xl font-extrabold">{tenant.branding.appName}</p>
+          <p className={cx('font-extrabold', LOGO_TEXT_SIZES[theme.logoSize])}>{tenant.branding.appName}</p>
         )}
-        <div className="flex items-center gap-3 text-right">
-          <div className="hidden sm:block">
-            <p className="font-semibold">{boot.branch.name}</p>
-          </div>
+        <div className={cx('flex items-center gap-3', centered ? 'justify-center' : 'text-right')}>
+          {config.showBranch && (
+            <div className={cx(!centered && 'hidden sm:block')}>
+              <p className="font-semibold opacity-80">{boot.branch.name}</p>
+            </div>
+          )}
           {!mobile && (
             <button
               type="button"
               aria-label="Pantalla completa"
               onClick={() => void document.documentElement.requestFullscreen?.().catch(() => undefined)}
-              className="rounded-full p-2 opacity-40 hover:opacity-100"
+              className={cx('rounded-full p-2 opacity-40 hover:opacity-100', centered && 'absolute top-6 right-6')}
             >
               <Maximize className="size-5" />
             </button>
@@ -224,7 +274,7 @@ function Kiosk({ boot, token, refetch }: { boot: KioskBootstrapDTO; token: strin
             {config.priorityMode === 'list' ? (
               <div className="grid gap-4 sm:grid-cols-2">
                 {priorities.map((p) => (
-                  <BigButton key={p.id} onClick={() => next(step.service, p)} background={p.weight > 0 ? theme.priorityButtonBackground : theme.buttonBackground}>
+                  <BigButton key={p.id} theme={theme} onClick={() => next(step.service, p)} background={p.weight > 0 ? theme.priorityButtonBackground : theme.buttonBackground}>
                     {p.weight > 0 && <Star className="size-8" />}
                     <span>
                       <span className="block text-[1.6em] font-bold">{p.name}</span>
@@ -235,12 +285,12 @@ function Kiosk({ boot, token, refetch }: { boot: KioskBootstrapDTO; token: strin
               </div>
             ) : (
               <div className="grid gap-5 sm:grid-cols-2">
-                <BigButton onClick={() => next(step.service, normal)} background={theme.buttonBackground}>
+                <BigButton theme={theme} onClick={() => next(step.service, normal)} background={theme.buttonBackground}>
                   <Users className="size-10" />
                   <span className="text-[1.7em] font-bold">{t('kiosk.normal')}</span>
                 </BigButton>
                 {preferential && (
-                  <BigButton onClick={() => next(step.service, preferential)} background={theme.priorityButtonBackground}>
+                  <BigButton theme={theme} onClick={() => next(step.service, preferential)} background={theme.priorityButtonBackground}>
                     <Star className="size-10" />
                     <span>
                       <span className="block text-[1.7em] font-bold">{t('kiosk.preferential')}</span>
@@ -254,7 +304,7 @@ function Kiosk({ boot, token, refetch }: { boot: KioskBootstrapDTO; token: strin
         )}
         {step.name === 'form' && (
           <StepFrame title={t('kiosk.yourData')} subtitle={step.service.name} onBack={reset} t={t}>
-            <CustomerForm fields={askFields} t={t} onSubmit={(data) => void issue(step.service, step.priority, data)} />
+            <CustomerForm fields={askFields} t={t} shape={shapeClass(theme)} onSubmit={(data) => void issue(step.service, step.priority, data)} />
           </StepFrame>
         )}
         {step.name === 'issuing' && (
@@ -267,13 +317,49 @@ function Kiosk({ boot, token, refetch }: { boot: KioskBootstrapDTO; token: strin
         {step.name === 'error' && (
           <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
             <p className="max-w-xl text-[1.6em] font-semibold">{step.message}</p>
-            <BigButton onClick={reset} background={theme.buttonBackground} className="w-auto px-12">
+            <BigButton onClick={reset} background={theme.buttonBackground} theme={theme} className="w-auto px-12">
               {t('kiosk.back')}
             </BigButton>
           </div>
         )}
       </main>
+      {config.footerText && <footer className="px-6 pb-6 text-center text-[1.05em] font-medium opacity-75 sm:px-10">{config.footerText}</footer>}
+      {idle && <IdleScreen tenant={tenant} config={config} onWake={() => setIdle(false)} />}
     </div>
+  );
+}
+
+const LOGO_SIZES: Record<KioskTheme['logoSize'], string> = { sm: 'h-10', md: 'h-12 sm:h-16', lg: 'h-20 sm:h-24', xl: 'h-28 sm:h-36' };
+const LOGO_TEXT_SIZES: Record<KioskTheme['logoSize'], string> = { sm: 'text-xl', md: 'text-2xl', lg: 'text-3xl', xl: 'text-5xl' };
+
+/** Pantalla de espera: logo, hora y un mensaje. Se cierra al tocar. */
+function IdleScreen({ tenant, config, onWake }: { tenant: KioskBootstrapDTO['tenant']; config: KioskBootstrapDTO['kiosk']['config']; onWake: () => void }) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const locale = tenant.locale === 'pt' ? 'pt-BR' : tenant.locale;
+  const tz = tenant.timezone && tenant.timezone !== 'UTC' ? tenant.timezone : undefined;
+  return (
+    <button
+      type="button"
+      onClick={onWake}
+      className="gc-fade-in absolute inset-0 z-20 flex flex-col items-center justify-center gap-10 p-10 text-center"
+      style={{ background: kioskBackground(config.theme), color: config.theme.text }}
+    >
+      {tenant.branding.logoUrl ? (
+        <img src={assetUrl(tenant.branding.logoUrl)} alt={tenant.name} className="max-h-[28vh] max-w-[70%] object-contain" />
+      ) : (
+        <p className="text-[4em] font-extrabold">{tenant.branding.appName}</p>
+      )}
+      {config.idle.showClock && (
+        <p className="text-[5em] leading-none font-black tabular-nums">{now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', timeZone: tz })}</p>
+      )}
+      <p className="gc-breathe rounded-full px-10 py-5 text-[1.8em] font-bold shadow-xl" style={buttonColors(config.theme, config.theme.buttonBackground, config.theme.buttonText)}>
+        {config.idle.title}
+      </p>
+    </button>
   );
 }
 
@@ -281,12 +367,14 @@ function BigButton({
   children,
   onClick,
   background,
+  theme,
   className,
   type = 'button',
 }: {
   children: ReactNode;
   onClick?: () => void;
   background: string;
+  theme: KioskTheme;
   className?: string;
   type?: 'button' | 'submit';
 }) {
@@ -295,10 +383,11 @@ function BigButton({
       type={type}
       onClick={onClick}
       className={cx(
-        'flex min-h-28 w-full items-center justify-center gap-5 rounded-3xl px-8 py-6 text-center shadow-lg transition active:scale-[0.98] hover:brightness-110',
+        'flex min-h-28 w-full items-center justify-center gap-5 px-8 py-6 text-center shadow-lg transition active:scale-[0.98] hover:brightness-110',
+        shapeClass(theme),
         className,
       )}
-      style={{ background, color: readableOn(background) }}
+      style={buttonColors(theme, background)}
     >
       {children}
     </button>
@@ -356,28 +445,45 @@ function ServicesStep({
             <section key={group.id}>
               {group.name && <h2 className="mb-4 text-[1.4em] font-bold opacity-80">{group.name}</h2>}
               <div className={cx('grid gap-5', columns)}>
-                {group.services.map((service) => (
-                  <button
-                    key={service.id}
-                    type="button"
-                    onClick={() => onChoose(service)}
-                    className="group flex min-h-32 items-center gap-5 rounded-3xl px-7 py-6 text-left shadow-lg transition active:scale-[0.98] hover:brightness-110"
-                    style={{ background: config.theme.buttonBackground, color: config.theme.buttonText }}
-                  >
-                    <span className="grid size-16 shrink-0 place-items-center rounded-2xl bg-white shadow-sm" style={{ color: service.color }}>
-                      <ServiceIcon name={service.icon} className="size-8" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[1.5em] leading-tight font-bold">{service.name}</span>
-                      {service.description && <span className="mt-1 block text-[0.95em] opacity-80">{service.description}</span>}
-                    </span>
-                    {config.showWaitingCount && (
-                      <span className="shrink-0 rounded-full bg-black/15 px-3 py-1 text-[0.9em] font-semibold tabular-nums">
-                        {service.waiting} {t('kiosk.waiting')}
+                {group.services.map((service) => {
+                  const theme = config.theme;
+                  const tile = theme.buttonStyle === 'tile';
+                  const size = SIZES[theme.buttonSize];
+                  const colors = theme.serviceColors ? buttonColors(theme, service.color) : buttonColors(theme, theme.buttonBackground, theme.buttonText);
+                  return (
+                    <button
+                      key={service.id}
+                      type="button"
+                      onClick={() => onChoose(service)}
+                      className={cx(
+                        'group relative flex shadow-lg transition active:scale-[0.98] hover:brightness-110',
+                        shapeClass(theme),
+                        tile ? cx('flex-col items-center justify-center gap-4 px-6 py-8 text-center', size.tile) : cx('items-center gap-5 px-7 py-6 text-left', size.row),
+                      )}
+                      style={colors}
+                    >
+                      {theme.showIcons && (
+                        <span
+                          className={cx('grid shrink-0 place-items-center rounded-2xl shadow-sm', tile ? size.tileIcon : size.icon)}
+                          style={theme.serviceColors || theme.buttonStyle === 'outline' ? { background: 'rgb(255 255 255 / 0.9)', color: service.color } : { background: '#ffffff', color: service.color }}
+                        >
+                          <ServiceIcon name={service.icon} className={tile ? 'size-12' : 'size-8'} />
+                        </span>
+                      )}
+                      <span className={cx('min-w-0', !tile && 'flex-1')}>
+                        <span className="block leading-tight font-bold" style={{ fontSize: size.text }}>
+                          {service.name}
+                        </span>
+                        {service.description && <span className="mt-1 block text-[0.95em] opacity-80">{service.description}</span>}
                       </span>
-                    )}
-                  </button>
-                ))}
+                      {config.showWaitingCount && (
+                        <span className="shrink-0 rounded-full bg-black/15 px-3 py-1 text-[0.9em] font-semibold tabular-nums">
+                          {service.waiting} {t('kiosk.waiting')}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </section>
           ))}
@@ -387,7 +493,13 @@ function ServicesStep({
   );
 }
 
-function CustomerForm({ fields, t, onSubmit }: { fields: CustomerField[]; t: ReturnType<typeof translator>; onSubmit: (data: Record<string, string>) => void }) {
+const SIZES: Record<KioskTheme['buttonSize'], { row: string; tile: string; icon: string; tileIcon: string; text: string }> = {
+  md: { row: 'min-h-24', tile: 'min-h-44', icon: 'size-14', tileIcon: 'size-20', text: '1.3em' },
+  lg: { row: 'min-h-32', tile: 'min-h-56', icon: 'size-16', tileIcon: 'size-24', text: '1.5em' },
+  xl: { row: 'min-h-40', tile: 'min-h-72', icon: 'size-20', tileIcon: 'size-28', text: '1.85em' },
+};
+
+function CustomerForm({ fields, t, onSubmit, shape }: { fields: CustomerField[]; t: ReturnType<typeof translator>; onSubmit: (data: Record<string, string>) => void; shape: string }) {
   const [data, setData] = useState<Record<string, string>>({});
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -430,7 +542,7 @@ function CustomerForm({ fields, t, onSubmit }: { fields: CustomerField[]; t: Ret
       ))}
       <button
         type="submit"
-        className="mt-4 flex h-20 w-full items-center justify-center gap-3 rounded-3xl text-[1.5em] font-bold shadow-lg active:scale-[0.99]"
+        className={cx('mt-4 flex h-20 w-full items-center justify-center gap-3 text-[1.5em] font-bold shadow-lg active:scale-[0.99]', shape)}
         style={{ background: 'var(--k-btn)', color: 'var(--k-btn-fg)' }}
       >
         <Check className="size-7" /> {t('kiosk.continue')}
@@ -479,7 +591,7 @@ function DoneStep({
       {mobile ? (
         <Link
           to={`/t/${result.ticket.publicToken}`}
-          className="mt-8 inline-flex items-center gap-3 rounded-3xl px-8 py-5 text-[1.3em] font-bold shadow-lg"
+          className={cx('mt-8 inline-flex items-center gap-3 px-8 py-5 text-[1.3em] font-bold shadow-lg', shapeClass(config.theme))}
           style={{ background: 'var(--k-btn)', color: 'var(--k-btn-fg)' }}
         >
           <Smartphone className="size-6" /> {t('kiosk.openTracking')}
@@ -494,7 +606,7 @@ function DoneStep({
           <button
             type="button"
             onClick={onDone}
-            className="mt-8 rounded-3xl px-12 py-5 text-[1.3em] font-bold shadow-lg"
+            className={cx('mt-8 px-12 py-5 text-[1.3em] font-bold shadow-lg', shapeClass(config.theme))}
             style={{ background: 'var(--k-btn)', color: 'var(--k-btn-fg)' }}
           >
             {t('kiosk.done')}

@@ -177,7 +177,7 @@ function QuickAccess() {
         <Link
           key={item.to}
           to={item.to}
-          className="group flex items-center gap-4 rounded-ui border border-border bg-surface p-4 shadow-sm transition hover:border-primary/40 hover:shadow-md"
+          className="gc-card group flex items-center gap-4 p-4 transition hover:-translate-y-0.5 hover:shadow-md"
         >
           <span className="grid size-11 shrink-0 place-items-center rounded-ui bg-primary/10 text-primary [&_svg]:size-5">{item.icon}</span>
           <span className="min-w-0 flex-1">
@@ -221,12 +221,12 @@ function Onboarding() {
   const branded = Boolean(b.logoUrl) || b.primaryColor !== defaults.primaryColor || b.appName !== defaults.appName;
 
   const steps: { key: string; label: string; description: string; to: string; done: boolean; role: Role }[] = [
-    { key: 'brand', label: 'Personalice su marca', description: 'Logo, colores y tipografía de su organización', to: '/app/personalizacion', done: branded, role: 'admin' },
+    { key: 'brand', label: 'Personalice su marca', description: 'Logo, colores y tipografía de su organización', to: '/app/configuracion/marca', done: branded, role: 'admin' },
     {
       key: 'services',
       label: `Configure sus ${terms.services.toLowerCase()}`,
       description: `Defina qué ${terms.services.toLowerCase()} ofrece y sus prefijos`,
-      to: '/app/servicios',
+      to: '/app/configuracion/servicios',
       done: (services.data?.length ?? 0) > 0,
       role: 'admin',
     },
@@ -247,7 +247,7 @@ function Onboarding() {
       role: 'manager',
     },
     { key: 'media', label: 'Agregue publicidad', description: 'Suba videos o imágenes para sus pantallas', to: '/app/contenido', done: (media.data?.length ?? 0) > 0, role: 'manager' },
-    { key: 'team', label: 'Invite a su equipo', description: `Cree usuarios para cada ${terms.agent.toLowerCase()}`, to: '/app/usuarios', done: (usage.data?.usage.users ?? 0) > 1, role: 'admin' },
+    { key: 'team', label: 'Invite a su equipo', description: `Cree usuarios para cada ${terms.agent.toLowerCase()}`, to: '/app/configuracion/usuarios', done: (usage.data?.usage.users ?? 0) > 1, role: 'admin' },
   ];
   const visible = steps.filter((s) => can(s.role));
   const completed = visible.filter((s) => s.done).length;

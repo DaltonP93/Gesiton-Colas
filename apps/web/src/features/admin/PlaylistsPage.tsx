@@ -47,6 +47,7 @@ import { formatDuration } from '../../lib/format';
 import { useDisplays, useMedia, usePlaylists } from '../../lib/queries';
 import { MediaPlayer } from '../display/MediaPlayer';
 import { MediaThumb } from './MediaPage';
+import { ContentTabs } from './ContentTabs';
 
 type DraftItem = PlaylistItemDTO & { media: MediaDTO; key: string };
 
@@ -96,6 +97,7 @@ export default function PlaylistsPage() {
 
   return (
     <div>
+      <ContentTabs />
       <PageHeader
         title="Listas de reproducción"
         description="Ordene su publicidad, defina cuánto dura cada contenido y en qué días u horarios se muestra. Asigne la lista a una o más pantallas."

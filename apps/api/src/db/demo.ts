@@ -73,6 +73,8 @@ export async function createDemoOrganization(db: DbOrTx, input: DemoInput) {
     timezone: input.timezone,
     plan: 'pro',
     demoDays: input.days,
+    // La demo ya viene configurada: no se ofrece el asistente inicial.
+    settings: { onboarding: { completed: true, dismissed: false, industry: 'demo' } },
   });
   const tenantId = tenant.id;
   const timezone = tenant.settings.timezone;

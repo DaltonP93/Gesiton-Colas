@@ -95,7 +95,7 @@ export function SaveBar({
 
 export function Section({ title, description, children, className }: { title: ReactNode; description?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={cx('rounded-ui border border-border bg-surface p-5 shadow-sm', className)}>
+    <section className={cx('gc-card gc-pad', className)}>
       <header className="mb-4">
         <h3 className="text-base font-semibold">{title}</h3>
         {description && <p className="mt-0.5 text-sm text-muted">{description}</p>}

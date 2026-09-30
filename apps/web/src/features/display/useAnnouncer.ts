@@ -67,15 +67,47 @@ export async function speak(text: string, voice: DisplayConfig['voice']): Promis
   });
 }
 
-export function callSpeechText(call: CallDTO, voice: DisplayConfig['voice'], branch = '') {
-  return renderTemplate(voice.template, {
+function speechVars(call: CallDTO, voice: DisplayConfig['voice'], branch: string) {
+  return {
     code: codeForSpeech(call.code, voice.codeMode),
     service: call.service,
     counter: call.counter,
     priority: call.priorityWeight > 0 ? call.priority : '',
     customer: call.customerName ?? '',
     branch,
-  });
+  };
+}
+
+/** Frase del anuncio: la propia del servicio o la general. */
+export function callSpeechText(call: CallDTO, voice: DisplayConfig['voice'], branch = '') {
+  const template = voice.serviceTemplates?.[call.serviceId]?.trim() || voice.template;
+  return renderTemplate(template, speechVars(call, voice, branch));
+}
+
+/** Frase en el segundo idioma (o vacío si no está activado). */
+export function secondarySpeechText(call: CallDTO, voice: DisplayConfig['voice'], branch = '') {
+  if (!voice.secondary?.enabled || !voice.secondary.template.trim()) return '';
+  return renderTemplate(voice.secondary.template, speechVars(call, voice, branch));
+}
+
+/** Voz del segundo idioma con la misma velocidad, tono y volumen. */
+export function secondaryVoice(voice: DisplayConfig['voice']): DisplayConfig['voice'] {
+  return { ...voice, lang: voice.secondary.lang, voiceName: voice.secondary.voiceName };
+}
+
+/** Lee el llamado completo: repeticiones con pausa y, si corresponde, el segundo idioma. */
+export async function speakCall(call: CallDTO, voice: DisplayConfig['voice'], branch = '') {
+  const text = callSpeechText(call, voice, branch);
+  const pause = Math.max(0, (voice.repeatDelay ?? 0.6) * 1000);
+  for (let i = 0; i < voice.repeat; i++) {
+    await speak(text, voice);
+    if (i < voice.repeat - 1) await wait(pause);
+  }
+  const second = secondarySpeechText(call, voice, branch);
+  if (second) {
+    await wait(pause);
+    await speak(second, secondaryVoice(voice));
+  }
 }
 
 /**
@@ -98,13 +130,7 @@ export function useAnnouncer(config: DisplayConfig, branch: string) {
       setSpeaking(true);
       try {
         if (cfg.sound.enabled) await playSound(soundUrl(cfg.sound.file), cfg.sound.volume);
-        if (cfg.voice.enabled) {
-          const text = callSpeechText(call, cfg.voice, branchName);
-          for (let i = 0; i < cfg.voice.repeat; i++) {
-            await speak(text, cfg.voice);
-            if (i < cfg.voice.repeat - 1) await wait(500);
-          }
-        }
+        if (cfg.voice.enabled) await speakCall(call, cfg.voice, branchName);
       } finally {
         await wait(350);
         setSpeaking(false);
