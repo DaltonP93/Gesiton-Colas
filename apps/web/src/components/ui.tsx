@@ -39,7 +39,7 @@ const variants: Record<Variant, string> = {
 
 const sizes: Record<Size, string> = {
   sm: 'h-8 px-3 text-sm gap-1.5',
-  md: 'h-10 px-4 text-sm gap-2',
+  md: 'h-[var(--gc-control-h)] px-4 text-sm gap-2',
   lg: 'h-12 px-5 text-base gap-2',
   xl: 'h-16 px-7 text-lg gap-3',
   icon: 'size-8 p-0',
@@ -87,7 +87,7 @@ const fieldBase =
   'w-full rounded-ui border border-border bg-surface px-3 text-sm text-fg placeholder:text-muted outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60';
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, ...rest }, ref) {
-  return <input ref={ref} className={cx(fieldBase, 'h-10', className)} {...rest} />;
+  return <input ref={ref} className={cx(fieldBase, 'h-[var(--gc-control-h)]', className)} {...rest} />;
 });
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(function Textarea(
@@ -99,7 +99,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
 
 export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(function Select({ className, children, ...rest }, ref) {
   return (
-    <select ref={ref} className={cx(fieldBase, 'h-10 pr-8', className)} {...rest}>
+    <select ref={ref} className={cx(fieldBase, 'h-[var(--gc-control-h)] pr-8', className)} {...rest}>
       {children}
     </select>
   );
@@ -308,9 +308,9 @@ export function Card({
   padded?: boolean;
 }) {
   return (
-    <section className={cx('rounded-ui border border-border bg-surface shadow-sm', className)}>
+    <section className={cx('gc-card', className)}>
       {(title || actions) && (
-        <header className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
+        <header className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-[var(--gc-pad)] py-4">
           <div className="min-w-0 flex-1 basis-60">
             {title && <h2 className="text-base font-semibold">{title}</h2>}
             {description && <p className="mt-0.5 text-sm text-muted">{description}</p>}
@@ -318,19 +318,26 @@ export function Card({
           {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
         </header>
       )}
-      <div className={padded ? 'p-5' : undefined}>{children}</div>
+      <div className={padded ? 'gc-pad' : undefined}>{children}</div>
     </section>
   );
 }
 
-export function PageHeader({ title, description, actions }: { title: ReactNode; description?: ReactNode; actions?: ReactNode }) {
+export function PageHeader({ title, description, actions, icon }: { title: ReactNode; description?: ReactNode; actions?: ReactNode; icon?: ReactNode }) {
   return (
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-      <div className="min-w-0">
-        <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
-        {description && <p className="mt-1 max-w-3xl text-sm text-muted">{description}</p>}
+    <div className="mb-[var(--gc-gap)] flex flex-wrap items-end justify-between gap-4">
+      <div className="flex min-w-0 flex-1 basis-[26rem] items-start gap-4">
+        {icon && (
+          <span className="grid size-12 shrink-0 place-items-center rounded-ui bg-primary/10 text-primary-text [&_svg]:size-6" aria-hidden>
+            {icon}
+          </span>
+        )}
+        <div className="min-w-0">
+          <h1 className="text-[1.65rem] leading-tight font-bold tracking-tight text-balance">{title}</h1>
+          {description && <p className="mt-1 max-w-3xl text-sm text-muted">{description}</p>}
+        </div>
       </div>
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
     </div>
   );
 }
@@ -410,7 +417,7 @@ export function Table({ children, className }: { children: ReactNode; className?
 
 export function Stat({ label, value, hint, icon, tone }: { label: ReactNode; value: ReactNode; hint?: ReactNode; icon?: ReactNode; tone?: string }) {
   return (
-    <div className="rounded-ui border border-border bg-surface p-4 shadow-sm">
+    <div className="gc-card p-4">
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm text-muted">{label}</span>
         {icon && (

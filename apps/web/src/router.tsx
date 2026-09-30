@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ReactNode } from 'react';
-import { createBrowserRouter, Navigate, useLocation } from 'react-router';
+import { createBrowserRouter, Navigate, useLocation, useSearchParams } from 'react-router';
 import { Loading } from './components/ui';
 import { useAuth } from './lib/auth';
 import type { Role } from '@gc/shared';
@@ -23,15 +23,12 @@ const DeviceLinkPage = lazy(() => import('./features/portal/DeviceLinkPage'));
 const SoundsPage = lazy(() => import('./features/admin/SoundsPage'));
 const DashboardPage = lazy(() => import('./features/admin/DashboardPage'));
 const MonitorPage = lazy(() => import('./features/admin/MonitorPage'));
-const BranchesPage = lazy(() => import('./features/admin/BranchesPage'));
-const ServicesPage = lazy(() => import('./features/admin/ServicesPage'));
-const UsersPage = lazy(() => import('./features/admin/UsersPage'));
 const DisplaysPage = lazy(() => import('./features/admin/DisplaysPage'));
 const KiosksPage = lazy(() => import('./features/admin/KiosksPage'));
 const MediaPage = lazy(() => import('./features/admin/MediaPage'));
 const PlaylistsPage = lazy(() => import('./features/admin/PlaylistsPage'));
-const CustomizationPage = lazy(() => import('./features/admin/CustomizationPage'));
-const IntegrationsPage = lazy(() => import('./features/admin/IntegrationsPage'));
+const ConfigurationPage = lazy(() => import('./features/admin/ConfigurationPage'));
+const SetupWizard = lazy(() => import('./features/admin/setup/SetupWizard'));
 const ReportsPage = lazy(() => import('./features/admin/ReportsPage'));
 const ProfilePage = lazy(() => import('./features/admin/ProfilePage'));
 const PlatformPage = lazy(() => import('./features/platform/PlatformPage'));
@@ -59,6 +56,14 @@ function Home() {
   if (loading) return <Loading />;
   if (me) return <Navigate to={me.tenant ? '/app' : '/plataforma'} replace />;
   return <LandingPage />;
+}
+
+/** Las antiguas páginas de configuración ahora son secciones de /app/configuracion. */
+function LegacyConfig({ section }: { section?: string }) {
+  const [params] = useSearchParams();
+  const tabs: Record<string, string> = { marca: 'marca', terminologia: 'terminologia', turnos: 'turnos', cliente: 'cliente', region: 'region' };
+  const target = section ?? tabs[params.get('tab') ?? ''] ?? 'marca';
+  return <Navigate to={`/app/configuracion/${target}`} replace />;
 }
 
 const page = (el: ReactNode, role?: Role) => (
@@ -100,15 +105,18 @@ export const router = createBrowserRouter([
       { path: 'sonidos', element: page(<SoundsPage />, 'manager') },
       { path: 'atencion', element: page(<AgentConsole />) },
       { path: 'monitor', element: page(<MonitorPage />, 'manager') },
-      { path: 'sucursales', element: page(<BranchesPage />, 'admin') },
-      { path: 'servicios', element: page(<ServicesPage />, 'admin') },
-      { path: 'usuarios', element: page(<UsersPage />, 'admin') },
+      { path: 'configuracion', element: page(<ConfigurationPage />, 'admin') },
+      { path: 'configuracion/:section', element: page(<ConfigurationPage />, 'admin') },
+      { path: 'bienvenida', element: page(<SetupWizard />, 'admin') },
+      { path: 'sucursales', element: <LegacyConfig section="sucursales" /> },
+      { path: 'servicios', element: <LegacyConfig section="servicios" /> },
+      { path: 'usuarios', element: <LegacyConfig section="usuarios" /> },
+      { path: 'integraciones', element: <LegacyConfig section="integraciones" /> },
+      { path: 'personalizacion', element: <LegacyConfig /> },
       { path: 'pantallas', element: page(<DisplaysPage />, 'manager') },
       { path: 'kioscos', element: page(<KiosksPage />, 'manager') },
       { path: 'contenido', element: page(<MediaPage />, 'manager') },
       { path: 'listas', element: page(<PlaylistsPage />, 'manager') },
-      { path: 'personalizacion', element: page(<CustomizationPage />, 'admin') },
-      { path: 'integraciones', element: page(<IntegrationsPage />, 'admin') },
       { path: 'reportes', element: page(<ReportsPage />, 'manager') },
       { path: 'perfil', element: page(<ProfilePage />) },
     ],

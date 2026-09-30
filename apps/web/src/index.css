@@ -15,9 +15,28 @@
   --gc-fg: #0f172a;
   --gc-radius: 12px;
   --gc-font: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --gc-font-heading: var(--gc-font);
   --gc-muted: color-mix(in srgb, var(--gc-fg) 58%, transparent);
   --gc-border: color-mix(in srgb, var(--gc-fg) 12%, transparent);
   --gc-subtle: color-mix(in srgb, var(--gc-fg) 5%, transparent);
+  --gc-primary-text: var(--gc-primary);
+  /* Tarjetas, menú lateral y espaciado: se recalculan según la marca (ver brandingVars). */
+  --gc-card-bg: var(--gc-surface);
+  --gc-card-border: color-mix(in srgb, var(--gc-fg) 6%, transparent);
+  --gc-card-shadow: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px -10px rgb(15 23 42 / 0.16);
+  --gc-card-blur: none;
+  --gc-nav-bg: var(--gc-surface);
+  --gc-nav-fg: var(--gc-fg);
+  --gc-nav-muted: color-mix(in srgb, var(--gc-fg) 55%, transparent);
+  --gc-nav-hover: color-mix(in srgb, var(--gc-fg) 6%, transparent);
+  --gc-nav-active-bg: color-mix(in srgb, var(--gc-primary) 11%, transparent);
+  --gc-nav-active-fg: var(--gc-primary);
+  --gc-nav-indicator: var(--gc-primary);
+  --gc-nav-border: color-mix(in srgb, var(--gc-fg) 8%, transparent);
+  --gc-pad: 1.25rem;
+  --gc-gap: 1.5rem;
+  --gc-control-h: 2.5rem;
+  --gc-page-bg: var(--gc-bg);
   color-scheme: light;
 }
 
@@ -32,8 +51,10 @@
   --color-muted: var(--gc-muted);
   --color-border: var(--gc-border);
   --color-subtle: var(--gc-subtle);
+  --color-primary-text: var(--gc-primary-text);
   --radius-ui: var(--gc-radius);
   --font-sans: var(--gc-font);
+  --font-heading: var(--gc-font-heading);
 }
 
 html,
@@ -44,7 +65,8 @@ body,
 
 body {
   margin: 0;
-  background: var(--gc-bg);
+  background: var(--gc-page-bg, var(--gc-bg));
+  background-attachment: fixed;
   color: var(--gc-fg);
   font-family: var(--gc-font);
   -webkit-font-smoothing: antialiased;
@@ -58,6 +80,24 @@ body {
 :focus-visible {
   outline: 2px solid var(--gc-primary);
   outline-offset: 2px;
+}
+
+/* Tarjetas y paneles del panel de administración (estilo configurable en Personalización). */
+.gc-card {
+  background: var(--gc-card-bg);
+  border: 1px solid var(--gc-card-border);
+  box-shadow: var(--gc-card-shadow);
+  border-radius: var(--gc-radius);
+  -webkit-backdrop-filter: var(--gc-card-blur);
+  backdrop-filter: var(--gc-card-blur);
+}
+.gc-pad {
+  padding: var(--gc-pad);
+}
+
+/* Títulos del panel con la tipografía de títulos de la marca (las pantallas y kioscos usan la suya). */
+.gc-app :is(h1, h2, h3) {
+  font-family: var(--gc-font-heading);
 }
 
 ::selection {
@@ -98,6 +138,17 @@ body {
   }
 }
 
+@keyframes gc-zoom {
+  0% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 @keyframes gc-flash {
   0%,
   100% {
@@ -135,6 +186,20 @@ body {
 .gc-pop {
   animation: gc-pop 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
 }
+.gc-zoom {
+  animation: gc-zoom 0.6s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+@keyframes gc-breathe {
+  50% {
+    transform: scale(1.05);
+  }
+}
+.gc-breathe {
+  animation: gc-breathe 2.4s ease-in-out infinite;
+}
+.gc-num {
+  font-family: var(--d-num-font, inherit);
+}
 .gc-flash {
   animation: gc-flash 0.8s ease-in-out 4;
 }
@@ -143,11 +208,23 @@ body {
     gc-pop 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.2) both,
     gc-flash 0.8s ease-in-out 0.55s 4;
 }
+.gc-slide-in.gc-flash {
+  animation:
+    gc-slide-in 0.6s ease both,
+    gc-flash 0.8s ease-in-out 0.6s 4;
+}
+.gc-zoom.gc-flash {
+  animation:
+    gc-zoom 0.6s cubic-bezier(0.2, 0.9, 0.3, 1) both,
+    gc-flash 0.8s ease-in-out 0.6s 4;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .gc-fade-in,
   .gc-slide-in,
   .gc-pop,
+  .gc-zoom,
+  .gc-breathe,
   .gc-flash {
     animation: none;
   }

@@ -1,8 +1,9 @@
-import { Check, ImageOff, Moon, RotateCcw, Sun, SunMoon, TriangleAlert, Upload, X } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { brandingSchema, type Branding, type MediaDTO } from '@gc/shared';
-import { Button, ColorInput, Field, Input, RangeInput, Select, Textarea, cx, useFeedback } from '../../../components/ui';
-import { assetUrl, errorMessage, upload } from '../../../lib/api';
+import { Check, Moon, RotateCcw, Sun, SunMoon, TriangleAlert, Upload } from 'lucide-react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { brandingSchema, type Branding } from '@gc/shared';
+import { ImageField } from '../../../components/ImageField';
+import { Button, ColorInput, Field, Input, RangeInput, Select, Textarea, cx } from '../../../components/ui';
+import { assetUrl } from '../../../lib/api';
 import { useAuth } from '../../../lib/auth';
 import { FONT_OPTIONS, fontStack, loadFont, readableOn } from '../../../lib/theme';
 import { BrandingPreview, contrastRatio, effectiveColors } from './BrandingPreview';
@@ -48,6 +49,9 @@ export function BrandTab({ onDirtyChange }: TabProps) {
   useReportDirty(dirty, onDirtyChange);
 
   useEffect(() => loadFont(draft.fontFamily), [draft.fontFamily]);
+  useEffect(() => {
+    if (draft.headingFontFamily) loadFont(draft.headingFontFamily);
+  }, [draft.headingFontFamily]);
 
   const set = <K extends keyof Branding>(key: K, value: Branding[K]) => setDraft((d) => ({ ...d, [key]: value }));
 
@@ -76,8 +80,13 @@ export function BrandTab({ onDirtyChange }: TabProps) {
       surfaceColor: d.surfaceColor,
       textColor: d.textColor,
       fontFamily: d.fontFamily,
+      headingFontFamily: d.headingFontFamily,
       borderRadius: d.borderRadius,
       colorScheme: d.colorScheme,
+      cardStyle: d.cardStyle,
+      sidebarStyle: d.sidebarStyle,
+      density: d.density,
+      backgroundStyle: d.backgroundStyle,
     }));
   };
 
@@ -251,13 +260,66 @@ export function BrandTab({ onDirtyChange }: TabProps) {
             </div>
           </Section>
 
+          <Section title="Apariencia del panel" description="Cómo se ven el menú, las tarjetas y el fondo. Combine a gusto: la vista previa muestra el resultado.">
+            <div className="space-y-6">
+              <OptionTiles
+                label="Tarjetas y paneles"
+                value={draft.cardStyle}
+                onChange={(v) => set('cardStyle', v)}
+                options={CARD_STYLES}
+              />
+              <OptionTiles
+                label="Menú lateral"
+                value={draft.sidebarStyle}
+                onChange={(v) => set('sidebarStyle', v)}
+                options={SIDEBAR_STYLES.map((o) => ({ ...o, preview: o.render(draft.primaryColor) }))}
+              />
+              <OptionTiles
+                label="Fondo"
+                value={draft.backgroundStyle}
+                onChange={(v) => set('backgroundStyle', v)}
+                options={BACKGROUND_STYLES.map((o) => ({ ...o, preview: o.render(draft) }))}
+              />
+              {draft.backgroundStyle === 'image' && (
+                <ImageField
+                  label="Imagen de fondo"
+                  hint="Una foto o textura clara. Se aclara automáticamente para que el texto se lea bien."
+                  value={draft.backgroundImageUrl}
+                  onChange={(v) => set('backgroundImageUrl', v)}
+                  uploadName="Fondo"
+                />
+              )}
+              <OptionTiles
+                label="Espaciado"
+                value={draft.density}
+                onChange={(v) => set('density', v)}
+                options={DENSITIES}
+                columns={2}
+              />
+            </div>
+          </Section>
+
           <Section title="Tipografía y forma">
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Fuente" hint="Fuentes de Google Fonts. La vista previa se actualiza al instante.">
+              <Field label="Fuente del texto" hint="Fuentes de Google Fonts. La vista previa se actualiza al instante.">
                 <Select value={draft.fontFamily} onChange={(e) => set('fontFamily', e.target.value)} style={{ fontFamily: fontStack(draft.fontFamily) }}>
                   {fonts.map((f) => (
                     <option key={f} value={f}>
                       {f === 'system-ui' ? 'Fuente del sistema' : f}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Fuente de los títulos" hint="Opcional: una fuente con más personalidad para títulos y encabezados.">
+                <Select
+                  value={draft.headingFontFamily}
+                  onChange={(e) => set('headingFontFamily', e.target.value)}
+                  style={{ fontFamily: fontStack(draft.headingFontFamily || draft.fontFamily) }}
+                >
+                  <option value="">La misma del texto</option>
+                  {HEADING_FONTS.map((f) => (
+                    <option key={f} value={f}>
+                      {f}
                     </option>
                   ))}
                 </Select>
@@ -279,9 +341,14 @@ export function BrandTab({ onDirtyChange }: TabProps) {
                 </div>
               </div>
             </div>
-            <p className="mt-4 rounded-ui bg-subtle px-4 py-3 text-lg" style={{ fontFamily: fontStack(draft.fontFamily) }}>
-              {terms.ticket} A001 · {terms.counter} 3 — ÁÉÍÓÚ ñ 0123456789
-            </p>
+            <div className="mt-4 rounded-ui bg-subtle px-4 py-3">
+              <p className="text-xl font-bold" style={{ fontFamily: fontStack(draft.headingFontFamily || draft.fontFamily) }}>
+                Bienvenidos a {name || 'su organización'}
+              </p>
+              <p className="mt-1 text-base" style={{ fontFamily: fontStack(draft.fontFamily) }}>
+                {terms.ticket} A001 · {terms.counter} 3 — ÁÉÍÓÚ ñ 0123456789
+              </p>
+            </div>
           </Section>
 
           <Section
@@ -323,96 +390,165 @@ export function BrandTab({ onDirtyChange }: TabProps) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Imagen (logo / favicon)                                             */
+/* Apariencia del panel                                                */
 /* ------------------------------------------------------------------ */
 
-const IMAGE_TYPES = 'image/png,image/jpeg,image/svg+xml,image/webp,image/gif';
+/** Fuentes con personalidad para títulos (se suman a las del texto). */
+const HEADING_FONTS = [...new Set(['Poppins', 'Montserrat', 'Outfit', 'Playfair Display', 'Merriweather', 'Oswald', 'Raleway', 'Rubik', 'DM Sans', ...FONT_OPTIONS.filter((f) => f !== 'system-ui')])];
 
-function ImageField({
-  label,
-  hint,
-  value,
-  onChange,
-  uploadName,
-  square,
-}: {
+interface Tile<T extends string> {
+  value: T;
   label: string;
   hint?: string;
-  value: string | null;
-  onChange: (value: string | null) => void;
-  uploadName: string;
-  square?: boolean;
-}) {
-  const { toast } = useFeedback();
-  const input = useRef<HTMLInputElement>(null);
-  const [progress, setProgress] = useState<number | null>(null);
-  const [broken, setBroken] = useState(false);
-  useEffect(() => setBroken(false), [value]);
+  preview: ReactNode;
+}
 
-  const onFile = async (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      toast('Seleccione una imagen (PNG, JPG, SVG, WebP o GIF)', 'error');
-      return;
-    }
-    setProgress(0);
-    try {
-      const media = await upload<MediaDTO>('/media/upload', file, { name: uploadName, tags: 'branding' }, setProgress);
-      onChange(media.url);
-      toast('Imagen subida. Guarde los cambios para aplicarla.', 'info');
-    } catch (e) {
-      toast(errorMessage(e), 'error');
-    } finally {
-      setProgress(null);
-      if (input.current) input.current.value = '';
-    }
-  };
+const miniCard = (style: CSSProperties) => <span className="block h-7 w-4/5 rounded-md" style={style} />;
 
-  const src = value ? assetUrl(value) : '';
-  const inputId = `img-${uploadName.toLowerCase()}`;
+const CARD_STYLES: Tile<Branding['cardStyle']>[] = [
+  {
+    value: 'elevated',
+    label: 'Sombra suave',
+    hint: 'Moderno y liviano',
+    preview: miniCard({ background: '#fff', boxShadow: '0 6px 14px -6px rgb(15 23 42 / .35)', border: '1px solid rgb(15 23 42 / .05)' }),
+  },
+  { value: 'bordered', label: 'Con borde', hint: 'Clásico y ordenado', preview: miniCard({ background: '#fff', border: '1.5px solid rgb(15 23 42 / .2)' }) },
+  { value: 'flat', label: 'Plano', hint: 'Sin bordes ni sombras', preview: miniCard({ background: '#fff' }) },
+  {
+    value: 'glass',
+    label: 'Vidrio',
+    hint: 'Translúcido, luce con degradado o imagen',
+    preview: miniCard({ background: 'rgb(255 255 255 / .55)', border: '1px solid rgb(255 255 255 / .8)', backdropFilter: 'blur(4px)', boxShadow: '0 6px 14px -8px rgb(15 23 42 / .4)' }),
+  },
+];
+
+const SIDEBAR_STYLES: (Omit<Tile<Branding['sidebarStyle']>, 'preview'> & { render: (primary: string) => ReactNode })[] = [
+  { value: 'light', label: 'Claro', hint: 'Del color de las tarjetas', render: () => <MiniLayout nav="#ffffff" navFg="#0f172a" border /> },
+  { value: 'dark', label: 'Oscuro', hint: 'Contraste elegante', render: () => <MiniLayout nav="#0f172a" navFg="#e2e8f0" /> },
+  { value: 'brand', label: 'Color de la marca', hint: 'Con su color principal', render: (primary) => <MiniLayout nav={primary} navFg={readableOn(primary)} /> },
+];
+
+const BACKGROUND_STYLES: (Omit<Tile<Branding['backgroundStyle']>, 'preview'> & { render: (b: Branding) => ReactNode })[] = [
+  { value: 'solid', label: 'Liso', render: (b) => <span className="block size-full" style={{ background: b.backgroundColor }} /> },
+  {
+    value: 'gradient',
+    label: 'Degradado suave',
+    render: (b) => (
+      <span
+        className="block size-full"
+        style={{
+          background: `radial-gradient(circle at 100% 0%, color-mix(in srgb, ${b.primaryColor} 30%, transparent), transparent 60%), radial-gradient(circle at 0% 100%, color-mix(in srgb, ${b.accentColor} 26%, transparent), transparent 60%), ${b.backgroundColor}`,
+        }}
+      />
+    ),
+  },
+  {
+    value: 'dots',
+    label: 'Puntos',
+    render: (b) => (
+      <span className="block size-full" style={{ background: `radial-gradient(color-mix(in srgb, ${b.textColor} 22%, transparent) 1px, transparent 1.4px) 0 0 / 8px 8px, ${b.backgroundColor}` }} />
+    ),
+  },
+  {
+    value: 'image',
+    label: 'Imagen propia',
+    render: (b) =>
+      b.backgroundImageUrl ? (
+        <span className="block size-full bg-cover bg-center" style={{ backgroundImage: `url("${assetUrl(b.backgroundImageUrl)}")` }} />
+      ) : (
+        <span className="grid size-full place-items-center text-muted" style={{ background: b.backgroundColor }}>
+          <Upload className="size-4" />
+        </span>
+      ),
+  },
+];
+
+const DENSITIES: Tile<Branding['density']>[] = [
+  {
+    value: 'comfortable',
+    label: 'Cómodo',
+    hint: 'Más aire entre elementos',
+    preview: (
+      <span className="flex w-4/5 flex-col gap-1.5">
+        <span className="h-2 rounded-full bg-fg/15" />
+        <span className="h-2 rounded-full bg-fg/15" />
+      </span>
+    ),
+  },
+  {
+    value: 'compact',
+    label: 'Compacto',
+    hint: 'Entra más información en pantalla',
+    preview: (
+      <span className="flex w-4/5 flex-col gap-0.5">
+        <span className="h-1.5 rounded-full bg-fg/15" />
+        <span className="h-1.5 rounded-full bg-fg/15" />
+        <span className="h-1.5 rounded-full bg-fg/15" />
+      </span>
+    ),
+  },
+];
+
+function MiniLayout({ nav, navFg, border }: { nav: string; navFg: string; border?: boolean }) {
   return (
-    <div className="space-y-1.5">
-      <label htmlFor={inputId} className="block text-sm font-medium">
+    <span className="flex size-full overflow-hidden rounded-md" style={{ background: '#eef2f7' }}>
+      <span className="flex w-1/3 flex-col gap-1 p-1.5" style={{ background: nav, borderRight: border ? '1px solid rgb(15 23 42 / .1)' : undefined }}>
+        {[0.9, 0.5, 0.5].map((o, i) => (
+          <span key={i} className="h-1.5 rounded-full" style={{ background: navFg, opacity: o }} />
+        ))}
+      </span>
+      <span className="flex flex-1 flex-col gap-1 p-1.5">
+        <span className="h-3 rounded bg-white shadow-sm" />
+        <span className="h-3 rounded bg-white shadow-sm" />
+      </span>
+    </span>
+  );
+}
+
+function OptionTiles<T extends string>({
+  label,
+  value,
+  onChange,
+  options,
+  columns = 4,
+}: {
+  label: string;
+  value: T;
+  onChange: (value: T) => void;
+  options: Tile<T>[];
+  columns?: 2 | 3 | 4;
+}) {
+  const id = `tiles-${label.replace(/\s+/g, '-').toLowerCase()}`;
+  return (
+    <div>
+      <span id={id} className="mb-2 block text-sm font-medium">
         {label}
-      </label>
-      <div className="flex gap-3">
-        <div
-          className={cx('grid shrink-0 place-items-center overflow-hidden rounded-ui border border-border', square ? 'size-20' : 'h-20 w-28')}
-          style={{ backgroundImage: 'repeating-conic-gradient(var(--gc-subtle) 0% 25%, transparent 0% 50%)', backgroundSize: '14px 14px' }}
-        >
-          {src && !broken ? (
-            <img src={src} alt={`${label} actual`} className="max-h-full max-w-full object-contain p-1.5" onError={() => setBroken(true)} />
-          ) : (
-            <ImageOff className={cx('size-6', broken ? 'text-red-500' : 'text-muted')} aria-label={broken ? 'No se pudo cargar la imagen' : 'Sin imagen'} />
-          )}
-        </div>
-        <div className="min-w-0 flex-1 space-y-2">
-          <Input id={inputId} value={value ?? ''} onChange={(e) => onChange(e.target.value || null)} placeholder="https://… o suba un archivo" className="text-xs" />
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="secondary" icon={<Upload className="size-4" />} loading={progress !== null} onClick={() => input.current?.click()}>
-              {progress !== null ? `Subiendo ${Math.round(progress * 100)} %` : 'Subir imagen'}
-            </Button>
-            {value && (
-              <Button size="sm" variant="ghost" icon={<X className="size-4" />} onClick={() => onChange(null)}>
-                Quitar
-              </Button>
-            )}
-          </div>
-          <input
-            ref={input}
-            type="file"
-            accept={IMAGE_TYPES}
-            className="hidden"
-            aria-hidden
-            tabIndex={-1}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void onFile(file);
-            }}
-          />
-        </div>
+      </span>
+      <div role="radiogroup" aria-labelledby={id} className={cx('grid grid-cols-2 gap-2', columns === 4 ? 'sm:grid-cols-4' : columns === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
+        {options.map((o) => {
+          const checked = o.value === value;
+          return (
+            <button
+              key={o.value}
+              type="button"
+              role="radio"
+              aria-checked={checked}
+              onClick={() => onChange(o.value)}
+              className={cx(
+                'group rounded-ui border p-2 text-left transition',
+                checked ? 'border-primary bg-primary/5 ring-2 ring-primary/20' : 'border-border hover:border-primary/40 hover:bg-subtle',
+              )}
+            >
+              <span className="grid h-14 place-items-center overflow-hidden rounded-[calc(var(--gc-radius)*0.6)] bg-gradient-to-br from-slate-100 to-slate-200">{o.preview}</span>
+              <span className="mt-2 flex items-center gap-1 text-xs font-semibold">
+                {o.label}
+                {checked && <Check className="size-3.5 text-primary-text" aria-hidden />}
+              </span>
+              {o.hint && <span className="block text-[11px] leading-snug text-muted">{o.hint}</span>}
+            </button>
+          );
+        })}
       </div>
-      {broken && <p className="text-xs text-red-600">No se pudo cargar la imagen. Revise la dirección.</p>}
-      {hint && !broken && <p className="text-xs text-muted">{hint}</p>}
     </div>
   );
 }

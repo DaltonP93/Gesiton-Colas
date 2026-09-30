@@ -522,7 +522,7 @@ function CreateTenantModal({ onClose }: { onClose: () => void }) {
               ))}
             </Select>
           </Field>
-          <Field label="Zona horaria" hint="Se puede cambiar luego en Personalización.">
+          <Field label="Zona horaria" hint="Se puede cambiar luego en Configuración → Idioma y zona horaria.">
             <Input list={tzListId} value={form.timezone} onChange={(e) => set('timezone', e.target.value)} autoComplete="off" />
             <datalist id={tzListId}>
               {timezones.map((tz) => (

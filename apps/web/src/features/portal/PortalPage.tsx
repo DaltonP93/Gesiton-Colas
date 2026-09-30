@@ -14,6 +14,7 @@ import {
   Plug,
   QrCode as QrIcon,
   Smartphone,
+  Sparkles,
   Tablet,
   Tv,
   Video,
@@ -23,6 +24,7 @@ import { Link, useNavigate } from 'react-router';
 import type { DisplayDTO, KioskDTO, Role } from '@gc/shared';
 import { QrCode } from '../../components/QrCode';
 import { Button, Card, EmptyState, IconButton, Input, Modal, cx } from '../../components/ui';
+import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { copyToClipboard } from '../../lib/format';
 import { useBranches, useDisplays, useKiosks } from '../../lib/queries';
@@ -49,10 +51,15 @@ interface Tool {
 
 /** Portal de inicio: acceso directo a todas las herramientas del sistema. */
 export default function PortalPage() {
-  const { me, terms, can } = useAuth();
+  const { me, terms, can, settings, refresh } = useAuth();
   const navigate = useNavigate();
   const [code, setCode] = useState('');
   const isManager = can('manager');
+  const showSetup = can('admin') && !settings.onboarding.completed && !settings.onboarding.dismissed;
+  const dismissSetup = async () => {
+    await api.put('/tenant', { settings: { onboarding: { dismissed: true } } }).catch(() => undefined);
+    await refresh();
+  };
 
   const allTools: Tool[] = [
     { to: '/app/atencion', title: 'Consola de atención', description: `Llame, atienda y derive ${terms.tickets.toLowerCase()}`, icon: <Headset />, role: 'agent', tone: '#2563eb' },
@@ -61,9 +68,9 @@ export default function PortalPage() {
     { to: '/app/reportes', title: 'Reportes', description: 'Tiempos, servicios y operadores', icon: <BarChart3 />, role: 'manager', tone: '#16a34a' },
     { to: '/app/contenido', title: 'Publicidad', description: 'Videos, imágenes y plataformas', icon: <Video />, role: 'manager', tone: '#ea580c' },
     { to: '/app/sonidos', title: 'Sonidos de llamado', description: 'Tonos, audios propios y música', icon: <Music />, role: 'manager', tone: '#db2777' },
-    { to: '/app/personalizacion', title: 'Personalización', description: 'Marca, colores y terminología', icon: <Palette />, role: 'admin', tone: '#9333ea' },
-    { to: '/app/sucursales', title: 'Configuración', description: `${terms.branches}, ${terms.services.toLowerCase()} y usuarios`, icon: <Building2 />, role: 'admin', tone: '#475569' },
-    { to: '/app/integraciones', title: 'Integraciones y API', description: 'API keys, webhooks y documentación', icon: <Plug />, role: 'admin', tone: '#0f766e' },
+    { to: '/app/configuracion/marca', title: 'Marca y apariencia', description: 'Logo, colores, menú y tipografía', icon: <Palette />, role: 'admin', tone: '#9333ea' },
+    { to: '/app/configuracion', title: 'Configuración', description: `${terms.branches}, ${terms.services.toLowerCase()} y usuarios`, icon: <Building2 />, role: 'admin', tone: '#475569' },
+    { to: '/app/configuracion/integraciones', title: 'Integraciones y API', description: 'API keys, webhooks y documentación', icon: <Plug />, role: 'admin', tone: '#0f766e' },
   ];
   const tools = allTools.filter((t) => can(t.role));
 
@@ -83,12 +90,35 @@ export default function PortalPage() {
         </div>
       </div>
 
+      {showSetup && (
+        <section
+          className="gc-card flex flex-wrap items-center gap-5 p-5 sm:p-6"
+          style={{ background: 'linear-gradient(120deg, color-mix(in srgb, var(--gc-primary) 14%, var(--gc-surface)), var(--gc-surface) 75%)' }}
+        >
+          <span className="grid size-14 shrink-0 place-items-center rounded-ui bg-primary text-primary-fg shadow-sm">
+            <Sparkles className="size-7" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-lg font-bold">Configure su sistema en 5 pasos</p>
+            <p className="mt-0.5 text-sm text-muted">Su rubro, la marca, la sucursal y los puestos, los servicios, la pantalla de TV y el kiosco. Tarda unos minutos.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="ghost" onClick={() => void dismissSetup()}>
+              Ahora no
+            </Button>
+            <Link to="/app/bienvenida">
+              <Button icon={<Sparkles className="size-4" />}>Empezar</Button>
+            </Link>
+          </div>
+        </section>
+      )}
+
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {tools.map((tool) => (
           <Link
             key={tool.to}
             to={tool.to}
-            className="group flex items-center gap-4 rounded-ui border border-border bg-surface p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            className="gc-card group flex items-center gap-4 p-4 transition hover:-translate-y-0.5 hover:shadow-md"
           >
             <span className="grid size-12 shrink-0 place-items-center rounded-ui [&_svg]:size-6" style={{ background: `color-mix(in srgb, ${tool.tone} 12%, transparent)`, color: tool.tone }}>
               {tool.icon}

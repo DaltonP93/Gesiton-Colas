@@ -24,6 +24,10 @@ test('flujo completo: registro, kiosco, llamado en pantalla y seguimiento', asyn
   await page.getByLabel('Email').fill(`ana+${Date.now()}@e2e.test`);
   await page.getByLabel('Contraseña').fill('password123');
   await page.getByRole('button', { name: 'Crear cuenta' }).click();
+  // Una organización nueva empieza por el asistente de configuración; esta prueba lo omite.
+  await expect(page).toHaveURL(/\/app\/bienvenida$/);
+  await expect(page.getByText('¿A qué se dedica su organización?')).toBeVisible();
+  await page.getByRole('button', { name: 'Omitir por ahora' }).click();
   await expect(page).toHaveURL(/\/app$/);
   await expect(page.getByText('Clínica E2E').first()).toBeVisible();
   await shot(page, '02-dashboard');

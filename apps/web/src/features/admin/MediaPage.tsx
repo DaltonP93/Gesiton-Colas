@@ -47,6 +47,7 @@ import { useAuth } from '../../lib/auth';
 import { formatBytes, formatDuration } from '../../lib/format';
 import { useMedia } from '../../lib/queries';
 import { MediaPlayer } from '../display/MediaPlayer';
+import { ContentTabs } from './ContentTabs';
 
 type Filter = 'all' | 'video' | 'image' | 'audio' | 'platform' | 'text';
 
@@ -158,6 +159,7 @@ export default function MediaPage() {
 
   return (
     <div>
+      <ContentTabs />
       <PageHeader
         title="Biblioteca de medios"
         description="Suba videos e imágenes o integre contenido de cualquier plataforma. Luego agréguelo a una lista de reproducción y asígnela a sus pantallas."
@@ -219,7 +221,7 @@ export default function MediaPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {list.map((m) => (
-            <article key={m.id} className="group overflow-hidden rounded-ui border border-border bg-surface shadow-sm">
+            <article key={m.id} className="gc-card group overflow-hidden">
               <button type="button" onClick={() => setPreview(m)} className="relative block aspect-video w-full overflow-hidden bg-black">
                 <MediaThumb media={m} className="size-full" />
                 <span className="absolute inset-0 grid place-items-center bg-black/0 text-white opacity-0 transition group-hover:bg-black/40 group-hover:opacity-100">
