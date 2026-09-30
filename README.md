@@ -14,7 +14,10 @@ Plataforma **SaaS** de gestión de turnos, pantallas y publicidad digital. Organ
 | **Fila virtual** | El mismo kiosco funciona desde el celular (`?modo=movil`): el cliente saca su turno con un QR y sigue su posición y tiempo estimado en vivo, con aviso al ser llamado. Puede cancelarlo. |
 | **Consola de atención** | Llamar siguiente, llamar uno específico, rellamar, iniciar, finalizar con notas, no se presentó, devolver a la cola, derivar a otro servicio, pausa y emisión manual. Atajos F1–F8. Varios operadores sin duplicados (bloqueo en base de datos). |
 | **Administración** | Sucursales, puestos de atención, departamentos, servicios (prefijo, color, ícono, tiempo estimado), prioridades con peso, usuarios con roles (administrador, supervisor, operador) y asignación a sucursales/servicios. |
-| **Personalización total** | Logo, favicon, colores, tipografía, bordes, modo oscuro, CSS propio, **terminología** (Turno/Ficha/Ticket, Ventanilla/Box/Caja…), numeración (dígitos, reinicio diario, por servicio o sucursal), campos del cliente, idioma (es/en/pt) y zona horaria. |
+| **Personalización total** | Logo, favicon, colores, tipografía de texto y de títulos, bordes, modo oscuro, **estilo de tarjetas** (sombra, borde, plano, vidrio), **menú lateral** claro, oscuro o del color de la marca, fondo (degradado, puntos o imagen), densidad, CSS propio, **terminología** (Turno/Ficha/Ticket, Ventanilla/Box/Caja…), numeración, campos del cliente, idioma (es/en/pt) y zona horaria. |
+| **Pantalla TV a medida** | Imagen de fondo, paneles sólidos, de vidrio o con borde, redondeo, tipografía propia para los números, tamaño del llamado y del historial, animación del llamado, reloj de 12/24 h, **código QR en pantalla** (fila virtual, encuesta, WhatsApp), frase de voz por servicio y **segundo idioma**. |
+| **Kiosco a medida** | Temas rápidos, fondo liso, degradado o imagen, botones redondeados, píldora, rectos, de contorno o **mosaico**, color por servicio, tamaño de logo, encabezado centrado, texto al pie y **pantalla de espera**. Ticket con **5 diseños prediseñados**, encabezado y pie sin tocar HTML. |
+| **Asistente inicial** | Al crear una organización, un asistente de 5 pasos propone según el **rubro** (banco, salud, farmacia, oficina pública, comercio, educación) la terminología, los colores y los servicios, y configura la sucursal, los puestos, la pantalla y el kiosco. |
 | **Reportes** | Espera y atención promedio, por servicio, operador, hora y día. Monitor en vivo y exportación a CSV/Excel. |
 | **Integraciones** | API REST con OpenAPI/Swagger (`/api/docs`), API keys con permisos, **webhooks firmados (HMAC-SHA256) con reintentos**, Socket.IO. Ideal para ERP, CRM, WhatsApp, Zapier, Make o n8n. |
 | **SaaS** | Registro autónomo de organizaciones, datos aislados por organización, planes con límites (sucursales, pantallas, kioscos, usuarios, almacenamiento), superadministrador con modo soporte. |
@@ -83,6 +86,8 @@ Sin SMTP configurado, los correos (verificación, recuperación, códigos, demos
 | `/registro`, `/login`, `/demo` | Alta de organización, inicio de sesión y demo por correo |
 | `/ingresar-con-correo`, `/olvide-contrasena` | Acceso con código por correo y recuperación de contraseña |
 | `/app` | Portal de herramientas (consola, kiosco, panel TV, administración) |
+| `/app/configuracion` | Toda la configuración en un solo lugar: marca, sucursales, servicios, usuarios, integraciones… |
+| `/app/bienvenida` | Asistente de configuración inicial |
 | `/vincular` | Se abre en la TV o tablet para vincularla con un código |
 | `/app/atencion` | Consola del operador |
 | `/pantalla/:token` | Pantalla de TV (enlace por pantalla) |

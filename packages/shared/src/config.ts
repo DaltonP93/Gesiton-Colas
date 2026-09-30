@@ -18,8 +18,19 @@ export const brandingSchema = z.object({
   surfaceColor: color.default('#ffffff'),
   textColor: color.default('#0f172a'),
   fontFamily: z.string().max(120).default('Inter'),
+  /** Tipografía de los títulos (vacío = la misma que el texto). */
+  headingFontFamily: z.string().max(120).default(''),
   borderRadius: z.number().int().min(0).max(32).default(12),
   colorScheme: z.enum(['light', 'dark', 'auto']).default('light'),
+  /** Aspecto de tarjetas y paneles. */
+  cardStyle: z.enum(['elevated', 'bordered', 'flat', 'glass']).default('elevated'),
+  /** Menú lateral: claro, oscuro o con el color principal. */
+  sidebarStyle: z.enum(['light', 'dark', 'brand']).default('light'),
+  /** Espaciado general de la interfaz. */
+  density: z.enum(['comfortable', 'compact']).default('comfortable'),
+  /** Fondo del panel. */
+  backgroundStyle: z.enum(['solid', 'gradient', 'dots', 'image']).default('gradient'),
+  backgroundImageUrl: z.string().max(2048).nullable().default(null),
   customCss: cssText.default(''),
 });
 export type Branding = z.infer<typeof brandingSchema>;
@@ -68,6 +79,16 @@ export const ticketSettingsSchema = z.object({
 });
 export type TicketSettings = z.infer<typeof ticketSettingsSchema>;
 
+/** Estado del asistente de configuración inicial. */
+export const onboardingSchema = z.object({
+  completed: z.boolean().default(false),
+  /** El administrador eligió configurar por su cuenta. */
+  dismissed: z.boolean().default(false),
+  /** Rubro elegido en el asistente (banco, salud, farmacia...). */
+  industry: z.string().max(40).default(''),
+});
+export type Onboarding = z.infer<typeof onboardingSchema>;
+
 export const tenantSettingsSchema = z.object({
   branding: brandingSchema.prefault({}),
   terminology: terminologySchema.prefault({}),
@@ -75,6 +96,7 @@ export const tenantSettingsSchema = z.object({
   customerFields: z.array(customerFieldSchema).max(30).default([]),
   locale: z.enum(LOCALES).default('es'),
   timezone: z.string().max(64).default('UTC'),
+  onboarding: onboardingSchema.prefault({}),
 });
 export type TenantSettings = z.infer<typeof tenantSettingsSchema>;
 
@@ -97,6 +119,19 @@ export const displayConfigSchema = z.object({
   historySize: z.number().int().min(1).max(20).default(5),
   /** Segundos que se destaca un llamado (overlay en layout de pantalla completa). */
   callHighlightSeconds: z.number().int().min(2).max(60).default(10),
+  /** Animación con la que aparece cada llamado. */
+  callAnimation: z.enum(['pop', 'slide', 'zoom', 'flash', 'none']).default('pop'),
+  clockFormat: z.enum(['24h', '12h']).default('24h'),
+  showSeconds: z.boolean().default(false),
+  /** Código QR en pantalla: fila virtual, encuesta, WhatsApp, menú... */
+  qr: z
+    .object({
+      enabled: z.boolean().default(false),
+      url: z.string().max(2048).default(''),
+      label: z.string().max(120).default('Saque su turno desde el celular'),
+      position: z.enum(['bottom-left', 'bottom-right', 'top-left', 'top-right']).default('bottom-left'),
+    })
+    .prefault({}),
   theme: z
     .object({
       background: color.default('#0f172a'),
@@ -107,8 +142,21 @@ export const displayConfigSchema = z.object({
       callText: color.default('#ffffff'),
       priorityColor: color.default('#f59e0b'),
       fontFamily: z.string().max(120).default('Inter'),
+      /** Tipografía de los números de turno (vacío = la misma). */
+      numberFontFamily: z.string().max(120).default(''),
       /** Escala tipográfica (1 = normal). */
       fontScale: z.number().min(0.5).max(3).default(1),
+      /** Escala del llamado actual y del historial. */
+      callScale: z.number().min(0.5).max(2).default(1),
+      historyScale: z.number().min(0.5).max(2).default(1),
+      /** Imagen de fondo de la pantalla (se ve detrás de los paneles). */
+      backgroundImageUrl: z.string().max(2048).nullable().default(null),
+      /** Oscurecimiento sobre la imagen de fondo (0 a 0,9). */
+      backgroundOverlay: z.number().min(0).max(0.9).default(0.45),
+      /** Paneles sólidos, translúcidos (vidrio) o solo con borde. */
+      panelStyle: z.enum(['solid', 'glass', 'outline']).default('solid'),
+      /** Redondeo de los paneles (en % de la altura de la pantalla). */
+      radius: z.number().min(0).max(6).default(2),
     })
     .prefault({}),
   voice: z
@@ -123,6 +171,19 @@ export const displayConfigSchema = z.object({
       template: z.string().max(300).default('Turno {{code}}, por favor diríjase a {{counter}}'),
       codeMode: z.enum(['number', 'spell']).default('spell'),
       repeat: z.number().int().min(1).max(3).default(1),
+      /** Pausa entre repeticiones (segundos). */
+      repeatDelay: z.number().min(0).max(10).default(0.6),
+      /** Frase propia por servicio (id del servicio → frase). Sin frase se usa la general. */
+      serviceTemplates: z.record(z.string(), z.string().max(300)).default({}),
+      /** Repite el anuncio en un segundo idioma (zonas turísticas, fronteras...). */
+      secondary: z
+        .object({
+          enabled: z.boolean().default(false),
+          lang: z.string().max(20).default('en-US'),
+          voiceName: z.string().max(200).default(''),
+          template: z.string().max(300).default('Ticket {{code}}, please go to {{counter}}'),
+        })
+        .prefault({}),
     })
     .prefault({}),
   sound: z
@@ -183,6 +244,7 @@ export type DisplayConfig = z.infer<typeof displayConfigSchema>;
 
 export const DEFAULT_TICKET_TEMPLATE = `<div class="t">
   {{logo}}
+  <div class="head">{{header}}</div>
   <div class="org">{{organization}}</div>
   <div class="branch">{{branch}}</div>
   <div class="label">Su turno</div>
@@ -193,6 +255,7 @@ export const DEFAULT_TICKET_TEMPLATE = `<div class="t">
   <div class="meta">Personas antes que usted: {{waiting}}</div>
   {{qr}}
   <div class="foot">Escanee el código para seguir su turno desde el celular</div>
+  <div class="note">{{footer}}</div>
 </div>`;
 
 export const DEFAULT_TICKET_CSS = `.t{font-family:system-ui,sans-serif;text-align:center;color:#000;padding:4mm 2mm}
@@ -205,7 +268,9 @@ export const DEFAULT_TICKET_CSS = `.t{font-family:system-ui,sans-serif;text-alig
 .t .priority{font-size:10pt;margin-bottom:2mm}
 .t .meta{font-size:9pt}
 .t img.qr{width:28mm;height:28mm;margin:3mm auto 1mm;display:block}
-.t .foot{font-size:8pt}`;
+.t .foot{font-size:8pt}
+.t .head,.t .note{font-size:9pt;margin:1mm 0}
+.t .head:empty,.t .note:empty,.t .priority:empty{display:none}`;
 
 export const kioskConfigSchema = z.object({
   title: z.string().max(120).default('¡Bienvenido!'),
@@ -224,14 +289,29 @@ export const kioskConfigSchema = z.object({
   askFields: z.array(z.string()).default([]),
   showQr: z.boolean().default(true),
   showWaitingCount: z.boolean().default(true),
+  showBranch: z.boolean().default(true),
+  /** Texto al pie de la pantalla (horarios, avisos...). */
+  footerText: z.string().max(300).default(''),
   /** Segundos antes de volver a la pantalla inicial. */
   returnSeconds: z.number().int().min(3).max(120).default(8),
+  /** Pantalla de espera después de un tiempo sin uso. */
+  idle: z
+    .object({
+      enabled: z.boolean().default(false),
+      seconds: z.number().int().min(10).max(3600).default(60),
+      title: z.string().max(120).default('Toque la pantalla para sacar su turno'),
+      showClock: z.boolean().default(true),
+    })
+    .prefault({}),
   print: z
     .object({
       enabled: z.boolean().default(true),
       paperWidthMm: z.number().int().min(40).max(210).default(80),
       template: z.string().max(20_000).default(DEFAULT_TICKET_TEMPLATE),
       css: cssText.default(DEFAULT_TICKET_CSS),
+      /** Textos libres que las plantillas muestran con {{header}} y {{footer}}. */
+      headerText: z.string().max(200).default(''),
+      footerText: z.string().max(300).default(''),
     })
     .prefault({}),
   theme: z
@@ -244,6 +324,21 @@ export const kioskConfigSchema = z.object({
       fontFamily: z.string().max(120).default('Inter'),
       fontScale: z.number().min(0.5).max(3).default(1),
       columns: z.number().int().min(1).max(6).default(2),
+      /** Fondo liso, degradado o con imagen. */
+      backgroundStyle: z.enum(['solid', 'gradient', 'image']).default('solid'),
+      /** Segundo color del degradado. */
+      backgroundTo: color.default('#dbeafe'),
+      backgroundImageUrl: z.string().max(2048).nullable().default(null),
+      backgroundOverlay: z.number().min(0).max(0.9).default(0.35),
+      /** Forma de los botones de servicio. */
+      buttonStyle: z.enum(['rounded', 'pill', 'square', 'outline', 'tile']).default('rounded'),
+      buttonSize: z.enum(['md', 'lg', 'xl']).default('lg'),
+      /** Cada botón usa el color de su servicio. */
+      serviceColors: z.boolean().default(false),
+      showIcons: z.boolean().default(true),
+      logoSize: z.enum(['sm', 'md', 'lg', 'xl']).default('md'),
+      /** Logo a la izquierda y sucursal a la derecha, o todo centrado. */
+      headerAlign: z.enum(['split', 'center']).default('split'),
     })
     .prefault({}),
   customCss: cssText.default(''),

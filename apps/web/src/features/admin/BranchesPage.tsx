@@ -425,7 +425,7 @@ function BranchFormModal({
           ) : services.length === 0 ? (
             <p className="rounded-ui border border-dashed border-border px-4 py-6 text-center text-sm text-muted">
               Aún no hay {terms.services.toLowerCase()}.{' '}
-              <Link to="/app/servicios" className="font-medium text-primary hover:underline">
+              <Link to="/app/configuracion/servicios" className="font-medium text-primary hover:underline">
                 Créelos aquí
               </Link>
               .

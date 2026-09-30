@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DEFAULT_TICKET_CSS,
+  DEFAULT_TICKET_TEMPLATE,
+  TICKET_PRESETS,
   codeForSpeech,
   defaultDisplayConfig,
+  kioskConfigSchema,
+  matchTicketPreset,
   deepMerge,
   detectMedia,
   displayConfigSchema,
@@ -131,3 +136,49 @@ describe('configuración', () => {
     expect(deepMerge({ a: { b: 1, c: 2 }, l: [1, 2] }, { a: { c: 3 }, l: [9] })).toEqual({ a: { b: 1, c: 3 }, l: [9] });
   });
 });
+
+describe('personalización ampliada', () => {
+  it('las configuraciones guardadas antes de la actualización reciben las opciones nuevas', () => {
+    const tenant = tenantSettingsSchema.parse({ branding: { primaryColor: '#059669', borderRadius: 8 } });
+    expect(tenant.branding.primaryColor).toBe('#059669');
+    expect(tenant.branding).toMatchObject({ cardStyle: 'elevated', sidebarStyle: 'light', density: 'comfortable', backgroundStyle: 'gradient', headingFontFamily: '' });
+    expect(tenant.onboarding).toEqual({ completed: false, dismissed: false, industry: '' });
+
+    const display = normalizeConfig(displayConfigSchema, { layout: 'tickets', theme: { background: '#000000' }, voice: { template: 'Número {{code}}' } });
+    expect(display.layout).toBe('tickets');
+    expect(display.theme).toMatchObject({ background: '#000000', panelStyle: 'solid', callScale: 1, backgroundImageUrl: null });
+    expect(display.voice).toMatchObject({ template: 'Número {{code}}', repeatDelay: 0.6, serviceTemplates: {} });
+    expect(display.voice.secondary.enabled).toBe(false);
+    expect(display.qr).toMatchObject({ enabled: false, position: 'bottom-left' });
+
+    const kiosk = normalizeConfig(kioskConfigSchema, { theme: { buttonBackground: '#dc2626' }, print: { paperWidthMm: 58 } });
+    expect(kiosk.theme).toMatchObject({ buttonBackground: '#dc2626', buttonStyle: 'rounded', backgroundStyle: 'solid', serviceColors: false });
+    expect(kiosk.print).toMatchObject({ paperWidthMm: 58, headerText: '', footerText: '' });
+    expect(kiosk.idle.enabled).toBe(false);
+  });
+
+  it('descarta opciones de diseño desconocidas sin perder el resto', () => {
+    const kiosk = normalizeConfig(kioskConfigSchema, { title: 'Hola', theme: { buttonStyle: 'estrella', columns: 3 } });
+    expect(kiosk.title).toBe('Hola');
+    expect(kiosk.theme.buttonStyle).toBe('rounded');
+    expect(kiosk.theme.columns).toBe(3);
+  });
+
+  it('reconoce los diseños de ticket prediseñados', () => {
+    expect(matchTicketPreset(DEFAULT_TICKET_TEMPLATE, DEFAULT_TICKET_CSS)?.id).toBe('classic');
+    for (const preset of TICKET_PRESETS) expect(matchTicketPreset(preset.template, preset.css)?.id).toBe(preset.id);
+    expect(matchTicketPreset('<div>{{code}}</div>', '')).toBeNull();
+    // Todos los diseños muestran el número y aceptan encabezado o pie.
+    for (const preset of TICKET_PRESETS) {
+      expect(preset.template).toContain('{{code}}');
+      expect(preset.template).toMatch(/\{\{(header|footer)\}\}/);
+    }
+  });
+
+  it('el encabezado y el pie vacíos no dejan texto en el ticket', () => {
+    const html = renderTemplate(DEFAULT_TICKET_TEMPLATE, { code: 'A001', header: '', footer: 'Gracias' }, { html: true });
+    expect(html).toContain('<div class="head"></div>');
+    expect(html).toContain('<div class="note">Gracias</div>');
+  });
+});
+

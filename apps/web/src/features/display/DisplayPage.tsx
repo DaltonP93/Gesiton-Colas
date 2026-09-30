@@ -14,6 +14,26 @@ import { useAnnouncer } from './useAnnouncer';
 
 /** Tamaño tipográfico relativo a la altura de la pantalla, afectado por la escala configurada. */
 const fs = (vh: number): CSSProperties => ({ fontSize: `calc(${vh}vh * var(--d-scale, 1))` });
+/** Igual que `fs`, con la escala propia del llamado actual o del historial. */
+const fsCall = (vh: number): CSSProperties => ({ fontSize: `calc(${vh}vh * var(--d-scale, 1) * var(--d-call, 1))` });
+const fsHist = (vh: number): CSSProperties => ({ fontSize: `calc(${vh}vh * var(--d-scale, 1) * var(--d-hist, 1))` });
+
+/** Fondo de un panel según el estilo elegido (sólido, vidrio o solo borde). */
+function panel(theme: DisplayConfig['theme'], extra: CSSProperties = {}): CSSProperties {
+  const base: CSSProperties =
+    theme.panelStyle === 'glass'
+      ? { background: `color-mix(in srgb, ${theme.panelBackground} 55%, transparent)`, backdropFilter: 'blur(1.6vh) saturate(1.3)', WebkitBackdropFilter: 'blur(1.6vh) saturate(1.3)' }
+      : theme.panelStyle === 'outline'
+        ? { background: 'transparent', boxShadow: `inset 0 0 0 0.25vh color-mix(in srgb, ${theme.text} 28%, transparent)` }
+        : { background: theme.panelBackground };
+  return { ...base, ...extra };
+}
+
+/** Clase de animación de un llamado nuevo. */
+function callAnimationClass(config: DisplayConfig, flash: boolean) {
+  const entry = { pop: 'gc-pop', slide: 'gc-slide-in', zoom: 'gc-zoom', flash: '', none: '' }[config.callAnimation];
+  return cx(entry, flash && config.callAnimation !== 'none' && 'gc-flash');
+}
 
 export default function DisplayPage() {
   const { token = '' } = useParams();
@@ -135,10 +155,11 @@ function DisplayScreen({ boot, token, refetch }: { boot: DisplayBootstrapDTO; to
   // Tipografía, CSS propio, pantalla siempre encendida y título.
   useEffect(() => {
     loadFont(config.theme.fontFamily);
+    if (config.theme.numberFontFamily) loadFont(config.theme.numberFontFamily);
     setCustomCss('gc-display-css', config.customCss);
     document.title = `${config.title || boot.display.name} · ${tenant.name}`;
     return () => setCustomCss('gc-display-css', '');
-  }, [config.theme.fontFamily, config.customCss, config.title, boot.display.name, tenant.name]);
+  }, [config.theme.fontFamily, config.theme.numberFontFamily, config.customCss, config.title, boot.display.name, tenant.name]);
 
   useEffect(() => {
     if (preview) return;
@@ -157,9 +178,16 @@ function DisplayScreen({ boot, token, refetch }: { boot: DisplayBootstrapDTO; to
   const playlistItems = useMemo(() => boot.playlist?.items ?? [], [boot.playlist]);
   const idle = useIdleCursor();
   const theme = config.theme;
+  const overlay = `rgb(0 0 0 / ${theme.backgroundOverlay})`;
   const style = {
     '--d-scale': theme.fontScale,
-    background: theme.background,
+    '--d-call': theme.callScale,
+    '--d-hist': theme.historyScale,
+    '--d-radius': `${theme.radius}vh`,
+    '--d-num-font': fontStack(theme.numberFontFamily || theme.fontFamily),
+    background: theme.backgroundImageUrl
+      ? `linear-gradient(${overlay}, ${overlay}), url("${assetUrl(theme.backgroundImageUrl).replace(/["\\\n]/g, '')}") center / cover no-repeat, ${theme.background}`
+      : theme.background,
     color: theme.text,
     fontFamily: fontStack(theme.fontFamily),
   } as CSSProperties;
@@ -186,6 +214,8 @@ function DisplayScreen({ boot, token, refetch }: { boot: DisplayBootstrapDTO; to
       onClick={() => !unlocked && unlock()}
     >
       {config.layout === 'fullscreen' ? <FullscreenLayout {...props} /> : config.layout === 'tickets' ? <TicketsLayout {...props} /> : <SplitLayout {...props} />}
+
+      <ScreenQr config={config} />
 
       <BackgroundMusic
         tracks={boot.music}
@@ -261,20 +291,39 @@ interface LayoutProps {
   media: ReactNode;
 }
 
-function Clock({ tenant, showDate, className }: { tenant: PublicTenantDTO; showDate: boolean; className?: string }) {
+function Clock({ tenant, config, className }: { tenant: PublicTenantDTO; config: DisplayConfig; className?: string }) {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+  const showDate = config.showDate;
   const locale = tenant.locale === 'pt' ? 'pt-BR' : tenant.locale;
   const tz = tenant.timezone && tenant.timezone !== 'UTC' ? tenant.timezone : undefined;
-  const time = now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', timeZone: tz });
+  // En formato de 12 h, «a. m./p. m.» va más chico para no quitarle lugar al nombre.
+  const parts = new Intl.DateTimeFormat(locale, {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: config.showSeconds ? '2-digit' : undefined,
+    hour12: config.clockFormat === '12h',
+    timeZone: tz,
+  }).formatToParts(now);
+  const time = parts
+    .filter((p) => p.type !== 'dayPeriod')
+    .map((p) => p.value)
+    .join('')
+    .trim();
+  const period = parts.find((p) => p.type === 'dayPeriod')?.value;
   const date = now.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long', timeZone: tz });
   return (
     <div className={cx('shrink-0 text-right leading-tight', className)}>
       <p className="font-bold tabular-nums" style={fs(5)}>
         {time}
+        {period && (
+          <span className="ml-[0.6vh] font-semibold opacity-80" style={fs(2.2)}>
+            {period}
+          </span>
+        )}
       </p>
       {showDate && (
         <p className="opacity-75 first-letter:uppercase" style={fs(1.9)}>
@@ -324,7 +373,7 @@ function CurrentCall({ call, config, t, flash, big = false }: { call: CallDTO | 
   const theme = config.theme;
   if (!call) {
     return (
-      <div className="flex flex-1 items-center justify-center rounded-[2vh] p-[3vh] text-center opacity-70" style={{ background: theme.panelBackground, ...fs(2.6) }}>
+      <div className="flex flex-1 items-center justify-center rounded-[var(--d-radius)] p-[3vh] text-center opacity-70" style={panel(theme, fs(2.6))}>
         {t('display.waitingCalls')}
       </div>
     );
@@ -332,24 +381,24 @@ function CurrentCall({ call, config, t, flash, big = false }: { call: CallDTO | 
   return (
     <div
       key={`${call.ticketId}:${call.callCount}`}
-      className={cx('gc-pop flex flex-col justify-center rounded-[2vh] p-[3vh] text-center shadow-2xl', flash && 'gc-flash')}
+      className={cx('flex flex-col justify-center rounded-[var(--d-radius)] p-[3vh] text-center shadow-2xl', callAnimationClass(config, flash))}
       style={{ background: theme.callBackground, color: theme.callText }}
     >
-      <p className="font-semibold tracking-[0.3em] uppercase opacity-80" style={fs(2.1)}>
+      <p className="font-semibold tracking-[0.3em] uppercase opacity-80" style={fsCall(2.1)}>
         {t('display.nowCalling')}
       </p>
-      <p className="my-[1vh] leading-none font-black tracking-tight" style={fs(big ? 22 : 13)}>
+      <p className="gc-num my-[1vh] leading-none font-black tracking-tight" style={fsCall(big ? 22 : 13)}>
         {call.code}
       </p>
       {call.customerName && (
-        <p className="truncate font-semibold" style={fs(big ? 4 : 3)}>
+        <p className="truncate font-semibold" style={fsCall(big ? 4 : 3)}>
           {call.customerName}
         </p>
       )}
-      <p className="font-bold" style={fs(big ? 6 : 4.2)}>
+      <p className="font-bold" style={fsCall(big ? 6 : 4.2)}>
         {call.counter}
       </p>
-      <p className="mt-[0.6vh] opacity-80" style={fs(big ? 2.8 : 2.2)}>
+      <p className="mt-[0.6vh] opacity-80" style={fsCall(big ? 2.8 : 2.2)}>
         {call.service}
       </p>
       <div className="mt-[1vh]">
@@ -371,17 +420,17 @@ function HistoryList({ calls, config, t }: { calls: CallDTO[]; config: DisplayCo
         {calls.slice(0, config.historySize).map((call) => (
           <li
             key={`${call.ticketId}:${call.callCount}`}
-            className="gc-fade-in flex min-h-0 items-center justify-between gap-[1.5vh] overflow-hidden rounded-[1.4vh] px-[2vh] py-[0.6vh]"
-            style={{ background: config.theme.panelBackground, borderLeft: `0.7vh solid ${call.serviceColor}` }}
+            className="gc-fade-in flex min-h-0 items-center justify-between gap-[1.5vh] overflow-hidden rounded-[calc(var(--d-radius)*0.7)] px-[2vh] py-[0.6vh]"
+            style={panel(config.theme, { borderLeft: `0.7vh solid ${call.serviceColor}` })}
           >
-            <span className="font-black tabular-nums" style={fs(4.2)}>
+            <span className="gc-num font-black tabular-nums" style={fsHist(4.2)}>
               {call.code}
             </span>
             <span className="min-w-0 text-right">
-              <span className="block truncate font-semibold" style={fs(2.5)}>
+              <span className="block truncate font-semibold" style={fsHist(2.5)}>
                 {call.counter}
               </span>
-              <span className="block truncate opacity-70" style={fs(1.7)}>
+              <span className="block truncate opacity-70" style={fsHist(1.7)}>
                 {call.service}
               </span>
             </span>
@@ -423,7 +472,7 @@ function SplitLayout({ config, tenant, t, calls, highlight, media }: LayoutProps
     <aside className="flex min-h-0 flex-col gap-[2.2vh] p-[2.5vh]" style={{ width: `${config.sidebarWidth}%` }}>
       <header className="flex items-center justify-between gap-[2vh]">
         {config.showLogo ? <Logo tenant={tenant} /> : <span />}
-        {config.showClock && <Clock tenant={tenant} showDate={config.showDate} />}
+        {config.showClock && <Clock tenant={tenant} config={config} />}
       </header>
       {config.title && (
         <p className="truncate font-semibold opacity-80" style={fs(2.4)}>
@@ -458,25 +507,25 @@ function FullscreenLayout({ config, tenant, t, calls, highlight, media }: Layout
           </div>
         )}
       </div>
-      <div className="flex shrink-0 items-center gap-[3vh] px-[3vh] py-[1.6vh]" style={{ background: config.theme.panelBackground }}>
+      <div className="flex shrink-0 items-center gap-[3vh] px-[3vh] py-[1.6vh]" style={panel(config.theme)}>
         {config.showLogo && <Logo tenant={tenant} className="max-w-[18%]" />}
         <div className="flex min-w-0 flex-1 gap-[1.6vh] overflow-hidden [mask-image:linear-gradient(to_right,black_88%,transparent)]">
           {calls.slice(0, config.historySize).map((call, i) => (
             <div
               key={`${call.ticketId}:${call.callCount}`}
-              className="gc-fade-in flex shrink-0 items-baseline gap-[1.2vh] rounded-[1.2vh] px-[1.8vh] py-[0.8vh]"
+              className="gc-fade-in flex shrink-0 items-baseline gap-[1.2vh] rounded-[calc(var(--d-radius)*0.6)] px-[1.8vh] py-[0.8vh]"
               style={i === 0 ? { background: config.theme.callBackground, color: config.theme.callText } : { background: 'rgba(255,255,255,0.06)' }}
             >
-              <span className="font-black tabular-nums" style={fs(i === 0 ? 4.6 : 3.4)}>
+              <span className="gc-num font-black tabular-nums" style={fsHist(i === 0 ? 4.6 : 3.4)}>
                 {call.code}
               </span>
-              <span className="font-semibold opacity-85" style={fs(i === 0 ? 2.6 : 2.1)}>
+              <span className="font-semibold opacity-85" style={fsHist(i === 0 ? 2.6 : 2.1)}>
                 {call.counter}
               </span>
             </div>
           ))}
         </div>
-        {config.showClock && <Clock tenant={tenant} showDate={config.showDate} />}
+        {config.showClock && <Clock tenant={tenant} config={config} />}
       </div>
       <Ticker config={config} />
     </div>
@@ -486,14 +535,14 @@ function FullscreenLayout({ config, tenant, t, calls, highlight, media }: Layout
 function TicketsLayout({ config, tenant, t, calls, highlight }: LayoutProps) {
   return (
     <div className="flex h-full flex-col">
-      <header className="flex shrink-0 items-center justify-between gap-[3vh] px-[4vh] py-[2vh]" style={{ background: config.theme.panelBackground }}>
+      <header className="flex shrink-0 items-center justify-between gap-[3vh] px-[4vh] py-[2vh]" style={panel(config.theme)}>
         {config.showLogo ? <Logo tenant={tenant} /> : <span />}
         {config.title && (
           <p className="truncate font-bold" style={fs(3.6)}>
             {config.title}
           </p>
         )}
-        {config.showClock ? <Clock tenant={tenant} showDate={config.showDate} /> : <span />}
+        {config.showClock ? <Clock tenant={tenant} config={config} /> : <span />}
       </header>
       <main className="grid min-h-0 flex-1 grid-cols-[1.1fr_1fr] gap-[3vh] p-[3vh]">
         <CurrentCall call={calls[0]} config={config} t={t} flash={Boolean(highlight && highlight.ticketId === calls[0]?.ticketId)} big />
@@ -506,16 +555,16 @@ function TicketsLayout({ config, tenant, t, calls, highlight }: LayoutProps) {
             {calls.slice(1, config.historySize + 1).map((call) => (
               <div
                 key={`${call.ticketId}:${call.callCount}`}
-                className="gc-fade-in flex flex-col justify-center rounded-[1.6vh] px-[2.4vh]"
-                style={{ background: config.theme.panelBackground, borderTop: `0.7vh solid ${call.serviceColor}` }}
+                className="gc-fade-in flex flex-col justify-center rounded-[calc(var(--d-radius)*0.8)] px-[2.4vh]"
+                style={panel(config.theme, { borderTop: `0.7vh solid ${call.serviceColor}` })}
               >
-                <span className="font-black tabular-nums" style={fs(6)}>
+                <span className="gc-num font-black tabular-nums" style={fsHist(6)}>
                   {call.code}
                 </span>
-                <span className="truncate font-semibold" style={fs(2.8)}>
+                <span className="truncate font-semibold" style={fsHist(2.8)}>
                   {call.counter}
                 </span>
-                <span className="truncate opacity-70" style={fs(1.8)}>
+                <span className="truncate opacity-70" style={fsHist(1.8)}>
                   {call.service}
                 </span>
               </div>
@@ -524,6 +573,40 @@ function TicketsLayout({ config, tenant, t, calls, highlight }: LayoutProps) {
         </div>
       </main>
       <Ticker config={config} />
+    </div>
+  );
+}
+
+/** Código QR en una esquina: fila virtual, encuesta, WhatsApp... */
+function ScreenQr({ config }: { config: DisplayConfig }) {
+  const { qr } = config;
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    if (!qr.enabled || !qr.url) return setSrc(null);
+    let alive = true;
+    void import('qrcode')
+      .then((m) => m.default.toDataURL(qr.url, { width: 480, margin: 1 }))
+      .then((url) => alive && setSrc(url))
+      .catch(() => alive && setSrc(null));
+    return () => {
+      alive = false;
+    };
+  }, [qr.enabled, qr.url]);
+  if (!src) return null;
+  const tickerOn = config.ticker.enabled && config.ticker.messages.some(Boolean);
+  const vertical = qr.position.startsWith('top') ? { top: '2.5vh' } : { bottom: tickerOn ? '8vh' : '2.5vh' };
+  const horizontal = qr.position.endsWith('left') ? { left: '2.5vh' } : { right: '2.5vh' };
+  return (
+    <div
+      className="absolute z-10 flex items-center gap-[1.6vh] rounded-[var(--d-radius)] bg-white p-[1.2vh] pr-[2vh] text-slate-900 shadow-2xl"
+      style={{ ...vertical, ...horizontal }}
+    >
+      <img src={src} alt="" className="size-[14vh]" />
+      {qr.label && (
+        <p className="max-w-[22vh] leading-tight font-bold" style={fs(2.2)}>
+          {qr.label}
+        </p>
+      )}
     </div>
   );
 }
