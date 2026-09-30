@@ -9,3 +9,4 @@ export * from './modules';
 export * from './notifications';
 export * from './platform';
 export * from './types';
+export * from './surveys';

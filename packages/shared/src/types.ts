@@ -299,6 +299,8 @@ export interface PublicTicketDTO {
   tenant: PublicTenantDTO;
   /** Avisos por WhatsApp/SMS: si se ofrecen y el teléfono anotado (enmascarado). */
   notify: { available: boolean; phone: string | null };
+  /** Encuesta de satisfacción del turno (cuando terminó la atención). */
+  survey: { url: string; answered: boolean } | null;
 }
 
 export interface PairingDTO {

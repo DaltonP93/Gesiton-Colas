@@ -30,6 +30,7 @@ Plataforma **SaaS** de gestión de turnos, pantallas y publicidad digital. Organ
 | **Módulos activables** | Pantallas, kioscos, publicidad, reportes, integraciones, avisos, encuestas y pagos son **módulos**: el superadministrador define qué incluye cada plan y puede **activar o desactivar cada módulo por organización**. Un módulo apagado desaparece del menú y la API responde `403 module_disabled`. |
 | **Numeración de turnos** | Prefijo por servicio, 1 a 6 dígitos, número inicial, reinicio **diario, semanal, mensual, anual o nunca**, y qué pasa al llegar al máximo (A999 → A001 o A1000). Estado del contador y **reinicio manual** en Configuración → Numeración. |
 | **Avisos por WhatsApp y SMS** | Mensajes al **sacar el turno**, **cuando se acerca** (faltan N), **cuando lo llaman** y **al terminar** (con la encuesta). Canales: **WhatsApp oficial (Meta Cloud API)** con plantillas, **WAHA** u otra API local de WhatsApp y **cualquier proveedor de SMS por HTTP** (URL y cuerpo con `{{phone}}` y `{{message}}`). Proveedor de la plataforma o propio de cada organización, clave cifrada, mensaje de prueba, historial con reintentos y alta del teléfono desde la página de seguimiento. |
+| **Encuestas de satisfacción** | Constructor de encuestas con **estrellas, caritas, recomendación (NPS), una o varias opciones, sí/no y comentarios**, plantillas (general, rápida, pacientes, NPS), vista previa en celular y alcance por servicio y sucursal. El cliente responde desde el **seguimiento de su turno**, el **aviso por WhatsApp/SMS al terminar** o un **QR general** (por sucursal). Métricas: **NPS, CSAT, promedio**, tasa de respuesta, evolución diaria, por servicio, operador y sucursal, detalle por pregunta, comentarios y CSV. Webhook `survey.answered`. |
 | **Privacidad** | Plazo de conservación de datos personales, borrado a pedido del titular y exportación de datos personales solo para administradores (ver [docs/SEGURIDAD.md](docs/SEGURIDAD.md)). |
 
 Funciona en **cualquier dispositivo con navegador**: Smart TV, Android TV/Google TV, mini PC, Raspberry Pi, tablets, celulares, Windows, macOS y Linux.
@@ -112,6 +113,8 @@ docker compose exec app node apps/api/dist/db/admin-cli.js superadmin correo@emp
 | `/plataforma` | Superadministrador: organizaciones, planes, superadministradores, página principal, marca y correo |
 | `/app/configuracion/correo` | Servidor de correo propio de la organización |
 | `/app/configuracion/avisos` | Avisos por WhatsApp y SMS: canal, mensajes e historial |
+| `/app/encuestas` | Encuestas de satisfacción: resultados (NPS, CSAT, comentarios) y constructor |
+| `/encuesta/:token`, `/encuesta/s/:token` | Encuesta del turno y encuesta por enlace general o QR (`?sucursal=`) |
 | `/api/docs` | Documentación interactiva de la API |
 
 ## Documentación

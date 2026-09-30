@@ -85,6 +85,7 @@ Configure una URL en **Integraciones y API → Webhooks** y elija los eventos (o
 | `ticket.transferred` | Se derivó a otro servicio |
 | `ticket.requeued` | Se devolvió a la cola |
 | `queue.reset` | Cierre de jornada de una sucursal |
+| `survey.answered` | Un cliente respondió una encuesta (`survey`, `response` con NPS, calificación, comentario y respuestas, y `ticket` si vino del turno) |
 
 Formato del cuerpo (`POST`, JSON):
 
@@ -171,3 +172,14 @@ Módulo **Avisos** (se activa por plan o por organización desde la Plataforma).
 - El teléfono sale del dato «Teléfono» del turno (kiosco, panel o API) o lo escribe el cliente en su página de seguimiento. Los números locales se completan con el código de país configurado (595 por defecto): `0981 123 456` → `595981123456`.
 - Los envíos pasan por una cola con 3 intentos (al minuto y a los 5 minutos) y quedan en el **Historial**, donde se pueden reintentar.
 - Por seguridad, el proveedor de una organización no puede apuntar a la red interna del servidor. Si WAHA o el gateway de SMS están en la red local, configúrelos como **proveedor de la plataforma** o active `WEBHOOKS_ALLOW_PRIVATE=true` en una instalación con organizaciones de confianza.
+
+## Encuestas de satisfacción
+
+Módulo **Encuestas**. Cada turno atendido tiene su enlace `/encuesta/{publicToken}` (una respuesta por turno,
+vence a los N días) y cada encuesta un enlace general `/encuesta/s/{token}` para QR o redes (opcionalmente
+`?sucursal={branchId}`). La encuesta que corresponde a un turno es la activa más específica: servicio y
+sucursal, luego servicio, luego sucursal y por último la general.
+
+- Métricas: `GET /api/v1/surveys/results?from=&to=&surveyId=&branchId=&serviceId=&agentId=` (NPS, CSAT, promedio, por día, servicio, operador, sucursal, pregunta y comentarios).
+- Exportación: `GET /api/v1/surveys/responses.csv` con los mismos filtros (con `surveyId`, una columna por pregunta).
+- Con una API key `reports:read` se pueden leer desde un BI (Power BI, Metabase, Looker Studio).

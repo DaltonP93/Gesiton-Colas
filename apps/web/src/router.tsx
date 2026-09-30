@@ -38,6 +38,9 @@ const AgentConsole = lazy(() => import('./features/agent/AgentConsole'));
 const DisplayPage = lazy(() => import('./features/display/DisplayPage'));
 const KioskPage = lazy(() => import('./features/kiosk/KioskPage'));
 const TrackingPage = lazy(() => import('./features/tracking/TrackingPage'));
+const SurveyPage = lazy(() => import('./features/survey/SurveyPage'));
+const SurveysPage = lazy(() => import('./features/admin/SurveysPage'));
+const SurveyEditorPage = lazy(() => import('./features/admin/SurveyEditorPage'));
 
 function Lazy({ children }: { children: ReactNode }) {
   return <Suspense fallback={<Loading />}>{children}</Suspense>;
@@ -137,6 +140,8 @@ export const router = createBrowserRouter([
       { path: 'contenido', element: page(<MediaPage />, 'manager', ['advertising']) },
       { path: 'listas', element: page(<PlaylistsPage />, 'manager', ['advertising']) },
       { path: 'reportes', element: page(<ReportsPage />, 'manager', ['reports']) },
+      { path: 'encuestas', element: page(<SurveysPage />, 'manager', ['surveys']) },
+      { path: 'encuestas/:id', element: page(<SurveyEditorPage />, 'admin', ['surveys']) },
       { path: 'perfil', element: page(<ProfilePage />) },
     ],
   },
@@ -162,6 +167,22 @@ export const router = createBrowserRouter([
     element: (
       <Lazy>
         <TrackingPage />
+      </Lazy>
+    ),
+  },
+  {
+    path: '/encuesta/:token',
+    element: (
+      <Lazy>
+        <SurveyPage />
+      </Lazy>
+    ),
+  },
+  {
+    path: '/encuesta/s/:token',
+    element: (
+      <Lazy>
+        <SurveyPage general />
       </Lazy>
     ),
   },

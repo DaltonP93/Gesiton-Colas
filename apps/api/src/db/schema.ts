@@ -28,6 +28,8 @@ import type {
   PlatformSettings,
   Role,
   Schedule,
+  SurveyAnswers,
+  SurveyQuestion,
   TenantSettings,
   TicketChannel,
   TicketStatus,
@@ -557,6 +559,59 @@ export const notifyMessages = pgTable(
   ],
 );
 
+export const surveys = pgTable(
+  'surveys',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    name: text('name').notNull(),
+    title: text('title').notNull().default(''),
+    intro: text('intro').notNull().default(''),
+    thanks: text('thanks').notNull().default(''),
+    active: boolean('active').notNull().default(true),
+    /** Servicios y sucursales donde se usa (vacío = todos). */
+    serviceIds: jsonb('service_ids').$type<string[]>().notNull().default([]),
+    branchIds: jsonb('branch_ids').$type<string[]>().notNull().default([]),
+    questions: jsonb('questions').$type<SurveyQuestion[]>().notNull().default([]),
+    expiresDays: integer('expires_days').notNull().default(7),
+    allowAnonymous: boolean('allow_anonymous').notNull().default(true),
+    /** Enlace general (QR) para responder sin turno. */
+    publicToken: text('public_token').notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex('surveys_public_token_idx').on(t.publicToken), index('surveys_tenant_idx').on(t.tenantId)],
+);
+
+export const surveyResponses = pgTable(
+  'survey_responses',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    surveyId: uuid('survey_id')
+      .notNull()
+      .references(() => surveys.id, { onDelete: 'cascade' }),
+    ticketId: uuid('ticket_id').references(() => tickets.id, { onDelete: 'set null' }),
+    branchId: uuid('branch_id').references(() => branches.id, { onDelete: 'set null' }),
+    serviceId: uuid('service_id').references(() => services.id, { onDelete: 'set null' }),
+    agentId: uuid('agent_id').references(() => users.id, { onDelete: 'set null' }),
+    counterId: uuid('counter_id').references(() => counters.id, { onDelete: 'set null' }),
+    /** `ticket` (enlace del turno) o `link` (enlace general / QR). */
+    channel: text('channel').$type<'ticket' | 'link'>().notNull().default('ticket'),
+    answers: jsonb('answers').$type<SurveyAnswers>().notNull().default({}),
+    nps: integer('nps'),
+    rating: integer('rating'),
+    comment: text('comment'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    // Una respuesta por turno.
+    uniqueIndex('survey_responses_ticket_idx').on(t.ticketId),
+    index('survey_responses_tenant_idx').on(t.tenantId, t.createdAt),
+    index('survey_responses_survey_idx').on(t.surveyId, t.createdAt),
+  ],
+);
+
 export type Tenant = typeof tenants.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Branch = typeof branches.$inferSelect;
@@ -576,3 +631,5 @@ export type WebhookDelivery = typeof webhookDeliveries.$inferSelect;
 export type MailSettingsRow = typeof mailSettings.$inferSelect;
 export type NotifyProviderRow = typeof notifyProviders.$inferSelect;
 export type NotifyMessageRow = typeof notifyMessages.$inferSelect;
+export type Survey = typeof surveys.$inferSelect;
+export type SurveyResponse = typeof surveyResponses.$inferSelect;

@@ -68,6 +68,7 @@ export const WEBHOOK_EVENTS = [
   'ticket.transferred',
   'ticket.requeued',
   'queue.reset',
+  'survey.answered',
 ] as const;
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
 

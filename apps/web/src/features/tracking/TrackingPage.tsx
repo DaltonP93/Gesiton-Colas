@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
-import { BellRing, CheckCircle2, Clock, Loader2, MapPin, MessageCircle, Users, XCircle } from 'lucide-react';
+import { BellRing, CheckCircle2, ChevronRight, Clock, Heart, Loader2, MapPin, MessageCircle, Star, Users, XCircle } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { RT, type PublicTicketDTO } from '@gc/shared';
 import { ApiError, api, assetUrl } from '../../lib/api';
 import { translator } from '../../lib/i18n';
@@ -164,6 +164,27 @@ export default function TrackingPage() {
             )}
           </p>
         </div>
+
+        {ticket.survey && (
+          <div className="mt-4">
+            {ticket.survey.answered ? (
+              <p className="flex items-center justify-center gap-2 rounded-2xl bg-surface px-4 py-4 text-sm font-semibold shadow">
+                <Heart className="size-5 fill-rose-500 text-rose-500" /> {t('track.surveyDone')}
+              </p>
+            ) : (
+              <Link to={ticket.survey.url} className="gc-pop flex items-center gap-4 rounded-2xl bg-surface p-5 text-left shadow-lg ring-2 ring-primary/30">
+                <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-amber-400/20">
+                  <Star className="size-7 fill-amber-400 text-amber-400" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-lg font-bold">{t('track.surveyTitle')}</span>
+                  <span className="block text-sm text-muted">{t('track.surveyHint')}</span>
+                </span>
+                <ChevronRight className="size-6 shrink-0 text-primary" aria-label={t('track.surveyOpen')} />
+              </Link>
+            )}
+          </div>
+        )}
 
         {active && (
           <div className="mt-4 space-y-3">
