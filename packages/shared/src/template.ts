@@ -72,6 +72,8 @@ export const TEMPLATE_VARIABLES = {
     'waiting',
     'customer',
     'trackingUrl',
+    'header',
+    'footer',
     'qr',
     'logo',
   ],

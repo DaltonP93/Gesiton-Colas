@@ -34,6 +34,10 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-gc}:${POSTGRES_PASSWORD:-gc}@db:5432/${POSTGRES_DB:-gestion_colas}
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
       JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET en .env}
+      # Dentro del contenedor la app siempre escucha en 3000 y guarda los archivos en el volumen,
+      # aunque .env defina PORT (puerto publicado en el servidor) o UPLOAD_DIR (instalación sin Docker).
+      PORT: '3000'
+      UPLOAD_DIR: /data/uploads
     volumes:
       - uploads:/data/uploads
 

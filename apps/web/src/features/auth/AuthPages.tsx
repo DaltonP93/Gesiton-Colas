@@ -580,19 +580,23 @@ export function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Una organización recién creada empieza por el asistente de configuración.
+  const justCreated = useRef(false);
 
-  if (me) return <Navigate to="/app" replace />;
+  if (me) return <Navigate to={justCreated.current ? '/app/bienvenida' : '/app'} replace />;
   const set = (key: keyof typeof form) => (e: { target: { value: string } }) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
+    justCreated.current = true;
     try {
       const res = await register(form);
-      if (res) navigate('/app', { replace: true });
+      if (res) navigate('/app/bienvenida', { replace: true });
       else setPendingEmail(form.email);
     } catch (err) {
+      justCreated.current = false;
       setError(errorMessage(err));
     } finally {
       setLoading(false);

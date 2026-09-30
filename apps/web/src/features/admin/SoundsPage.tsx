@@ -202,7 +202,7 @@ function SoundCard({
   onAssign: () => void;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-ui border border-border bg-surface p-3 shadow-sm">
+    <div className="gc-card flex items-center gap-3 p-3">
       <button
         type="button"
         onClick={onPlay}

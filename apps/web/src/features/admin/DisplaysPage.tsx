@@ -30,6 +30,7 @@ import {
 } from '@gc/shared';
 import { Link } from 'react-router';
 import { CopyField } from '../../components/CopyField';
+import { ImageField } from '../../components/ImageField';
 import { QrCode } from '../../components/QrCode';
 import {
   Badge,
@@ -55,11 +56,11 @@ import {
 import { api, errorMessage } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { formatDateTime } from '../../lib/format';
-import { useBranches, useDisplays, useMedia, usePlaylists, useServices } from '../../lib/queries';
+import { useBranches, useDisplays, useKiosks, useMedia, usePlaylists, useServices } from '../../lib/queries';
 import { FONT_OPTIONS } from '../../lib/theme';
-import { callSpeechText, pickVoice, playSound, soundUrl, speak } from '../display/useAnnouncer';
+import { callSpeechText, pickVoice, playSound, secondarySpeechText, soundUrl, speakCall } from '../display/useAnnouncer';
 
-const LAYOUTS: { value: DisplayConfig['layout']; label: string; description: string; icon: ReactNode }[] = [
+export const LAYOUTS: { value: DisplayConfig['layout']; label: string; description: string; icon: ReactNode }[] = [
   { value: 'split', label: 'Publicidad + turnos', description: 'Contenido a un lado y panel de llamados al otro.', icon: <Columns2 /> },
   { value: 'fullscreen', label: 'Publicidad a pantalla completa', description: 'El llamado aparece destacado encima del contenido.', icon: <Maximize2 /> },
   { value: 'tickets', label: 'Solo turnos', description: 'Llamado grande e historial. Sin publicidad.', icon: <Rows3 /> },
@@ -84,7 +85,7 @@ export default function DisplaysPage() {
   const displays = useDisplays();
   const branches = useBranches();
   const playlists = usePlaylists();
-  const { can } = useAuth();
+  const { can, terms } = useAuth();
   const [editing, setEditing] = useState<DisplayDTO | null>(null);
   const [creating, setCreating] = useState(false);
 
@@ -92,13 +93,21 @@ export default function DisplaysPage() {
     <div>
       <PageHeader
         title="Pantallas"
+        icon={<MonitorPlay />}
         description="Cada pantalla tiene su propio enlace: ábralo en el navegador de una Smart TV, Android TV, mini PC, Chromecast con Google TV o Raspberry Pi."
         actions={
-          can('admin') && (
-            <Button icon={<Plus className="size-4" />} onClick={() => setCreating(true)}>
-              Nueva pantalla
-            </Button>
-          )
+          <>
+            <Link to="/app/vincular">
+              <Button variant="secondary" icon={<Link2 className="size-4" />}>
+                Vincular una TV
+              </Button>
+            </Link>
+            {can('admin') && (
+              <Button icon={<Plus className="size-4" />} onClick={() => setCreating(true)}>
+                Nueva pantalla
+              </Button>
+            )}
+          </>
         }
       />
       {displays.isLoading ? (
@@ -113,7 +122,7 @@ export default function DisplaysPage() {
             return (
               <Card key={d.id} padded={false} className="overflow-hidden">
                 <div className="relative">
-                  <LayoutThumb config={d.config} />
+                  <LayoutThumb config={d.config} counter={terms.counter} />
                   <span className={cx('absolute top-2 left-2 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium text-white', isOnline ? 'bg-emerald-600' : 'bg-slate-600')}>
                     <span className={cx('size-1.5 rounded-full', isOnline ? 'bg-white' : 'bg-white/60')} />
                     {isOnline ? 'En línea' : 'Sin conexión'}
@@ -143,6 +152,17 @@ export default function DisplaysPage() {
               </Card>
             );
           })}
+          {can('admin') && (
+            <button
+              type="button"
+              onClick={() => setCreating(true)}
+              className="flex min-h-56 flex-col items-center justify-center gap-2 rounded-ui border-2 border-dashed border-border p-6 text-center text-muted transition hover:border-primary/50 hover:bg-primary/5 hover:text-primary-text"
+            >
+              <Plus className="size-7" />
+              <span className="font-semibold">Agregar otra pantalla</span>
+              <span className="max-w-60 text-xs">Una por sala de espera o por sector, cada una con su diseño y su publicidad.</span>
+            </button>
+          )}
         </div>
       )}
       <CreateDisplayModal open={creating} onClose={() => setCreating(false)} onCreated={(d) => setEditing(d)} />
@@ -367,7 +387,24 @@ function DisplayEditor({ display, onClose }: { display: DisplayDTO; onClose: () 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <RangeInput label="Cantidad en el historial" value={config.historySize} min={1} max={20} onChange={(historySize) => set({ historySize })} />
                   <RangeInput label="Tiempo destacado del llamado" value={config.callHighlightSeconds} min={2} max={60} onChange={(callHighlightSeconds) => set({ callHighlightSeconds })} format={(v) => `${v} s`} />
+                  <Field label="Animación del llamado">
+                    <Select value={config.callAnimation} onChange={(e) => set({ callAnimation: e.target.value as DisplayConfig['callAnimation'] })}>
+                      <option value="pop">Rebote y destello</option>
+                      <option value="zoom">Acercamiento</option>
+                      <option value="slide">Deslizar</option>
+                      <option value="flash">Solo destello</option>
+                      <option value="none">Sin animación</option>
+                    </Select>
+                  </Field>
+                  <Field label="Reloj">
+                    <Select value={config.clockFormat} onChange={(e) => set({ clockFormat: e.target.value as DisplayConfig['clockFormat'] })}>
+                      <option value="24h">24 horas (14:30)</option>
+                      <option value="12h">12 horas (2:30 p. m.)</option>
+                    </Select>
+                  </Field>
+                  <Toggle checked={config.showSeconds} onChange={(showSeconds) => set({ showSeconds })} label="Mostrar segundos" />
                 </div>
+                <QrSettings config={config} set={set} />
               </>
             )}
 
@@ -399,16 +436,60 @@ function DisplayEditor({ display, onClose }: { display: DisplayDTO; onClose: () 
                   <ColorInput label="Texto del llamado" value={config.theme.callText} onChange={(callText) => set({ theme: { ...config.theme, callText } })} />
                   <ColorInput label="Prioridad" value={config.theme.priorityColor} onChange={(priorityColor) => set({ theme: { ...config.theme, priorityColor } })} />
                 </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Tipografía">
-                    <Select value={config.theme.fontFamily} onChange={(e) => set({ theme: { ...config.theme, fontFamily: e.target.value } })}>
-                      {FONT_OPTIONS.map((f) => (
-                        <option key={f}>{f}</option>
-                      ))}
-                    </Select>
-                  </Field>
-                  <RangeInput label="Tamaño de letra" value={config.theme.fontScale} min={0.6} max={2} step={0.05} onChange={(fontScale) => set({ theme: { ...config.theme, fontScale } })} format={(v) => `${Math.round(v * 100)}%`} />
-                </div>
+                <Card title="Tipografía y tamaños">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label="Tipografía">
+                      <Select value={config.theme.fontFamily} onChange={(e) => set({ theme: { ...config.theme, fontFamily: e.target.value } })}>
+                        {FONT_OPTIONS.map((f) => (
+                          <option key={f}>{f}</option>
+                        ))}
+                      </Select>
+                    </Field>
+                    <Field label="Tipografía de los números" hint="Una fuente condensada (Oswald, Barlow) se lee muy bien de lejos.">
+                      <Select value={config.theme.numberFontFamily} onChange={(e) => set({ theme: { ...config.theme, numberFontFamily: e.target.value } })}>
+                        <option value="">La misma</option>
+                        {FONT_OPTIONS.map((f) => (
+                          <option key={f}>{f}</option>
+                        ))}
+                      </Select>
+                    </Field>
+                    <RangeInput label="Tamaño general" value={config.theme.fontScale} min={0.6} max={2} step={0.05} onChange={(fontScale) => set({ theme: { ...config.theme, fontScale } })} format={(v) => `${Math.round(v * 100)}%`} />
+                    <RangeInput label="Tamaño del llamado" value={config.theme.callScale} min={0.5} max={2} step={0.05} onChange={(callScale) => set({ theme: { ...config.theme, callScale } })} format={(v) => `${Math.round(v * 100)}%`} />
+                    <RangeInput label="Tamaño del historial" value={config.theme.historyScale} min={0.5} max={2} step={0.05} onChange={(historyScale) => set({ theme: { ...config.theme, historyScale } })} format={(v) => `${Math.round(v * 100)}%`} />
+                  </div>
+                </Card>
+                <Card title="Fondo y paneles">
+                  <div className="space-y-5">
+                    <ImageField
+                      label="Imagen de fondo"
+                      hint="Opcional: una foto de su local o una textura. Se ve detrás del reloj, los llamados y el historial."
+                      value={config.theme.backgroundImageUrl}
+                      onChange={(backgroundImageUrl) => set({ theme: { ...config.theme, backgroundImageUrl } })}
+                      uploadName="Fondo de pantalla"
+                    />
+                    {config.theme.backgroundImageUrl && (
+                      <RangeInput
+                        label="Oscurecer la imagen"
+                        value={config.theme.backgroundOverlay}
+                        min={0}
+                        max={0.9}
+                        step={0.05}
+                        onChange={(backgroundOverlay) => set({ theme: { ...config.theme, backgroundOverlay } })}
+                        format={(v) => `${Math.round(v * 100)}%`}
+                      />
+                    )}
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field label="Estilo de los paneles">
+                        <Select value={config.theme.panelStyle} onChange={(e) => set({ theme: { ...config.theme, panelStyle: e.target.value as DisplayConfig['theme']['panelStyle'] } })}>
+                          <option value="solid">Sólidos</option>
+                          <option value="glass">Vidrio (translúcidos)</option>
+                          <option value="outline">Solo borde</option>
+                        </Select>
+                      </Field>
+                      <RangeInput label="Redondeo de esquinas" value={config.theme.radius} min={0} max={6} step={0.25} onChange={(radius) => set({ theme: { ...config.theme, radius } })} format={(v) => (v === 0 ? 'Rectas' : `${v}`)} />
+                    </div>
+                  </div>
+                </Card>
                 <Field label="CSS personalizado" hint="Para ajustes avanzados. La pantalla usa la clase .gc-display.">
                   <Textarea rows={5} className="font-mono text-xs" value={config.customCss} onChange={(e) => set({ customCss: e.target.value })} placeholder=".gc-display { letter-spacing: .02em }" />
                 </Field>
@@ -534,13 +615,14 @@ function DisplayEditor({ display, onClose }: { display: DisplayDTO; onClose: () 
 }
 
 /** Miniatura del diseño de la pantalla con sus colores (sin cargar la pantalla real). */
-function LayoutThumb({ config }: { config: DisplayConfig }) {
+export function LayoutThumb({ config, counter = 'Ventanilla' }: { config: DisplayConfig; counter?: string }) {
   const { theme } = config;
+  const short = counter.charAt(0).toUpperCase();
   const call = (
     <div className="flex flex-col items-center justify-center rounded-md px-2 py-1.5" style={{ background: theme.callBackground, color: theme.callText }}>
       <span className="text-[8px] font-semibold tracking-widest uppercase opacity-80">Llamando</span>
       <span className="text-xl leading-none font-black">A015</span>
-      <span className="text-[9px] font-semibold">Ventanilla 2</span>
+      <span className="text-[9px] font-semibold">{counter} 2</span>
     </div>
   );
   const rows = (
@@ -548,7 +630,7 @@ function LayoutThumb({ config }: { config: DisplayConfig }) {
       {['A014', 'C008', 'A013'].map((c) => (
         <div key={c} className="flex justify-between rounded px-1.5 py-0.5 text-[9px] font-bold" style={{ background: theme.panelBackground }}>
           <span>{c}</span>
-          <span className="opacity-70">V1</span>
+          <span className="opacity-70">{short}1</span>
         </div>
       ))}
     </div>
@@ -676,8 +758,12 @@ function VoiceSettings({ config, set }: { config: DisplayConfig; set: (p: Partia
 
   async function test() {
     if (config.sound.enabled) await playSound(soundUrl(config.sound.file), config.sound.volume);
-    if (voice.enabled) await speak(callSpeechText(sample, voice, 'Casa central'), voice);
+    if (voice.enabled) await speakCall(sample, voice, 'Casa central');
   }
+  const services = useServices();
+  const [showPerService, setShowPerService] = useState(Object.keys(voice.serviceTemplates).length > 0);
+  const secondary = voice.secondary;
+  const secondaryVoices = useMemo(() => voices.filter((v) => v.lang.toLowerCase().startsWith(secondary.lang.slice(0, 2).toLowerCase())), [voices, secondary.lang]);
 
   return (
     <>
@@ -726,7 +812,70 @@ function VoiceSettings({ config, set }: { config: DisplayConfig; set: (p: Partia
             <RangeInput label="Velocidad" value={voice.rate} min={0.5} max={2} step={0.05} onChange={(rate) => setVoice({ rate })} format={(v) => `${v.toFixed(2)}x`} />
             <RangeInput label="Tono" value={voice.pitch} min={0} max={2} step={0.05} onChange={(pitch) => setVoice({ pitch })} format={(v) => v.toFixed(2)} />
             <RangeInput label="Volumen de la voz" value={voice.volume} min={0} max={1} step={0.05} onChange={(volume) => setVoice({ volume })} format={(v) => `${Math.round(v * 100)}%`} />
+            <RangeInput label="Pausa entre repeticiones" value={voice.repeatDelay} min={0} max={5} step={0.1} onChange={(repeatDelay) => setVoice({ repeatDelay })} format={(v) => `${v.toFixed(1)} s`} />
           </div>
+
+          <div className="rounded-ui border border-border">
+            <button type="button" onClick={() => setShowPerService((v) => !v)} className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left" aria-expanded={showPerService}>
+              <span>
+                <span className="block text-sm font-medium">Frase propia por {terms.service.toLowerCase()}</span>
+                <span className="block text-xs text-muted">Por ejemplo «Paciente {'{{customer}}'}, pase al {'{{counter}}'}» solo para Consultas.</span>
+              </span>
+              <span className="text-sm font-medium text-primary-text">{showPerService ? 'Ocultar' : 'Configurar'}</span>
+            </button>
+            {showPerService && (
+              <div className="space-y-3 border-t border-border p-4">
+                {(services.data ?? []).filter((sv) => sv.active).map((sv) => (
+                  <Field key={sv.id} label={sv.name}>
+                    <Input
+                      value={voice.serviceTemplates[sv.id] ?? ''}
+                      placeholder={`Frase general: ${voice.template}`}
+                      onChange={(e) => {
+                        const next = { ...voice.serviceTemplates };
+                        if (e.target.value.trim()) next[sv.id] = e.target.value;
+                        else delete next[sv.id];
+                        set({ voice: { ...voice, serviceTemplates: next } });
+                      }}
+                    />
+                  </Field>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </Card>
+      <Card title="Segundo idioma" description="Repite cada llamado en otro idioma: zonas turísticas, fronteras, aeropuertos.">
+        <div className="space-y-4">
+          <Toggle checked={secondary.enabled} onChange={(enabled) => setVoice({ secondary: { ...secondary, enabled } })} label="Anunciar también en otro idioma" />
+          {secondary.enabled && (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Idioma">
+                  <Select value={secondary.lang} onChange={(e) => setVoice({ secondary: { ...secondary, lang: e.target.value, voiceName: '' } })}>
+                    {langs.map((l) => (
+                      <option key={l}>{l}</option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field label="Voz">
+                  <Select value={secondary.voiceName} onChange={(e) => setVoice({ secondary: { ...secondary, voiceName: e.target.value } })}>
+                    <option value="">Automática ({pickVoice(voices, secondary.lang, '')?.name ?? 'predeterminada'})</option>
+                    {secondaryVoices.map((v) => (
+                      <option key={v.name} value={v.name}>
+                        {v.name}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              </div>
+              <Field label="Texto a leer" hint={<>Variables: {TEMPLATE_VARIABLES.voice.map((v) => `{{${v}}}`).join(' ')}</>}>
+                <Input value={secondary.template} onChange={(e) => setVoice({ secondary: { ...secondary, template: e.target.value } })} />
+              </Field>
+              <p className="rounded-ui bg-subtle px-3 py-2 text-sm">
+                <span className="text-muted">Ejemplo: </span>«{secondarySpeechText(sample, voice, 'Casa central')}»
+              </p>
+            </>
+          )}
         </div>
       </Card>
       <Card title="Sonido de alerta" description="Se reproduce antes de la voz.">
@@ -779,5 +928,49 @@ function VoiceSettings({ config, set }: { config: DisplayConfig; set: (p: Partia
         Probar en este equipo
       </Button>
     </>
+  );
+}
+
+function QrSettings({ config, set }: { config: DisplayConfig; set: (p: Partial<DisplayConfig>) => void }) {
+  const kiosks = useKiosks();
+  const qr = config.qr;
+  const setQr = (patch: Partial<DisplayConfig['qr']>) => set({ qr: { ...qr, ...patch } });
+  return (
+    <Card title="Código QR en pantalla" description="Invite a sacar turno desde el celular, a completar una encuesta o a escribir por WhatsApp.">
+      <div className="space-y-4">
+        <Toggle checked={qr.enabled} onChange={(enabled) => setQr({ enabled })} label="Mostrar un código QR" />
+        <Field label="Enlace del QR" hint="Cualquier dirección: fila virtual, encuesta, WhatsApp (https://wa.me/595...), menú, redes sociales.">
+          <Input value={qr.url} onChange={(e) => setQr({ url: e.target.value })} placeholder="https://" />
+        </Field>
+        {(kiosks.data?.length ?? 0) > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-muted">Usar la fila virtual de:</span>
+            {kiosks.data!.map((k) => (
+              <button
+                key={k.id}
+                type="button"
+                onClick={() => setQr({ url: `${window.location.origin}/kiosco/${k.token}?modo=movil`, enabled: true })}
+                className="rounded-full border border-border px-3 py-1 text-xs font-medium hover:bg-subtle"
+              >
+                {k.name}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Texto junto al QR">
+            <Input value={qr.label} maxLength={120} onChange={(e) => setQr({ label: e.target.value })} />
+          </Field>
+          <Field label="Ubicación">
+            <Select value={qr.position} onChange={(e) => setQr({ position: e.target.value as DisplayConfig['qr']['position'] })}>
+              <option value="bottom-left">Abajo a la izquierda</option>
+              <option value="bottom-right">Abajo a la derecha</option>
+              <option value="top-left">Arriba a la izquierda</option>
+              <option value="top-right">Arriba a la derecha</option>
+            </Select>
+          </Field>
+        </div>
+      </div>
+    </Card>
   );
 }
