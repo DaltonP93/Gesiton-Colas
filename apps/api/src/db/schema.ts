@@ -22,6 +22,8 @@ import type {
   MediaProvider,
   MailSecurity,
   ModuleOverrides,
+  NotifyMessageStatus,
+  NotifyProvider,
   PlanId,
   PlatformSettings,
   Role,
@@ -511,6 +513,50 @@ export const mailSettings = pgTable('mail_settings', {
   updatedAt: updatedAt(),
 });
 
+/**
+ * Proveedor de avisos (WhatsApp / SMS). `scope` es `platform` (para todas las organizaciones)
+ * o el id de una organización con su propio proveedor. El token o clave va cifrado.
+ */
+export const notifyProviders = pgTable('notify_providers', {
+  scope: text('scope').primaryKey(),
+  tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }),
+  enabled: boolean('enabled').notNull().default(false),
+  provider: text('provider').$type<NotifyProvider>().notNull().default('waha'),
+  /** Datos no secretos (URL, sesión, número, cuerpo...). */
+  config: jsonb('config').$type<Record<string, string>>().notNull().default({}),
+  secretEnc: text('secret_enc').notNull().default(''),
+  updatedAt: updatedAt(),
+});
+
+/** Mensajes enviados (o por enviar) al cliente, con reintentos. */
+export const notifyMessages = pgTable(
+  'notify_messages',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    ticketId: uuid('ticket_id').references(() => tickets.id, { onDelete: 'cascade' }),
+    event: text('event').notNull(),
+    to: text('to').notNull(),
+    body: text('body').notNull(),
+    /** Parámetros de la plantilla de Meta. */
+    params: jsonb('params').$type<string[]>().notNull().default([]),
+    provider: text('provider').$type<NotifyProvider>(),
+    status: text('status').$type<NotifyMessageStatus>().notNull().default('pending'),
+    attempts: integer('attempts').notNull().default(0),
+    error: text('error'),
+    providerRef: text('provider_ref'),
+    nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).defaultNow(),
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('notify_messages_due_idx').on(t.status, t.nextAttemptAt),
+    index('notify_messages_tenant_idx').on(t.tenantId, t.createdAt),
+    // Cada aviso se envía una sola vez por turno.
+    uniqueIndex('notify_messages_ticket_event_idx').on(t.ticketId, t.event),
+  ],
+);
+
 export type Tenant = typeof tenants.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Branch = typeof branches.$inferSelect;
@@ -528,3 +574,5 @@ export type ApiKey = typeof apiKeys.$inferSelect;
 export type Webhook = typeof webhooks.$inferSelect;
 export type WebhookDelivery = typeof webhookDeliveries.$inferSelect;
 export type MailSettingsRow = typeof mailSettings.$inferSelect;
+export type NotifyProviderRow = typeof notifyProviders.$inferSelect;
+export type NotifyMessageRow = typeof notifyMessages.$inferSelect;

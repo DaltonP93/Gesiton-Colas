@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { BellRing, CheckCircle2, Clock, Loader2, MapPin, Users, XCircle } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { BellRing, CheckCircle2, Clock, Loader2, MapPin, MessageCircle, Users, XCircle } from 'lucide-react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useParams } from 'react-router';
 import { RT, type PublicTicketDTO } from '@gc/shared';
 import { ApiError, api, assetUrl } from '../../lib/api';
@@ -167,6 +167,7 @@ export default function TrackingPage() {
 
         {active && (
           <div className="mt-4 space-y-3">
+            {ticket.status === 'waiting' && ticket.notify.available && <PhoneOptIn token={token} phone={ticket.notify.phone} t={t} onSaved={() => void query.refetch()} />}
             {typeof Notification !== 'undefined' && (
               <button
                 type="button"
@@ -191,5 +192,73 @@ export default function TrackingPage() {
         )}
       </main>
     </div>
+  );
+}
+
+/** El cliente deja su teléfono para recibir los avisos por WhatsApp o SMS. */
+function PhoneOptIn({ token, phone, t, onSaved }: { token: string; phone: string | null; t: ReturnType<typeof translator>; onSaved: () => void }) {
+  const [editing, setEditing] = useState(!phone);
+  const [value, setValue] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      await api.public(`/public/tickets/${token}/notify`, { phone: value });
+      setEditing(false);
+      setValue('');
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo guardar');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!editing && phone) {
+    return (
+      <div className="flex items-center gap-3 rounded-2xl bg-surface px-4 py-4 shadow">
+        <MessageCircle className="size-5 shrink-0 text-emerald-600" />
+        <p className="min-w-0 flex-1 text-sm font-semibold">{t('track.phoneOn', { phone })}</p>
+        <button type="button" onClick={() => setEditing(true)} className="shrink-0 text-xs font-medium text-primary underline-offset-2 hover:underline">
+          {t('track.phoneChange')}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={(e) => void submit(e)} className="rounded-2xl bg-surface p-4 text-left shadow">
+      <p className="flex items-center gap-2 font-semibold">
+        <MessageCircle className="size-5 text-primary" /> {t('track.phoneTitle')}
+      </p>
+      <p className="mt-1 text-sm text-muted">{t('track.phoneHint')}</p>
+      <div className="mt-3 flex gap-2">
+        <input
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel"
+          required
+          minLength={6}
+          maxLength={30}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder={t('track.phonePlaceholder')}
+          aria-label={t('track.phonePlaceholder')}
+          className="min-w-0 flex-1 rounded-xl border border-border bg-bg px-3 py-2.5 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+        />
+        <button type="submit" disabled={saving || value.trim().length < 6} className="shrink-0 rounded-xl bg-primary px-4 py-2.5 font-semibold text-primary-fg disabled:opacity-50">
+          {saving ? <Loader2 className="size-5 animate-spin" /> : t('track.phoneSave')}
+        </button>
+      </div>
+      {error && (
+        <p role="alert" className="mt-2 text-sm text-red-600">
+          {error}
+        </p>
+      )}
+    </form>
   );
 }

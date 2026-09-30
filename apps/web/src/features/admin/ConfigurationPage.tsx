@@ -6,6 +6,7 @@ import {
   Hash,
   LayoutGrid,
   Mail,
+  MessageCircle,
   Palette,
   Plug,
   Sparkles,
@@ -32,9 +33,10 @@ const BranchesPage = lazy(() => import('./BranchesPage'));
 const ServicesPage = lazy(() => import('./ServicesPage'));
 const UsersPage = lazy(() => import('./UsersPage'));
 const IntegrationsPage = lazy(() => import('./IntegrationsPage'));
+const NotificationsPage = lazy(() => import('./NotificationsPage'));
 
 type TabKey = 'marca' | 'region' | 'terminologia' | 'turnos' | 'cliente';
-type PageKey = 'sucursales' | 'servicios' | 'usuarios' | 'correo' | 'integraciones';
+type PageKey = 'sucursales' | 'servicios' | 'usuarios' | 'correo' | 'avisos' | 'integraciones';
 export type ConfigSection = 'inicio' | TabKey | PageKey;
 
 interface SectionDef {
@@ -61,6 +63,7 @@ const PAGE_COMPONENTS: Record<PageKey, ComponentType> = {
   servicios: ServicesPage,
   usuarios: UsersPage,
   correo: MailSection,
+  avisos: NotificationsPage,
   integraciones: IntegrationsPage,
 };
 function MailSection() {
@@ -99,6 +102,7 @@ export default function ConfigurationPage() {
       { key: 'cliente', label: `Datos del ${terms.customer.toLowerCase()}`, short: `Datos del ${terms.customer.toLowerCase()}`, description: 'Qué se pide al sacar turno', icon: <TextCursorInput />, group: 'Atención' },
       { key: 'usuarios', label: 'Usuarios', short: 'Usuarios', description: 'Equipo, roles e invitaciones', icon: <Users />, group: 'Equipo e integraciones' },
       { key: 'correo', label: 'Correo saliente', short: 'Correo', description: 'Servidor SMTP para invitaciones y avisos', icon: <Mail />, group: 'Equipo e integraciones' },
+      { key: 'avisos', label: 'Avisos por WhatsApp y SMS', short: 'WhatsApp y SMS', description: 'Mensajes al sacar turno, al acercarse y al llamar', icon: <MessageCircle />, group: 'Equipo e integraciones', module: 'notifications' },
       { key: 'integraciones', label: 'Integraciones y API', short: 'Integraciones', description: 'API keys, webhooks y documentación', icon: <Plug />, group: 'Equipo e integraciones', module: 'integrations' },
       ] as SectionDef[]
     ).filter((s) => !s.module || hasModule(s.module)),
@@ -269,7 +273,8 @@ function Overview({ sections }: { sections: SectionDef[] }) {
     turnos: `${settings.tickets.digits} dígitos · ${settings.tickets.reset === 'daily' ? 'reinicio diario' : 'sin reinicio'}`,
     cliente: settings.customerFields.length ? `${settings.customerFields.length} campos propios` : 'Nombre, documento, teléfono y email',
     usuarios: users.data ? `${users.data.length} ${users.data.length === 1 ? 'usuario' : 'usuarios'}` : '…',
-    correo: 'Invitaciones, códigos de acceso y avisos',
+    correo: 'Invitaciones, códigos de acceso y recuperación',
+    avisos: Object.values(settings.notifications.events).filter((e) => e.enabled).length + ' avisos activos',
     integraciones: 'API REST, webhooks y tiempo real',
   };
 
