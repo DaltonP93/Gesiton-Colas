@@ -20,7 +20,9 @@ import type {
   KioskConfig,
   MediaKind,
   MediaProvider,
+  MailSecurity,
   PlanId,
+  PlatformSettings,
   Role,
   Schedule,
   TenantSettings,
@@ -479,6 +481,33 @@ export const devicePairings = pgTable(
   (t) => [index('device_pairings_code_idx').on(t.code, t.expiresAt)],
 );
 
+/** Ajustes globales de la plataforma que define el superadministrador (una fila por clave). */
+export const platformSettings = pgTable('platform_settings', {
+  key: text('key').primaryKey(),
+  value: jsonb('value').$type<PlatformSettings>().notNull(),
+  updatedAt: updatedAt(),
+});
+
+/**
+ * Servidor de correo saliente (SMTP). `scope` es `platform` (para toda la instalación)
+ * o el id de una organización que envía con su propio servidor.
+ */
+export const mailSettings = pgTable('mail_settings', {
+  scope: text('scope').primaryKey(),
+  tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }),
+  enabled: boolean('enabled').notNull().default(false),
+  host: text('host').notNull().default(''),
+  port: integer('port').notNull().default(587),
+  security: text('security').$type<MailSecurity>().notNull().default('starttls'),
+  username: text('username').notNull().default(''),
+  /** Contraseña cifrada con AES-256-GCM (clave derivada de JWT_SECRET). */
+  passwordEnc: text('password_enc').notNull().default(''),
+  fromName: text('from_name').notNull().default(''),
+  fromEmail: text('from_email').notNull().default(''),
+  replyTo: text('reply_to').notNull().default(''),
+  updatedAt: updatedAt(),
+});
+
 export type Tenant = typeof tenants.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Branch = typeof branches.$inferSelect;
@@ -495,3 +524,4 @@ export type PlaylistItem = typeof playlistItems.$inferSelect;
 export type ApiKey = typeof apiKeys.$inferSelect;
 export type Webhook = typeof webhooks.$inferSelect;
 export type WebhookDelivery = typeof webhookDeliveries.$inferSelect;
+export type MailSettingsRow = typeof mailSettings.$inferSelect;

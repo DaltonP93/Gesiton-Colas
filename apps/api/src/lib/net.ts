@@ -32,3 +32,17 @@ export async function assertPublicUrl(rawUrl: string): Promise<void> {
     throw new Error('La URL apunta a una dirección privada o no resoluble');
   }
 }
+
+/** Verifica que un servidor (p. ej. SMTP) no esté en la red interna. */
+export async function assertPublicHost(host: string): Promise<void> {
+  const hostname = host.replace(/^\[|\]$/g, '');
+  let addresses: { address: string }[];
+  try {
+    addresses = net.isIP(hostname) ? [{ address: hostname }] : await lookup(hostname, { all: true });
+  } catch {
+    throw new Error(`No se encontró el servidor ${host}`);
+  }
+  if (addresses.length === 0 || addresses.some((a) => isPrivateAddress(a.address))) {
+    throw new Error('El servidor está en una red privada');
+  }
+}

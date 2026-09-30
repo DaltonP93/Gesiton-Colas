@@ -114,10 +114,12 @@ export function BrandTab({ onDirtyChange }: TabProps) {
   const fonts = FONT_OPTIONS.includes(draft.fontFamily) ? FONT_OPTIONS : [draft.fontFamily, ...FONT_OPTIONS];
 
   return (
-    <div>
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,400px)] xl:grid-cols-[minmax(0,1fr)_minmax(0,460px)]">
+    // Las columnas dependen del ancho disponible (container queries), no del ancho de la ventana:
+    // así el formulario no se aprieta cuando el menú de configuración y la vista previa comparten la pantalla.
+    <div className="@container">
+      <div className="grid items-start gap-6 @5xl:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] @6xl:grid-cols-[minmax(0,1fr)_minmax(0,27rem)] @7xl:grid-cols-[minmax(0,1fr)_minmax(0,30rem)]">
         {/* Vista previa */}
-        <aside className="space-y-3 lg:sticky lg:top-6 lg:order-last">
+        <aside className="space-y-3 @5xl:sticky @5xl:top-6 @5xl:order-last">
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-sm font-semibold">Vista previa</h3>
             {draft.colorScheme === 'auto' ? (
@@ -158,9 +160,9 @@ export function BrandTab({ onDirtyChange }: TabProps) {
           )}
         </aside>
 
-        <div className="min-w-0 space-y-6">
+        <div className="@container min-w-0 space-y-6">
           <Section title="Identidad" description="Nombre y logo que verán su equipo y sus clientes.">
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 @xl:grid-cols-2">
               <Field label="Nombre de la organización" required error={errors.name} hint="Aparece en el panel, los tickets impresos y la página de seguimiento.">
                 <Input value={name} maxLength={120} onChange={(e) => setName(e.target.value)} />
               </Field>
@@ -168,7 +170,7 @@ export function BrandTab({ onDirtyChange }: TabProps) {
                 <Input value={draft.appName} maxLength={80} onChange={(e) => set('appName', e.target.value)} placeholder="Gestión de Colas" />
               </Field>
             </div>
-            <div className="mt-5 grid gap-5 sm:grid-cols-2">
+            <div className="mt-6 grid gap-6 @xl:grid-cols-[minmax(0,1fr)_minmax(0,11rem)]">
               <ImageField
                 label="Logo"
                 hint="PNG o SVG con fondo transparente, idealmente horizontal."
@@ -188,7 +190,7 @@ export function BrandTab({ onDirtyChange }: TabProps) {
           </Section>
 
           <Section title="Colores" description="Elija una paleta prediseñada o ajuste cada color a su gusto.">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 @lg:grid-cols-3 @3xl:grid-cols-4">
               {PALETTES.map((p) => {
                 const active = activePalette?.name === p.name;
                 return (
@@ -216,7 +218,7 @@ export function BrandTab({ onDirtyChange }: TabProps) {
               })}
             </div>
 
-            <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-5 grid gap-4 @lg:grid-cols-2 @3xl:grid-cols-3">
               <ColorInput label="Color principal" value={draft.primaryColor} onChange={(v) => set('primaryColor', v)} />
               <ColorInput label="Color de acento" value={draft.accentColor} onChange={(v) => set('accentColor', v)} />
               <ColorInput label="Fondo" value={draft.backgroundColor} onChange={(v) => set('backgroundColor', v)} />
@@ -228,7 +230,7 @@ export function BrandTab({ onDirtyChange }: TabProps) {
               <span className="mb-1.5 block text-sm font-medium" id="scheme-label">
                 Esquema de color
               </span>
-              <div role="radiogroup" aria-labelledby="scheme-label" className="grid gap-2 sm:grid-cols-3">
+              <div role="radiogroup" aria-labelledby="scheme-label" className="grid gap-2 @2xl:grid-cols-3">
                 {SCHEMES.map((s) => {
                   const checked = draft.colorScheme === s.value;
                   return (
@@ -300,7 +302,7 @@ export function BrandTab({ onDirtyChange }: TabProps) {
           </Section>
 
           <Section title="Tipografía y forma">
-            <div className="grid gap-5 sm:grid-cols-2">
+            <div className="grid gap-5 @xl:grid-cols-2">
               <Field label="Fuente del texto" hint="Fuentes de Google Fonts. La vista previa se actualiza al instante.">
                 <Select value={draft.fontFamily} onChange={(e) => set('fontFamily', e.target.value)} style={{ fontFamily: fontStack(draft.fontFamily) }}>
                   {fonts.map((f) => (
@@ -524,7 +526,7 @@ function OptionTiles<T extends string>({
       <span id={id} className="mb-2 block text-sm font-medium">
         {label}
       </span>
-      <div role="radiogroup" aria-labelledby={id} className={cx('grid grid-cols-2 gap-2', columns === 4 ? 'sm:grid-cols-4' : columns === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
+      <div role="radiogroup" aria-labelledby={id} className={cx('grid grid-cols-2 gap-2', columns === 4 ? '@2xl:grid-cols-4' : columns === 3 ? '@xl:grid-cols-3' : '@lg:grid-cols-2')}>
         {options.map((o) => {
           const checked = o.value === value;
           return (

@@ -246,7 +246,7 @@ export function RangeInput({
           onChange={(e) => onChange(Number(e.target.value))}
           className="w-full accent-[var(--gc-primary)]"
         />
-        <span className="w-14 text-right text-sm tabular-nums text-muted">{format(value)}</span>
+        <span className="min-w-14 shrink-0 text-right text-sm whitespace-nowrap tabular-nums text-muted">{format(value)}</span>
       </div>
     </Field>
   );
@@ -345,7 +345,7 @@ export function PageHeader({ title, description, actions, icon }: { title: React
 export function Badge({ children, color, className }: { children: ReactNode; color?: string; className?: string }) {
   return (
     <span
-      className={cx('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium', !color && 'bg-subtle text-fg', className)}
+      className={cx('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap', !color && 'bg-subtle text-fg', className)}
       style={color ? { background: `color-mix(in srgb, ${color} 14%, transparent)`, color } : undefined}
     >
       {children}

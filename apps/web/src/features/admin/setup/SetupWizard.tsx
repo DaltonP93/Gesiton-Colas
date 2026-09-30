@@ -29,7 +29,7 @@ import {
   type ServiceDTO,
   type Terminology,
 } from '@gc/shared';
-import { SERVICE_ICONS, ServiceIcon } from '../../../components/ServiceIcon';
+import { SERVICE_ICON_LABELS, SERVICE_ICONS, ServiceIcon } from '../../../components/ServiceIcon';
 import { Button, Field, Input, Loading, Toggle, cx, useFeedback } from '../../../components/ui';
 import { api, assetUrl, errorMessage, upload } from '../../../lib/api';
 import { useAuth } from '../../../lib/auth';
@@ -79,31 +79,6 @@ const STEPS = ['Su rubro', 'Marca', 'Sucursal', 'Servicios', 'Pantalla y kiosco'
 
 const newKey = () => Math.random().toString(36).slice(2, 10);
 
-const ICON_LABELS: Record<string, string> = {
-  ticket: 'Ticket',
-  users: 'Personas',
-  user: 'Persona',
-  wallet: 'Billetera',
-  cash: 'Efectivo',
-  card: 'Tarjeta',
-  bank: 'Banco',
-  receipt: 'Recibo',
-  file: 'Documento',
-  clipboard: 'Planilla',
-  calendar: 'Agenda',
-  health: 'Salud',
-  doctor: 'Médico',
-  pharmacy: 'Farmacia',
-  baby: 'Bebé',
-  shield: 'Seguro',
-  cart: 'Compras',
-  package: 'Paquete',
-  truck: 'Envíos',
-  tools: 'Herramientas',
-  briefcase: 'Maletín',
-  building: 'Edificio',
-  help: 'Ayuda',
-};
 
 function tvThemeColors(choice: TvTheme, primary: string, accent: string): Partial<DisplayConfig['theme']> {
   if (choice === 'light') return { background: '#f1f5f9', text: '#0f172a', panelBackground: '#ffffff', accent: primary, callBackground: primary, callText: readableOn(primary) };
@@ -679,7 +654,7 @@ function ServicesStep({ draft, set, industry, duplicatePrefix }: StepProps & { i
   const t = draft.terms;
   const update = (key: string, patch: Partial<ServiceRow>) => set({ services: draft.services.map((s) => (s.key === key ? { ...s, ...patch } : s)) });
   const icons = Object.keys(SERVICE_ICONS);
-  const iconLabel = (key: string) => ICON_LABELS[key] ?? key;
+  const iconLabel = (key: string) => SERVICE_ICON_LABELS[key] ?? key;
   const add = () => {
     const used = new Set(draft.services.filter((s) => s.enabled).map((s) => s.prefix.toUpperCase()));
     set({

@@ -15,6 +15,13 @@
       "when": 1790717156732,
       "tag": "0001_email_auth_pairing_audio",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790775948851,
+      "tag": "0002_platform_settings_mail",
+      "breakpoints": true
     }
   ]
 }

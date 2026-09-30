@@ -3,6 +3,7 @@ import { Maximize, Volume2, WifiOff } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import { RT, type CallDTO, type DisplayBootstrapDTO, type DisplayConfig, type PublicTenantDTO } from '@gc/shared';
+import { OverlayLayer } from '../../components/Overlays';
 import { cx } from '../../components/ui';
 import { ApiError, api, assetUrl } from '../../lib/api';
 import { translator } from '../../lib/i18n';
@@ -213,9 +214,13 @@ function DisplayScreen({ boot, token, refetch }: { boot: DisplayBootstrapDTO; to
       style={style}
       onClick={() => !unlocked && unlock()}
     >
-      {config.layout === 'fullscreen' ? <FullscreenLayout {...props} /> : config.layout === 'tickets' ? <TicketsLayout {...props} /> : <SplitLayout {...props} />}
+      <OverlayLayer overlays={config.overlays} layer="back" />
+      <div className="relative z-[1] size-full">
+        {config.layout === 'fullscreen' ? <FullscreenLayout {...props} /> : config.layout === 'tickets' ? <TicketsLayout {...props} /> : <SplitLayout {...props} />}
+      </div>
 
       <ScreenQr config={config} />
+      <OverlayLayer overlays={config.overlays} layer="front" />
 
       <BackgroundMusic
         tracks={boot.music}
