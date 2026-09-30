@@ -21,6 +21,7 @@ import type {
   MediaKind,
   MediaProvider,
   MailSecurity,
+  ModuleOverrides,
   PlanId,
   PlatformSettings,
   Role,
@@ -54,6 +55,8 @@ export const tenants = pgTable('tenants', {
   /** Organización de demostración (se crea desde "Probar demo" y vence). */
   isDemo: boolean('is_demo').notNull().default(false),
   demoExpiresAt: timestamp('demo_expires_at', { withTimezone: true }),
+  /** Módulos que el superadministrador activó o desactivó para la organización (sin clave = según el plan). */
+  modules: jsonb('modules').$type<ModuleOverrides>().notNull().default({}),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });

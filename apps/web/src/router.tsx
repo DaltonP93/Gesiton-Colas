@@ -3,7 +3,8 @@ import { createBrowserRouter, Navigate, useLocation, useSearchParams } from 'rea
 import { Loading } from './components/ui';
 import { useAuth } from './lib/auth';
 import { usePublicConfig } from './lib/queries';
-import type { Role } from '@gc/shared';
+import { MODULES, type ModuleId, type Role } from '@gc/shared';
+import { ModuleOff } from './components/ModuleOff';
 import { AdminLayout } from './features/admin/AdminLayout';
 import {
   AcceptInvitePage,
@@ -77,9 +78,16 @@ function LegacyConfig({ section }: { section?: string }) {
   return <Navigate to={`/app/configuracion/${target}`} replace />;
 }
 
-const page = (el: ReactNode, role?: Role) => (
+/** Muestra la página solo si la organización tiene alguno de los módulos activos. */
+function RequireModule({ modules, children }: { modules: ModuleId[]; children: ReactNode }) {
+  const { hasModule } = useAuth();
+  if (modules.some(hasModule)) return <>{children}</>;
+  return <ModuleOff name={modules.map((m) => MODULES[m].name).join(' / ')} />;
+}
+
+const page = (el: ReactNode, role?: Role, modules?: ModuleId[]) => (
   <RequireAuth role={role}>
-    <Lazy>{el}</Lazy>
+    <Lazy>{modules ? <RequireModule modules={modules}>{el}</RequireModule> : el}</Lazy>
   </RequireAuth>
 );
 
@@ -111,9 +119,9 @@ export const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: page(<PortalPage />) },
-      { path: 'resumen', element: page(<DashboardPage />, 'manager') },
-      { path: 'vincular', element: page(<PairDevicePage />, 'manager') },
-      { path: 'sonidos', element: page(<SoundsPage />, 'manager') },
+      { path: 'resumen', element: page(<DashboardPage />, 'manager', ['reports']) },
+      { path: 'vincular', element: page(<PairDevicePage />, 'manager', ['displays', 'kiosks']) },
+      { path: 'sonidos', element: page(<SoundsPage />, 'manager', ['displays']) },
       { path: 'atencion', element: page(<AgentConsole />) },
       { path: 'monitor', element: page(<MonitorPage />, 'manager') },
       { path: 'configuracion', element: page(<ConfigurationPage />, 'admin') },
@@ -124,11 +132,11 @@ export const router = createBrowserRouter([
       { path: 'usuarios', element: <LegacyConfig section="usuarios" /> },
       { path: 'integraciones', element: <LegacyConfig section="integraciones" /> },
       { path: 'personalizacion', element: <LegacyConfig /> },
-      { path: 'pantallas', element: page(<DisplaysPage />, 'manager') },
-      { path: 'kioscos', element: page(<KiosksPage />, 'manager') },
-      { path: 'contenido', element: page(<MediaPage />, 'manager') },
-      { path: 'listas', element: page(<PlaylistsPage />, 'manager') },
-      { path: 'reportes', element: page(<ReportsPage />, 'manager') },
+      { path: 'pantallas', element: page(<DisplaysPage />, 'manager', ['displays']) },
+      { path: 'kioscos', element: page(<KiosksPage />, 'manager', ['kiosks']) },
+      { path: 'contenido', element: page(<MediaPage />, 'manager', ['advertising']) },
+      { path: 'listas', element: page(<PlaylistsPage />, 'manager', ['advertising']) },
+      { path: 'reportes', element: page(<ReportsPage />, 'manager', ['reports']) },
       { path: 'perfil', element: page(<ProfilePage />) },
     ],
   },

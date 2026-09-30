@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ExternalLink, Globe, LogIn, Presentation } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
-import type { HomePage, PlatformSettings } from '@gc/shared';
+import { CURRENCIES, MODULE_IDS, MODULES, PLAN_IDS, PLANS, type Currency, type HomePage, type ModuleId, type PlanId, type PlatformSettings } from '@gc/shared';
 import { ImageField } from '../../components/ImageField';
 import { MailSettingsForm } from '../../components/MailSettingsForm';
-import { Button, ColorInput, Field, Input, Loading, Textarea, Toggle, cx, useFeedback } from '../../components/ui';
+import { Button, Checkbox, ColorInput, Field, Input, Loading, Select, Textarea, Toggle, cx, useFeedback } from '../../components/ui';
 import { api, assetUrl, errorMessage } from '../../lib/api';
 
 const HOME_OPTIONS: { value: HomePage; label: string; hint: string; icon: ReactNode }[] = [
@@ -108,6 +108,18 @@ export function PlatformSettingsTab() {
       </section>
 
       <section className="space-y-4">
+        <SectionHead
+          title="Planes y módulos"
+          description="Qué incluye cada plan y cuánto cuesta por mes. Cada organización sigue su plan, salvo que usted fuerce un módulo desde Organizaciones → Módulos."
+        />
+        <div className="grid gap-4 lg:grid-cols-3">
+          {PLAN_IDS.map((id) => (
+            <PlanCard key={id} id={id} value={draft.plans[id]} onChange={(plan) => set('plans', { ...draft.plans, [id]: plan })} />
+          ))}
+        </div>
+      </section>
+
+      <section className="space-y-4">
         <SectionHead title="Marca de la plataforma" description="Se ve en la pantalla de ingreso, la página principal, los correos sin organización y este panel." />
         <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
           <div className="gc-card gc-pad @container space-y-5">
@@ -158,7 +170,7 @@ export function PlatformSettingsTab() {
       </section>
 
       <div className="sticky bottom-4 z-10 flex flex-wrap items-center justify-end gap-2 rounded-ui border border-border bg-surface/95 px-4 py-3 shadow-lg backdrop-blur">
-        <span className="mr-auto text-sm text-muted">{dirty ? 'Hay cambios sin guardar en la página principal, el acceso o la marca.' : 'Todo está guardado.'}</span>
+        <span className="mr-auto text-sm text-muted">{dirty ? 'Hay cambios sin guardar en la página principal, el acceso, los planes o la marca.' : 'Todo está guardado.'}</span>
         <Button variant="secondary" disabled={!dirty || save.isPending} onClick={() => setDraft(settings.data!)}>
           Descartar
         </Button>
@@ -171,6 +183,44 @@ export function PlatformSettingsTab() {
         <SectionHead title="Correo saliente (SMTP)" description="Servidor por el que salen las invitaciones, los códigos de acceso y la recuperación de contraseñas." />
         <MailSettingsForm scope="platform" />
       </section>
+    </div>
+  );
+}
+
+/** Precio y módulos de un plan. */
+function PlanCard({ id, value, onChange }: { id: PlanId; value: PlatformSettings['plans'][PlanId]; onChange: (value: PlatformSettings['plans'][PlanId]) => void }) {
+  const toggle = (module: ModuleId, on: boolean) =>
+    onChange({ ...value, modules: on ? MODULE_IDS.filter((m) => m === module || value.modules.includes(m)) : value.modules.filter((m) => m !== module) });
+  return (
+    <div className="gc-card gc-pad space-y-4">
+      <div className="flex items-baseline justify-between gap-2">
+        <h3 className="text-base font-semibold">{PLANS[id].name}</h3>
+        <span className="text-xs text-muted">{value.modules.length} de {MODULE_IDS.length} módulos</span>
+      </div>
+      <div className="grid grid-cols-[minmax(0,1fr)_6.5rem] gap-2">
+        <Field label="Precio mensual">
+          <Input
+            type="number"
+            min={0}
+            step="any"
+            value={value.monthlyPrice}
+            onChange={(e) => onChange({ ...value, monthlyPrice: Math.max(0, Number(e.target.value) || 0) })}
+          />
+        </Field>
+        <Field label="Moneda">
+          <Select value={value.currency} onChange={(e) => onChange({ ...value, currency: e.target.value as Currency })}>
+            {CURRENCIES.map((c) => (
+              <option key={c}>{c}</option>
+            ))}
+          </Select>
+        </Field>
+      </div>
+      <fieldset className="space-y-2">
+        <legend className="mb-1 text-sm font-medium">Módulos incluidos</legend>
+        {MODULE_IDS.map((m) => (
+          <Checkbox key={m} checked={value.modules.includes(m)} onChange={(on) => toggle(m, on)} label={MODULES[m].name} />
+        ))}
+      </fieldset>
     </div>
   );
 }

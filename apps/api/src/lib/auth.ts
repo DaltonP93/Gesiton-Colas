@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import { and, eq, isNull } from 'drizzle-orm';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { SignJWT, jwtVerify } from 'jose';
-import { hasRole, type ApiKeyScope, type Role } from '@gc/shared';
+import { MODULES, hasRole, type ApiKeyScope, type ModuleId, type Role } from '@gc/shared';
 import type { AppConfig } from '../config';
 import type { Database } from '../db/client';
 import { apiKeys, tenants, users, type Tenant, type User } from '../db/schema';
@@ -24,6 +24,18 @@ export interface RequireOptions {
   role?: Role;
   /** Si se indica, las API keys con este permiso también pueden acceder. */
   scope?: ApiKeyScope;
+  /** Módulo que la organización debe tener activo. */
+  module?: ModuleId;
+}
+
+/** Calcula los módulos activos de una organización (lo provee el contexto de la aplicación). */
+export type ModulesResolver = (tenant: Tenant) => Promise<ModuleId[]>;
+
+/** Falla si la organización no tiene el módulo activo. */
+export async function assertModuleActive(resolver: ModulesResolver, tenant: Tenant, module: ModuleId) {
+  if (!(await resolver(tenant)).includes(module)) {
+    throw new AppError(403, 'module_disabled', `El módulo «${MODULES[module].name}» no está activo para su organización. Contacte al administrador de la plataforma.`);
+  }
 }
 
 export const API_KEY_PREFIX = 'gc_';
@@ -36,7 +48,7 @@ export async function verifyPassword(password: string, hash: string) {
   return bcrypt.compare(password, hash);
 }
 
-export function createAuth(config: AppConfig, db: Database) {
+export function createAuth(config: AppConfig, db: Database, modulesOf?: ModulesResolver) {
   const secret = new TextEncoder().encode(config.JWT_SECRET);
 
   async function signToken(user: Pick<User, 'id' | 'tenantId' | 'role'>) {
@@ -133,6 +145,11 @@ export function createAuth(config: AppConfig, db: Database) {
         throw forbidden();
       }
       if (auth.tenant && auth.role !== 'superadmin') assertTenantAvailable(auth.tenant);
+      if (modulesOf && auth.tenant) {
+        // Las API keys solo funcionan con el módulo de integraciones activo.
+        if (auth.kind === 'apiKey') await assertModuleActive(modulesOf, auth.tenant, 'integrations');
+        if (options.module) await assertModuleActive(modulesOf, auth.tenant, options.module);
+      }
     };
   }
 

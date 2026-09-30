@@ -3,7 +3,7 @@ import { and, asc, count, desc, eq, ne, sql } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { HOME_PAGES, PLAN_IDS, UPLOAD_MIME_TYPES, type AccessLinkDTO, type PlatformSettings } from '@gc/shared';
+import { CURRENCIES, HOME_PAGES, MODULE_IDS, PLAN_IDS, UPLOAD_MIME_TYPES, type AccessLinkDTO, type ModuleOverrides, type PlatformSettings } from '@gc/shared';
 import type { AppContext } from '../../context';
 import { createTenantWithDefaults } from '../../db/seed';
 import { tenants, users } from '../../db/schema';
@@ -41,6 +41,16 @@ const settingsBody = z.object({
       supportEmail: z.union([z.literal(''), email]),
     })
     .partial()
+    .optional(),
+  plans: z
+    .partialRecord(
+      z.enum(PLAN_IDS),
+      z.object({
+        modules: z.array(z.enum(MODULE_IDS)).optional(),
+        monthlyPrice: z.number().min(0).max(1_000_000_000).optional(),
+        currency: z.enum(CURRENCIES).optional(),
+      }),
+    )
     .optional(),
 });
 
@@ -96,11 +106,14 @@ export const platformRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async 
         .where(q ? sql`${tenants.name} ILIKE ${`%${q}%`} OR ${tenants.slug} ILIKE ${`%${q}%`}` : undefined)
         .orderBy(desc(tenants.createdAt))
         .limit(500);
-      return rows.map((r) => ({
-        ...toTenantDTO(r.tenant),
-        storageBytes: r.tenant.storageBytes,
-        usage: { users: r.users, branches: r.branches, displays: r.displays, tickets30d: r.tickets30d },
-      }));
+      return Promise.all(
+        rows.map(async (r) => ({
+          ...toTenantDTO(r.tenant),
+          modules: await ctx.modulesOf(r.tenant),
+          storageBytes: r.tenant.storageBytes,
+          usage: { users: r.users, branches: r.branches, displays: r.displays, tickets30d: r.tickets30d },
+        })),
+      );
     },
   );
 
@@ -151,14 +164,24 @@ export const platformRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async 
           isDemo: z.boolean().optional(),
           /** Extiende la demo N días (desde hoy o desde su vencimiento, lo que sea posterior). */
           extendDemoDays: z.number().int().min(1).max(365).optional(),
+          /** Activa (`true`), desactiva (`false`) o deja según el plan (`null`) cada módulo. */
+          modules: z.partialRecord(z.enum(MODULE_IDS), z.boolean().nullable()).optional(),
         }),
       },
     },
     async (request) => {
-      const { isDemo, extendDemoDays, ...rest } = request.body;
+      const { isDemo, extendDemoDays, modules, ...rest } = request.body;
       const [current] = await ctx.db.select().from(tenants).where(eq(tenants.id, request.params.id));
       if (!current) throw notFound('Organización');
       const patch: Partial<typeof tenants.$inferInsert> = { ...rest };
+      if (modules) {
+        const next: ModuleOverrides = { ...(current.modules ?? {}) };
+        for (const [id, value] of Object.entries(modules) as [keyof ModuleOverrides, boolean | null][]) {
+          if (value === null) delete next[id];
+          else next[id] = value;
+        }
+        patch.modules = next;
+      }
       if (isDemo === false) {
         patch.isDemo = false;
         patch.demoExpiresAt = null;
@@ -169,8 +192,9 @@ export const platformRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async 
       }
       const [row] = await ctx.db.update(tenants).set(patch).where(eq(tenants.id, request.params.id)).returning();
       if (!row) throw notFound('Organización');
-      if (request.body.status === 'suspended') ctx.refreshDevices(row.id);
-      return toTenantDTO(row);
+      // Pantallas y kioscos recargan su configuración (p. ej. si se apagó un módulo).
+      if (request.body.status === 'suspended' || modules || request.body.plan) ctx.refreshDevices(row.id);
+      return { ...toTenantDTO(row), modules: await ctx.modulesOf(row) };
     },
   );
 

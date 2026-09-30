@@ -59,6 +59,35 @@ export function formatTicketCode(prefix: string, number: number, digits: number)
   return `${prefix}${String(number).padStart(Math.max(1, digits), '0')}`;
 }
 
+/**
+ * Número a mostrar a partir del contador (que siempre crece): respeta el número inicial y,
+ * con `wrap`, vuelve a empezar al superar el máximo de dígitos (A999 → A001).
+ */
+export function ticketNumberFor(counter: number, options: { digits: number; startAt: number; overflow: 'wrap' | 'grow' }): number {
+  const start = Math.max(0, options.startAt);
+  const value = start + Math.max(0, counter - 1);
+  const max = 10 ** Math.max(1, options.digits) - 1;
+  if (options.overflow === 'grow' || value <= max || start > max) return value;
+  const span = max - start + 1;
+  return start + ((value - start) % span);
+}
+
+/** Clave del período de numeración de un día (YYYY-MM-DD) según el reinicio elegido. */
+export function numberingPeriod(day: string, reset: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'never'): string {
+  if (reset === 'daily') return day;
+  if (reset === 'monthly') return day.slice(0, 7);
+  if (reset === 'yearly') return day.slice(0, 4);
+  if (reset === 'weekly') {
+    // Semana ISO (lunes a domingo): el jueves de la semana define el año.
+    const date = new Date(`${day}T00:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+    const yearStart = Date.UTC(date.getUTCFullYear(), 0, 1);
+    const week = Math.ceil(((date.getTime() - yearStart) / 86_400_000 + 1) / 7);
+    return `${date.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+  }
+  return 'all';
+}
+
 export const TEMPLATE_VARIABLES = {
   voice: ['code', 'service', 'counter', 'priority', 'customer', 'branch'],
   ticket: [

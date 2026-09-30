@@ -22,6 +22,13 @@
       "when": 1790775948851,
       "tag": "0002_platform_settings_mail",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790794224646,
+      "tag": "0003_modules",
+      "breakpoints": true
     }
   ]
 }

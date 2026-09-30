@@ -29,6 +29,7 @@ import { catalogRoutes } from './modules/catalog/routes';
 import { deviceRoutes } from './modules/devices/routes';
 import { integrationRoutes } from './modules/integrations/routes';
 import { mediaRoutes } from './modules/media/routes';
+import { numberingRoutes } from './modules/numbering/routes';
 import { pairingRoutes } from './modules/pairing/routes';
 import { platformRoutes } from './modules/platform/routes';
 import { publicRoutes } from './modules/public/routes';
@@ -155,6 +156,7 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
       await api.register(catalogRoutes(ctx));
       await api.register(userRoutes(ctx));
       await api.register(ticketRoutes(ctx));
+      await api.register(numberingRoutes(ctx));
       await api.register(agentRoutes(ctx));
       await api.register(deviceRoutes(ctx));
       await api.register(mediaRoutes(ctx));

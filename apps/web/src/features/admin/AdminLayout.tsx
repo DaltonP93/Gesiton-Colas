@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
-import type { Role } from '@gc/shared';
+import type { Role, ModuleId } from '@gc/shared';
 import { cx } from '../../components/ui';
 import { api, assetUrl } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
@@ -33,6 +33,8 @@ interface NavItem {
   end?: boolean;
   /** Otras rutas que marcan este ítem como activo. */
   also?: string[];
+  /** Se muestra si la organización tiene alguno de estos módulos activos. */
+  module?: ModuleId[];
 }
 
 const COLLAPSED_KEY = 'gc.nav.collapsed';
@@ -52,7 +54,7 @@ function isActive(pathname: string, item: NavItem) {
 }
 
 export function AdminLayout() {
-  const { me, settings, can, logout, impersonate } = useAuth();
+  const { me, settings, can, hasModule, logout, impersonate } = useAuth();
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsedState] = useState(readCollapsed);
   const navigate = useNavigate();
@@ -75,16 +77,16 @@ export function AdminLayout() {
         { to: '/app', label: 'Inicio', icon: <LayoutGrid />, role: 'agent', end: true },
         { to: '/app/atencion', label: 'Atención', icon: <Headset />, role: 'agent' },
         { to: '/app/monitor', label: 'Monitor en vivo', icon: <Activity />, role: 'manager' },
-        { to: '/app/reportes', label: 'Reportes', icon: <BarChart3 />, role: 'manager', also: ['/app/resumen'] },
+        { to: '/app/reportes', label: 'Reportes', icon: <BarChart3 />, role: 'manager', also: ['/app/resumen'], module: ['reports'] },
       ],
     },
     {
       title: 'Pantallas y contenido',
       items: [
-        { to: '/app/pantallas', label: 'Pantallas', icon: <MonitorPlay />, role: 'manager', also: ['/app/vincular'] },
-        { to: '/app/kioscos', label: 'Kioscos', icon: <Tablet />, role: 'manager' },
-        { to: '/app/contenido', label: 'Publicidad', icon: <Video />, role: 'manager', also: ['/app/listas'] },
-        { to: '/app/sonidos', label: 'Sonidos', icon: <Music />, role: 'manager' },
+        { to: '/app/pantallas', label: 'Pantallas', icon: <MonitorPlay />, role: 'manager', also: ['/app/vincular'], module: ['displays'] },
+        { to: '/app/kioscos', label: 'Kioscos', icon: <Tablet />, role: 'manager', module: ['kiosks'] },
+        { to: '/app/contenido', label: 'Publicidad', icon: <Video />, role: 'manager', also: ['/app/listas'], module: ['advertising'] },
+        { to: '/app/sonidos', label: 'Sonidos', icon: <Music />, role: 'manager', module: ['displays'] },
       ],
     },
     {
@@ -93,7 +95,9 @@ export function AdminLayout() {
     },
   ];
 
-  const visibleGroups = groups.map((g) => ({ ...g, items: g.items.filter((i) => can(i.role)) })).filter((g) => g.items.length > 0);
+  const visibleGroups = groups
+    .map((g) => ({ ...g, items: g.items.filter((i) => can(i.role) && (!i.module || i.module.some(hasModule))) }))
+    .filter((g) => g.items.length > 0);
 
   // En el menú del celular siempre se muestran los textos.
   const renderNav = (compact: boolean) => (

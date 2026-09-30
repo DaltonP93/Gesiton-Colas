@@ -63,8 +63,16 @@ export type CustomerField = z.infer<typeof customerFieldSchema>;
 export const ticketSettingsSchema = z.object({
   /** Cantidad de dígitos del número (A001 = 3). */
   digits: z.number().int().min(1).max(6).default(3),
-  /** Reinicio de la numeración. */
-  reset: z.enum(['daily', 'never']).default('daily'),
+  /** Cada cuánto vuelve a empezar la numeración (además del reinicio manual). */
+  reset: z.enum(['daily', 'weekly', 'monthly', 'yearly', 'never']).default('daily'),
+  /** Número con el que empieza (y al que vuelve al reiniciar). */
+  startAt: z.number().int().min(0).max(99_999).default(1),
+  /**
+   * Qué pasa al llegar al máximo de dígitos (A999 con 3 dígitos):
+   * - `wrap`: vuelve al número inicial (A001)
+   * - `grow`: sigue con un dígito más (A1000)
+   */
+  overflow: z.enum(['wrap', 'grow']).default('wrap'),
   /** Numeración independiente por servicio o compartida por sucursal. */
   scope: z.enum(['service', 'branch']).default('service'),
   /** Veces que se puede rellamar antes de marcar "no se presentó" automáticamente (0 = nunca). */

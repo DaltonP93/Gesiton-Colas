@@ -38,6 +38,8 @@ export class WebhookDispatcher {
     private readonly db: Database,
     private readonly log: FastifyBaseLogger,
     private readonly allowPrivate: boolean,
+    /** Si devuelve `false` la organización no envía webhooks (módulo de integraciones apagado). */
+    private readonly enabledFor: (tenantId: string) => Promise<boolean> = async () => true,
   ) {}
 
   start(intervalMs = 10_000) {
@@ -52,6 +54,7 @@ export class WebhookDispatcher {
   }
 
   async dispatch(tenantId: string, event: WebhookEvent, data: unknown) {
+    if (!(await this.enabledFor(tenantId))) return 0;
     const targets = await this.db
       .select()
       .from(webhooks)

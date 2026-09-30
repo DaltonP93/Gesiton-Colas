@@ -37,6 +37,7 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
       user: toUserDTO(user, scope.branchIds, scope.serviceIds),
       tenant: tenant ? toTenantDTO(tenant) : null,
       limits: tenant ? PLANS[tenant.plan] : null,
+      modules: tenant ? await ctx.modulesOf(tenant) : [],
     };
   }
 
