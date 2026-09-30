@@ -69,6 +69,7 @@ const EVENT_DESCRIPTIONS: Record<WebhookEvent, string> = {
   'ticket.transferred': 'Un turno fue derivado a otro servicio.',
   'ticket.requeued': 'Un turno volvió a la cola de espera.',
   'queue.reset': 'Se reinició la cola de una sucursal.',
+  'survey.answered': 'Un cliente respondió la encuesta de satisfacción.',
 };
 
 const DELIVERY_STATUS: Record<WebhookDeliveryDTO['status'], { label: string; color: string }> = {

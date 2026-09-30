@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { formatTicketCode } from '@gc/shared';
+import { SURVEY_TEMPLATES, formatTicketCode, scoreAnswers, type SurveyAnswers } from '@gc/shared';
 import type { DbOrTx } from './client';
 import { createTenantWithDefaults, slugify } from './seed';
 import {
@@ -12,6 +12,8 @@ import {
   playlistItems,
   priorities,
   services,
+  surveyResponses,
+  surveys,
   tickets,
   users,
 } from './schema';
@@ -154,7 +156,37 @@ export async function createDemoOrganization(db: DbOrTx, input: DemoInput) {
       });
     }
   }
-  for (let i = 0; i < history.length; i += 100) await db.insert(tickets).values(history.slice(i, i + 100));
+  const inserted: (typeof tickets.$inferSelect)[] = [];
+  for (let i = 0; i < history.length; i += 100) inserted.push(...(await db.insert(tickets).values(history.slice(i, i + 100)).returning()));
+
+  // Encuesta de satisfacción con respuestas de ejemplo (casi la mitad de los atendidos responde).
+  const template = SURVEY_TEMPLATES[0]!.body;
+  const [survey] = await db.insert(surveys).values({ tenantId, ...template, thanks: '¡Gracias por su opinión! Nos ayuda a mejorar.', publicToken: randomToken(20) }).returning();
+  const POSITIVE = ['Muy amables, gracias', 'Rápido y ordenado', 'Excelente atención de la señorita', 'Todo muy claro', 'Me atendieron enseguida'];
+  const NEGATIVE = ['La espera fue larga', 'Faltan asientos en la sala', 'No se escuchaba el llamado', 'Deberían abrir más ventanillas'];
+  const responses = inserted
+    .filter((t) => t.status === 'finished' && Math.random() < 0.45)
+    .map((t) => {
+      const roll = Math.random();
+      const rating = roll < 0.45 ? 5 : roll < 0.75 ? 4 : roll < 0.88 ? 3 : roll < 0.95 ? 2 : 1;
+      const nps = Math.max(0, Math.min(10, Math.round(rating >= 5 ? between(8.6, 10.4) : rating === 4 ? between(6.5, 9.4) : rating === 3 ? between(4.5, 8) : between(0, 5))));
+      const answers: SurveyAnswers = { atencion: rating, recomienda: nps };
+      if (Math.random() < 0.35) answers.mejorar = rating >= 4 ? pick(POSITIVE) : pick(NEGATIVE);
+      return {
+        tenantId,
+        surveyId: survey!.id,
+        ticketId: t.id,
+        branchId: t.branchId,
+        serviceId: t.serviceId,
+        agentId: t.agentId,
+        counterId: t.counterId,
+        channel: 'ticket' as const,
+        answers,
+        ...scoreAnswers(template.questions, answers),
+        createdAt: new Date((t.finishedAt ?? t.createdAt).getTime() + between(2, 90) * 60_000),
+      };
+    });
+  for (let i = 0; i < responses.length; i += 100) await db.insert(surveyResponses).values(responses.slice(i, i + 100));
 
   const noop = { db, publishTicket: () => undefined };
 

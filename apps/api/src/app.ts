@@ -32,6 +32,7 @@ import { mediaRoutes } from './modules/media/routes';
 import { notificationRoutes } from './modules/notifications/routes';
 import { numberingRoutes } from './modules/numbering/routes';
 import { privacyRoutes } from './modules/privacy/routes';
+import { surveyRoutes } from './modules/surveys/routes';
 import { pairingRoutes } from './modules/pairing/routes';
 import { platformRoutes } from './modules/platform/routes';
 import { publicRoutes } from './modules/public/routes';
@@ -183,6 +184,7 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
       await api.register(numberingRoutes(ctx));
       await api.register(privacyRoutes(ctx));
       await api.register(notificationRoutes(ctx));
+      await api.register(surveyRoutes(ctx));
       await api.register(agentRoutes(ctx));
       await api.register(deviceRoutes(ctx));
       await api.register(mediaRoutes(ctx));

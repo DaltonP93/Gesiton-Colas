@@ -13,6 +13,7 @@ import {
   Settings,
   Shield,
   Sparkles,
+  Star,
   Tablet,
   UserRound,
   Video,
@@ -78,6 +79,7 @@ export function AdminLayout() {
         { to: '/app/atencion', label: 'Atención', icon: <Headset />, role: 'agent' },
         { to: '/app/monitor', label: 'Monitor en vivo', icon: <Activity />, role: 'manager' },
         { to: '/app/reportes', label: 'Reportes', icon: <BarChart3 />, role: 'manager', also: ['/app/resumen'], module: ['reports'] },
+        { to: '/app/encuestas', label: 'Encuestas', icon: <Star />, role: 'manager', module: ['surveys'] },
       ],
     },
     {

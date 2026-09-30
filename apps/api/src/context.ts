@@ -9,6 +9,7 @@ import { tenantSettings, toCallDTO } from './lib/dto';
 import { brandFrom, type EmailBrand } from './lib/emails';
 import { createMailer, type Mailer } from './lib/mailer';
 import { Notifier } from './lib/notifier';
+import { surveyLinkFor } from './lib/surveys';
 import { createPlatformSettings, type PlatformSettingsStore } from './lib/platformSettings';
 import { createStorage, type Storage } from './lib/storage';
 import { WebhookDispatcher } from './modules/webhooks/dispatcher';
@@ -74,6 +75,7 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
   const storage = createStorage(config);
   const mailer = createMailer(config, db, log);
   const notifier = new Notifier({ config, db, log, modulesOf });
+  notifier.surveyLink = async (tenant, ticket) => ((await modulesOf(tenant)).includes('surveys') ? surveyLinkFor(db, config.PUBLIC_URL, tenant, ticket) : null);
   const publicUrl = config.PUBLIC_URL.replace(/\/$/, '');
 
   return {
