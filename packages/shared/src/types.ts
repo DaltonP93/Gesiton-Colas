@@ -9,6 +9,7 @@ import type {
   TicketStatus,
   WebhookEvent,
 } from './enums';
+import type { ModuleId, ModuleOverrides } from './modules';
 import type { PlanId, PlanLimits } from './plans';
 import type { Schedule } from './schedule';
 
@@ -25,6 +26,8 @@ export interface TenantDTO {
   /** Organización de demostración creada desde "Probar demo". */
   isDemo: boolean;
   demoExpiresAt: ISODate | null;
+  /** Ajustes de módulos que hizo el superadministrador (sin clave = lo que diga el plan). */
+  moduleOverrides: ModuleOverrides;
   createdAt: ISODate;
 }
 
@@ -51,6 +54,8 @@ export interface MeDTO {
   user: UserDTO;
   tenant: TenantDTO | null;
   limits: PlanLimits | null;
+  /** Módulos activos de la organización (vacío sin organización). */
+  modules: ModuleId[];
 }
 
 export interface BranchDTO {
@@ -385,4 +390,22 @@ export type PlatformUserDTO = UserDTO;
 export interface AccessLinkDTO {
   url: string;
   expiresAt: ISODate;
+}
+
+/** Estado de la numeración de turnos en el período actual. */
+export interface NumberingStatusDTO {
+  /** Período vigente (día, semana, mes, año o `all`). */
+  period: string;
+  settings: import('./config').TicketSettings;
+  rows: {
+    branchId: string;
+    branchName: string;
+    /** Id del servicio, o `*` si la numeración es compartida por la sucursal. */
+    scopeKey: string;
+    label: string;
+    /** Turnos emitidos en el período. */
+    issued: number;
+    lastCode: string | null;
+    nextCode: string;
+  }[];
 }

@@ -5,7 +5,7 @@ import { z } from 'zod';
 import type { PairingDTO, PairingStatusDTO } from '@gc/shared';
 import type { AppContext } from '../../context';
 import { devicePairings, displays, kiosks } from '../../db/schema';
-import { tenantIdOf } from '../../lib/auth';
+import { assertModuleActive, tenantIdOf } from '../../lib/auth';
 import { randomToken, safeEqual, sha256 } from '../../lib/crypto';
 import { badRequest, notFound } from '../../lib/errors';
 
@@ -102,6 +102,7 @@ export const pairingRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (
     async (request) => {
       const tenantId = tenantIdOf(request);
       const { code, type, targetId } = request.body;
+      if (request.auth?.tenant) await assertModuleActive(ctx.modulesOf, request.auth.tenant, type === 'display' ? 'displays' : 'kiosks');
       const table = type === 'display' ? displays : kiosks;
       const [target] = await ctx.db
         .select({ id: table.id, name: table.name })

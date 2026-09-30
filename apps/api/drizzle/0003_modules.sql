@@ -1,0 +1,1 @@
+ALTER TABLE "tenants" ADD COLUMN "modules" jsonb DEFAULT '{}'::jsonb NOT NULL;

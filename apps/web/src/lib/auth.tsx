@@ -5,13 +5,14 @@ import {
   defaultTenantSettings,
   hasRole,
   type MeDTO,
+  type ModuleId,
   type PlatformBrand,
   type Role,
   type TenantSettings,
   type Terminology,
 } from '@gc/shared';
 import { api, session } from './api';
-import { usePublicConfig } from './queries';
+import { usePublicConfig } from './publicConfig';
 import { applyBranding } from './theme';
 
 interface AuthState {
@@ -29,6 +30,8 @@ interface AuthState {
   /** Guarda la sesión devuelta por los flujos de acceso por correo (verificación, enlace, invitación...). */
   acceptSession(res: MeDTO & { token: string }): MeDTO;
   can(role: Role): boolean;
+  /** La organización tiene el módulo activo. */
+  hasModule(module: ModuleId): boolean;
   /** El superadministrador entra a una organización para dar soporte. */
   impersonate(tenantId: string | null): Promise<void>;
 }
@@ -135,6 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return res;
       },
       can: (role) => (me ? hasRole(me.user.role, role) : false),
+      hasModule: (module) => Boolean(me?.modules?.includes(module)),
       async impersonate(tenantId) {
         session.tenantOverride = tenantId;
         queryClient.clear();

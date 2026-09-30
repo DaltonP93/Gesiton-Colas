@@ -55,6 +55,7 @@ export function toTenantDTO(t: Tenant): TenantDTO {
     settings: tenantSettings(t),
     isDemo: t.isDemo,
     demoExpiresAt: iso(t.demoExpiresAt),
+    moduleOverrides: t.modules ?? {},
     createdAt: t.createdAt.toISOString(),
   };
 }

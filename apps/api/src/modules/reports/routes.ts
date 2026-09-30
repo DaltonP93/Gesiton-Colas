@@ -28,7 +28,7 @@ function csvCell(value: unknown): string {
 
 export const reportRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app) => {
   const tags = ['Reportes'];
-  const read = ctx.auth.require({ role: 'manager', scope: 'reports:read' });
+  const read = ctx.auth.require({ role: 'manager', scope: 'reports:read', module: 'reports' });
 
   async function scope(tenantId: string, query: z.infer<typeof rangeQuery>) {
     const [tenant] = await ctx.db.select().from(tenants).where(eq(tenants.id, tenantId));

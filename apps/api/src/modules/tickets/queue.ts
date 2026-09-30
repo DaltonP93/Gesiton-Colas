@@ -2,6 +2,8 @@ import { and, asc, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import {
   RT,
   formatTicketCode,
+  numberingPeriod,
+  ticketNumberFor,
   hasRole,
   type AgentWorkstationDTO,
   type CustomerData,
@@ -209,14 +211,15 @@ export async function issueTicket(ctx: QueueCtx, input: IssueInput) {
 
     const now = new Date();
     const day = dayInTimezone(now, row.branch.timezone ?? settings.timezone);
-    const period = settings.tickets.reset === 'daily' ? day : 'all';
+    const period = numberingPeriod(day, settings.tickets.reset);
     const scopeKey = settings.tickets.scope === 'service' ? input.serviceId : '*';
+    // El contador siempre crece dentro del período; el número visible respeta el inicio y el tope de dígitos.
     const seq = await tx.execute<{ value: number }>(sql`
       INSERT INTO ticket_sequences (tenant_id, branch_id, scope_key, period, value)
       VALUES (${input.tenantId}, ${input.branchId}, ${scopeKey}, ${period}, 1)
       ON CONFLICT (branch_id, scope_key, period) DO UPDATE SET value = ticket_sequences.value + 1
       RETURNING value`);
-    const number = Number(seq.rows[0]!.value);
+    const number = ticketNumberFor(Number(seq.rows[0]!.value), settings.tickets);
     const prefix = row.bs.prefix ?? row.service.prefix;
 
     const [ticket] = await tx

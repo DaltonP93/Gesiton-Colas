@@ -44,7 +44,7 @@ import {
   toPublicTenantDTO,
   toServiceDTO,
 } from '../../lib/dto';
-import { assertTenantAvailable } from '../../lib/auth';
+import { assertModuleActive, assertTenantAvailable } from '../../lib/auth';
 import { badRequest, notFound } from '../../lib/errors';
 import { dayInTimezone } from '../../lib/tz';
 import { customerSchema } from '../tickets/routes';
@@ -106,6 +106,8 @@ export const publicRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
       const [display] = await ctx.db.select().from(displays).where(eq(displays.token, request.params.token)).limit(1);
       if (!display) throw notFound('Pantalla');
       const tenant = await activeTenant(display.tenantId);
+      await assertModuleActive(ctx.modulesOf, tenant, 'displays');
+      const advertising = (await ctx.modulesOf(tenant)).includes('advertising');
       const [branch] = await ctx.db.select().from(branches).where(eq(branches.id, display.branchId));
       const config = normalizeConfig(displayConfigSchema, display.config);
       const settings = tenantSettings(tenant);
@@ -131,7 +133,7 @@ export const publicRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
       await ctx.db.update(displays).set({ lastSeenAt: new Date() }).where(eq(displays.id, display.id));
       const dto = toDisplayDTO(display);
       const music =
-        config.music.enabled && config.music.mediaIds.length
+        advertising && config.music.enabled && config.music.mediaIds.length
           ? await ctx.db
               .select()
               .from(media)
@@ -141,7 +143,7 @@ export const publicRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
         display: { ...dto, config },
         tenant: toPublicTenantDTO(tenant),
         branch: { id: display.branchId, name: branch?.name ?? '' },
-        playlist: await loadPlaylist(ctx.db, display.playlistId),
+        playlist: advertising ? await loadPlaylist(ctx.db, display.playlistId) : null,
         music: config.music.mediaIds.map((id) => music.find((m) => m.id === id)).filter((m) => m !== undefined).map(toMediaDTO),
         recentCalls,
       };
@@ -153,6 +155,7 @@ export const publicRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
     const [kiosk] = await ctx.db.select().from(kiosks).where(eq(kiosks.token, token)).limit(1);
     if (!kiosk) throw notFound('Kiosco');
     const tenant = await activeTenant(kiosk.tenantId);
+    await assertModuleActive(ctx.modulesOf, tenant, 'kiosks');
     const config = normalizeConfig(kioskConfigSchema, kiosk.config);
     return { kiosk, tenant, config };
   }
@@ -161,6 +164,8 @@ export const publicRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
   async function idlePlaylist(tenantId: string, config: KioskConfig) {
     const { idle } = config;
     if (!idle.enabled || idle.mode !== 'playlist' || !idle.playlistId) return null;
+    const [tenant] = await ctx.db.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+    if (!tenant || !(await ctx.modulesOf(tenant)).includes('advertising')) return null;
     const [own] = await ctx.db
       .select({ id: playlists.id })
       .from(playlists)

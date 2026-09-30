@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
 import { Link, Navigate, useParams } from 'react-router';
+import type { ModuleId } from '@gc/shared';
 import { MailSettingsForm } from '../../components/MailSettingsForm';
 import { Button, Loading, PageHeader, cx } from '../../components/ui';
 import { useAuth } from '../../lib/auth';
@@ -44,6 +45,8 @@ interface SectionDef {
   description: string;
   icon: ReactNode;
   group: string;
+  /** Solo se muestra si la organización tiene el módulo activo. */
+  module?: ModuleId;
 }
 
 const TAB_COMPONENTS: Record<TabKey, ComponentType<TabProps>> = {
@@ -81,10 +84,11 @@ const isPage = (key: ConfigSection): key is PageKey => key in PAGE_COMPONENTS;
 
 export default function ConfigurationPage() {
   const { section = 'inicio' } = useParams();
-  const { terms } = useAuth();
+  const { terms, hasModule } = useAuth();
 
   const sections: SectionDef[] = useMemo(
-    () => [
+    () => (
+      [
       { key: 'inicio', label: 'Resumen', short: 'Resumen', description: 'Toda la configuración de un vistazo', icon: <LayoutGrid />, group: '' },
       { key: 'marca', label: 'Marca y apariencia', short: 'Marca', description: 'Logo, colores, tipografía, menú y fondo', icon: <Palette />, group: 'Organización' },
       { key: 'region', label: 'Idioma y zona horaria', short: 'Idioma', description: 'Idioma de pantallas y kioscos, hora local', icon: <Globe />, group: 'Organización' },
@@ -95,9 +99,10 @@ export default function ConfigurationPage() {
       { key: 'cliente', label: `Datos del ${terms.customer.toLowerCase()}`, short: `Datos del ${terms.customer.toLowerCase()}`, description: 'Qué se pide al sacar turno', icon: <TextCursorInput />, group: 'Atención' },
       { key: 'usuarios', label: 'Usuarios', short: 'Usuarios', description: 'Equipo, roles e invitaciones', icon: <Users />, group: 'Equipo e integraciones' },
       { key: 'correo', label: 'Correo saliente', short: 'Correo', description: 'Servidor SMTP para invitaciones y avisos', icon: <Mail />, group: 'Equipo e integraciones' },
-      { key: 'integraciones', label: 'Integraciones y API', short: 'Integraciones', description: 'API keys, webhooks y documentación', icon: <Plug />, group: 'Equipo e integraciones' },
-    ],
-    [terms],
+      { key: 'integraciones', label: 'Integraciones y API', short: 'Integraciones', description: 'API keys, webhooks y documentación', icon: <Plug />, group: 'Equipo e integraciones', module: 'integrations' },
+      ] as SectionDef[]
+    ).filter((s) => !s.module || hasModule(s.module)),
+    [terms, hasModule],
   );
 
   const current = sections.find((s) => s.key === section);

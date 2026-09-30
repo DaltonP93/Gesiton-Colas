@@ -1,8 +1,9 @@
 import type { FastifyBaseLogger } from 'fastify';
-import { RT, type TicketDTO, type WebhookEvent } from '@gc/shared';
+import { RT, effectiveModules, type ModuleId, type TicketDTO, type WebhookEvent } from '@gc/shared';
 import type { AppConfig } from './config';
 import type { Database } from './db/client';
-import type { Tenant } from './db/schema';
+import { eq } from 'drizzle-orm';
+import { tenants, type Tenant } from './db/schema';
 import { createAuth, type Auth } from './lib/auth';
 import { tenantSettings, toCallDTO } from './lib/dto';
 import { brandFrom, type EmailBrand } from './lib/emails';
@@ -25,6 +26,8 @@ export interface AppContext {
   log: FastifyBaseLogger;
   /** Marca de los correos: la de la organización o, sin organización, la de la plataforma. */
   emailBrand(tenant: Tenant | null | undefined): Promise<EmailBrand>;
+  /** Módulos activos de una organización: los de su plan con los ajustes del superadministrador. */
+  modulesOf(tenant: Pick<Tenant, 'plan' | 'modules'>): Promise<ModuleId[]>;
   /** Notifica un cambio de turno a pantallas, operadores, seguimiento público y webhooks. */
   publishTicket(
     tenantId: string,
@@ -54,12 +57,19 @@ export function toPublicTicketEvent(t: TicketDTO) {
 }
 
 export function createContext(config: AppConfig, db: Database, log: FastifyBaseLogger): AppContext {
-  const auth = createAuth(config, db);
+  const platform = createPlatformSettings(db);
+  const modulesOf = async (tenant: Pick<Tenant, 'plan' | 'modules'>) => {
+    const { plans } = await platform.get();
+    return effectiveModules(plans[tenant.plan]?.modules ?? plans.free.modules, tenant.modules);
+  };
+  const auth = createAuth(config, db, modulesOf);
   const rt = new Realtime(db, auth, log, config.CORS_ORIGINS);
-  const webhooks = new WebhookDispatcher(db, log, config.WEBHOOKS_ALLOW_PRIVATE);
+  const webhooks = new WebhookDispatcher(db, log, config.WEBHOOKS_ALLOW_PRIVATE, async (tenantId) => {
+    const [tenant] = await db.select({ plan: tenants.plan, modules: tenants.modules }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+    return tenant ? (await modulesOf(tenant)).includes('integrations') : false;
+  });
   const storage = createStorage(config);
   const mailer = createMailer(config, db, log);
-  const platform = createPlatformSettings(db);
   const publicUrl = config.PUBLIC_URL.replace(/\/$/, '');
 
   return {
@@ -71,6 +81,7 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
     webhooks,
     mailer,
     platform,
+    modulesOf,
     log,
     async emailBrand(tenant) {
       if (tenant) return brandFrom(tenantSettings(tenant).branding, publicUrl);

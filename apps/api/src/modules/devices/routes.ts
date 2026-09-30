@@ -14,8 +14,10 @@ import { idParam } from '../../lib/schemas';
 const configPatch = z.record(z.string(), z.unknown());
 
 export const deviceRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app) => {
-  const read = ctx.auth.require({ role: 'manager', scope: 'catalog:read' });
-  const write = ctx.auth.require({ role: 'admin', scope: 'displays:write' });
+  const read = ctx.auth.require({ role: 'manager', scope: 'catalog:read', module: 'displays' });
+  const write = ctx.auth.require({ role: 'admin', scope: 'displays:write', module: 'displays' });
+  const kRead = ctx.auth.require({ role: 'manager', scope: 'catalog:read', module: 'kiosks' });
+  const kWrite = ctx.auth.require({ role: 'admin', scope: 'displays:write', module: 'kiosks' });
 
   async function assertBranch(tenantId: string, branchId: string) {
     const [b] = await ctx.db
@@ -155,7 +157,7 @@ export const deviceRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
     config: configPatch.optional(),
   });
 
-  app.get('/kiosks', { preHandler: read, schema: { tags: ktags } }, async (request) => {
+  app.get('/kiosks', { preHandler: kRead, schema: { tags: ktags } }, async (request) => {
     const rows = await ctx.db
       .select()
       .from(kiosks)
@@ -164,7 +166,7 @@ export const deviceRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
     return rows.map(toKioskDTO);
   });
 
-  app.get('/kiosks/:id', { preHandler: read, schema: { tags: ktags, params: idParam } }, async (request) => {
+  app.get('/kiosks/:id', { preHandler: kRead, schema: { tags: ktags, params: idParam } }, async (request) => {
     const [row] = await ctx.db
       .select()
       .from(kiosks)
@@ -173,7 +175,7 @@ export const deviceRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
     return toKioskDTO(row);
   });
 
-  app.post('/kiosks', { preHandler: write, schema: { tags: ktags, body: kioskBody } }, async (request, reply) => {
+  app.post('/kiosks', { preHandler: kWrite, schema: { tags: ktags, body: kioskBody } }, async (request, reply) => {
     const tenantId = tenantIdOf(request);
     await assertBranch(tenantId, request.body.branchId);
     await assertWithinLimit(ctx.db, tenantId, 'kiosks');
@@ -190,7 +192,7 @@ export const deviceRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
     return reply.code(201).send(toKioskDTO(row!));
   });
 
-  app.put('/kiosks/:id', { preHandler: write, schema: { tags: ktags, params: idParam, body: kioskBody.partial() } }, async (request) => {
+  app.put('/kiosks/:id', { preHandler: kWrite, schema: { tags: ktags, params: idParam, body: kioskBody.partial() } }, async (request) => {
     const tenantId = tenantIdOf(request);
     const [current] = await ctx.db
       .select()
@@ -211,7 +213,7 @@ export const deviceRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
     return toKioskDTO(row!);
   });
 
-  app.post('/kiosks/:id/rotate-token', { preHandler: write, schema: { tags: ktags, params: idParam } }, async (request) => {
+  app.post('/kiosks/:id/rotate-token', { preHandler: kWrite, schema: { tags: ktags, params: idParam } }, async (request) => {
     const tenantId = tenantIdOf(request);
     const [row] = await ctx.db
       .update(kiosks)
@@ -223,7 +225,7 @@ export const deviceRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
     return toKioskDTO(row);
   });
 
-  app.delete('/kiosks/:id', { preHandler: write, schema: { tags: ktags, params: idParam } }, async (request, reply) => {
+  app.delete('/kiosks/:id', { preHandler: kWrite, schema: { tags: ktags, params: idParam } }, async (request, reply) => {
     const deleted = await ctx.db
       .delete(kiosks)
       .where(and(eq(kiosks.id, request.params.id), eq(kiosks.tenantId, tenantIdOf(request))))

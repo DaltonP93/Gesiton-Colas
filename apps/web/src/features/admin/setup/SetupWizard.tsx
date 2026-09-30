@@ -112,7 +112,9 @@ export default function SetupWizard() {
   const [applying, setApplying] = useState<null | { done: number; failed?: string }>(null);
   const [finished, setFinished] = useState(false);
 
-  const ready = branches.isSuccess && services.isSuccess && counters.isSuccess && displays.isSuccess && kiosks.isSuccess;
+  // Pantallas y kioscos pueden estar desactivados (módulos): en ese caso no se esperan.
+  const settled = (q: { isSuccess: boolean; fetchStatus: string; isPending: boolean }) => q.isSuccess || (q.isPending && q.fetchStatus === 'idle');
+  const ready = branches.isSuccess && services.isSuccess && counters.isSuccess && settled(displays) && settled(kiosks);
 
   // Estado inicial a partir de lo que ya tiene la organización.
   useEffect(() => {

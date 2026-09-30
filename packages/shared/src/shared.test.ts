@@ -10,8 +10,13 @@ import {
   deepMerge,
   detectMedia,
   displayConfigSchema,
+  DEFAULT_PLAN_MODULES,
+  MODULE_IDS,
   defaultPlatformSettings,
+  effectiveModules,
   formatTicketCode,
+  numberingPeriod,
+  ticketNumberFor,
   isImageIcon,
   isScheduleActive,
   platformSettingsSchema,
@@ -217,5 +222,46 @@ describe('imágenes, íconos y ajustes de plataforma', () => {
     const saved = normalizeConfig(platformSettingsSchema, { homePage: 'login', brand: { primaryColor: 'rojo', appName: 'Turnos SAA' } });
     expect(saved.homePage).toBe('login');
     expect(saved.brand).toMatchObject({ appName: 'Turnos SAA', primaryColor: '#2563eb' });
+  });
+});
+
+describe('numeración y módulos', () => {
+  it('después del máximo vuelve al inicio o suma un dígito', () => {
+    const wrap = { digits: 3, startAt: 1, overflow: 'wrap' as const };
+    expect(ticketNumberFor(1, wrap)).toBe(1);
+    expect(ticketNumberFor(999, wrap)).toBe(999);
+    expect(ticketNumberFor(1000, wrap)).toBe(1);
+    expect(ticketNumberFor(1001, wrap)).toBe(2);
+    expect(ticketNumberFor(1000, { ...wrap, overflow: 'grow' })).toBe(1000);
+    // Empezando en 100 con 3 dígitos: 100…999 y vuelve a 100.
+    const from100 = { digits: 3, startAt: 100, overflow: 'wrap' as const };
+    expect(ticketNumberFor(1, from100)).toBe(100);
+    expect(ticketNumberFor(900, from100)).toBe(999);
+    expect(ticketNumberFor(901, from100)).toBe(100);
+    expect(ticketNumberFor(2, { digits: 1, startAt: 0, overflow: 'wrap' })).toBe(1);
+    expect(ticketNumberFor(11, { digits: 1, startAt: 0, overflow: 'wrap' })).toBe(0);
+  });
+
+  it('calcula el período de reinicio', () => {
+    expect(numberingPeriod('2026-09-30', 'daily')).toBe('2026-09-30');
+    expect(numberingPeriod('2026-09-30', 'monthly')).toBe('2026-09');
+    expect(numberingPeriod('2026-09-30', 'yearly')).toBe('2026');
+    expect(numberingPeriod('2026-09-30', 'never')).toBe('all');
+    // Semana ISO: lunes a domingo, la semana del 1 de enero puede ser del año anterior.
+    expect(numberingPeriod('2026-09-28', 'weekly')).toBe('2026-W40');
+    expect(numberingPeriod('2026-10-04', 'weekly')).toBe('2026-W40');
+    expect(numberingPeriod('2026-10-05', 'weekly')).toBe('2026-W41');
+    expect(numberingPeriod('2027-01-01', 'weekly')).toBe('2026-W53');
+    expect(normalizeConfig(tenantSettingsSchema, {}).tickets).toMatchObject({ reset: 'daily', startAt: 1, overflow: 'wrap' });
+  });
+
+  it('los módulos siguen al plan salvo que se fuercen por organización', () => {
+    expect(effectiveModules(DEFAULT_PLAN_MODULES.free, {})).not.toContain('surveys');
+    expect(effectiveModules(DEFAULT_PLAN_MODULES.free, { surveys: true, advertising: false })).toEqual(
+      expect.arrayContaining(['surveys', 'displays']),
+    );
+    expect(effectiveModules(DEFAULT_PLAN_MODULES.free, { advertising: false })).not.toContain('advertising');
+    expect(effectiveModules(DEFAULT_PLAN_MODULES.enterprise, null)).toHaveLength(MODULE_IDS.length);
+    expect(defaultPlatformSettings().plans.pro.modules).toContain('notifications');
   });
 });

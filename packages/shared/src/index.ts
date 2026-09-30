@@ -5,5 +5,6 @@ export * from './template';
 export * from './ticketPresets';
 export * from './schedule';
 export * from './plans';
+export * from './modules';
 export * from './platform';
 export * from './types';

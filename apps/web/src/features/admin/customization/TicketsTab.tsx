@@ -1,9 +1,18 @@
 import { useState } from 'react';
-import { formatTicketCode, type TicketSettings } from '@gc/shared';
+import { formatTicketCode, ticketNumberFor, type TicketSettings } from '@gc/shared';
+import { NumberingStatus } from './NumberingStatus';
 import { Field, Input, RangeInput, Select, Toggle, cx } from '../../../components/ui';
 import { useAuth } from '../../../lib/auth';
 import { useServices } from '../../../lib/queries';
 import { SaveBar, Section, sameJson, useReportDirty, useSaveTenant, type TabProps } from './common';
+
+const RESET_TEXT: Record<TicketSettings['reset'], string> = {
+  daily: 'Vuelve al número inicial automáticamente cada día.',
+  weekly: 'Vuelve al número inicial automáticamente cada lunes.',
+  monthly: 'Vuelve al número inicial automáticamente el primer día de cada mes.',
+  yearly: 'Vuelve al número inicial automáticamente cada 1 de enero.',
+  never: 'No se reinicia sola entre días.',
+};
 
 function clampInt(value: string, min: number, max: number): number {
   const n = Math.round(Number(value));
@@ -40,10 +49,11 @@ export function TicketsTab({ onDirtyChange }: TabProps) {
   const ticket = terms.ticket.toLowerCase();
   const tickets = terms.tickets.toLowerCase();
 
+  const n = (counter: number) => ticketNumberFor(counter, draft);
   const sequence =
     draft.scope === 'service'
-      ? [code(p1, 1), code(p1, 2), code(p2, 1), code(p1, 3), code(p2, 2)]
-      : [code(p1, 1), code(p1, 2), code(p2, 3), code(p1, 4), code(p2, 5)];
+      ? [code(p1, n(1)), code(p1, n(2)), code(p2, n(1)), code(p1, n(3)), code(p2, n(2))]
+      : [code(p1, n(1)), code(p1, n(2)), code(p2, n(3)), code(p1, n(4)), code(p2, n(5))];
 
   const ratio = draft.priorityRatio;
 
@@ -75,14 +85,23 @@ export function TicketsTab({ onDirtyChange }: TabProps) {
                   </span>
                 ))}
               </div>
-              <p className="mt-2 text-xs text-muted">
-                Los códigos van de {code(p1, 1)} a {code(p1, max)}; si se emiten más {tickets} en el período, el número simplemente suma un dígito.
-              </p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Reinicio de la numeración">
+              <Field label="Empieza en" hint={`El primer ${ticket} de cada período y después de un reinicio.`}>
+                <Input type="number" min={0} max={Math.min(99_999, max)} value={draft.startAt} onChange={(e) => set('startAt', clampInt(e.target.value, 0, Math.min(99_999, max)))} />
+              </Field>
+              <Field label={`Después de ${code(p1, max)}`}>
+                <Select value={draft.overflow} onChange={(e) => set('overflow', e.target.value as TicketSettings['overflow'])}>
+                  <option value="wrap">Vuelve a {code(p1, draft.startAt)} (recomendado)</option>
+                  <option value="grow">Sigue con {code(p1, max + 1)}</option>
+                </Select>
+              </Field>
+              <Field label="Reinicio automático">
                 <Select value={draft.reset} onChange={(e) => set('reset', e.target.value as TicketSettings['reset'])}>
                   <option value="daily">Cada día (recomendado)</option>
+                  <option value="weekly">Cada semana (lunes)</option>
+                  <option value="monthly">Cada mes</option>
+                  <option value="yearly">Cada año</option>
                   <option value="never">Nunca (numeración continua)</option>
                 </Select>
               </Field>
@@ -93,14 +112,18 @@ export function TicketsTab({ onDirtyChange }: TabProps) {
                 </Select>
               </Field>
             </div>
-            <p className="text-xs text-muted">
-              {draft.scope === 'service'
-                ? `Cada ${terms.service.toLowerCase()} lleva su propia numeración (${code(p1, 1)}, ${code(p2, 1)}…).`
-                : `Un solo contador para toda la ${terms.branch.toLowerCase()}: el número nunca se repite entre ${terms.services.toLowerCase()}.`}{' '}
-              {draft.reset === 'daily'
-                ? 'La numeración vuelve a 1 al comenzar cada día.'
-                : 'La numeración continúa entre días; puede reiniciarla con «Cerrar jornada» en el Monitor.'}
-            </p>
+            <div className="rounded-ui border border-primary/25 bg-primary/5 p-4 text-sm">
+              <p className="font-semibold">¿Qué pasa después de {code(p1, max)}?</p>
+              <p className="mt-1 text-fg/85">
+                {draft.overflow === 'wrap'
+                  ? `El siguiente ${ticket} vuelve a ser ${code(p1, draft.startAt)} y la numeración sigue sola. No se mezclan: los ${tickets} anteriores con el mismo código ya fueron atendidos.`
+                  : `El número crece un dígito (${code(p1, max + 1)}, ${code(p1, max + 2)}…) hasta el próximo reinicio.`}{' '}
+                {draft.scope === 'service'
+                  ? `Cada ${terms.service.toLowerCase()} lleva su propio contador (${code(p1, draft.startAt)}, ${code(p2, draft.startAt)}…).`
+                  : `Un solo contador para toda la ${terms.branch.toLowerCase()}: el número no se repite entre ${terms.services.toLowerCase()}.`}{' '}
+                {RESET_TEXT[draft.reset]} Además puede reiniciarla a mano abajo o con «Cerrar jornada» en el Monitor.
+              </p>
+            </div>
           </div>
         </Section>
 
@@ -178,6 +201,8 @@ export function TicketsTab({ onDirtyChange }: TabProps) {
           </Section>
         </div>
       </div>
+
+      <NumberingStatus />
 
       <SaveBar dirty={dirty} saving={saving} onSave={() => void save({ settings: { tickets: draft } }, 'Configuración de turnos guardada')} onDiscard={() => setDraft(source)} />
     </div>
