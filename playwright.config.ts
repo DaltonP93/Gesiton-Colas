@@ -46,6 +46,8 @@ export default defineConfig({
       // Los correos se leen desde /api/v1/dev/outbox (solo en pruebas).
       MAIL_DRIVER: 'log',
       DEV_OUTBOX: 'true',
+      SUPERADMIN_EMAIL: 'root@e2e.test',
+      SUPERADMIN_PASSWORD: 'RootE2e2026!',
     },
   },
 });

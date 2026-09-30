@@ -182,11 +182,11 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
   }
 
   // Solo para pruebas automatizadas: permite leer los correos enviados sin SMTP.
-  if (config.DEV_OUTBOX && ctx.mailer.driver === 'log') {
+  if (config.DEV_OUTBOX && ctx.mailer.envDriver === 'log') {
     app.get('/api/v1/dev/outbox', { schema: { hide: true } }, async () => ctx.mailer.outbox());
   }
-  if (config.NODE_ENV === 'production' && ctx.mailer.driver === 'log') {
-    app.log.warn('SMTP no configurado: los correos (verificación, recuperación de contraseña, demos) solo se muestran en el log');
+  if (config.NODE_ENV === 'production' && ctx.mailer.envDriver === 'log' && (await ctx.mailer.resolve(null)).source === 'none') {
+    app.log.warn('Correo sin configurar: configúrelo en Plataforma → Ajustes → Correo. Hasta entonces los correos solo se muestran en el log.');
   }
 
   ctx.rt.attach(app.server);

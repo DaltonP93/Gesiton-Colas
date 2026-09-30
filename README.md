@@ -16,11 +16,14 @@ Plataforma **SaaS** de gestión de turnos, pantallas y publicidad digital. Organ
 | **Administración** | Sucursales, puestos de atención, departamentos, servicios (prefijo, color, ícono, tiempo estimado), prioridades con peso, usuarios con roles (administrador, supervisor, operador) y asignación a sucursales/servicios. |
 | **Personalización total** | Logo, favicon, colores, tipografía de texto y de títulos, bordes, modo oscuro, **estilo de tarjetas** (sombra, borde, plano, vidrio), **menú lateral** claro, oscuro o del color de la marca, fondo (degradado, puntos o imagen), densidad, CSS propio, **terminología** (Turno/Ficha/Ticket, Ventanilla/Box/Caja…), numeración, campos del cliente, idioma (es/en/pt) y zona horaria. |
 | **Pantalla TV a medida** | Imagen de fondo, paneles sólidos, de vidrio o con borde, redondeo, tipografía propia para los números, tamaño del llamado y del historial, animación del llamado, reloj de 12/24 h, **código QR en pantalla** (fila virtual, encuesta, WhatsApp), frase de voz por servicio y **segundo idioma**. |
-| **Kiosco a medida** | Temas rápidos, fondo liso, degradado o imagen, botones redondeados, píldora, rectos, de contorno o **mosaico**, color por servicio, tamaño de logo, encabezado centrado, texto al pie y **pantalla de espera**. Ticket con **5 diseños prediseñados**, encabezado y pie sin tocar HTML. |
+| **Kiosco a medida** | Temas rápidos, fondo liso, degradado o imagen, botones redondeados, píldora, rectos, de contorno o **mosaico**, color por servicio, ícono a la izquierda, arriba o a la derecha y en 4 tamaños, tamaño de logo, encabezado centrado, texto al pie y **pantalla de espera** con logo y hora o con una **galería de imágenes / video promocional** (lista de Publicidad). Ticket con **5 diseños prediseñados**, encabezado y pie sin tocar HTML. |
+| **Íconos e imágenes propias** | Más de 80 íconos de servicio agrupados por rubro o una **imagen propia por servicio**. En la TV y el kiosco se suman **logos, sellos o íconos ubicables** en 9 posiciones, con tamaño, opacidad y delante o detrás del contenido. |
 | **Asistente inicial** | Al crear una organización, un asistente de 5 pasos propone según el **rubro** (banco, salud, farmacia, oficina pública, comercio, educación) la terminología, los colores y los servicios, y configura la sucursal, los puestos, la pantalla y el kiosco. |
 | **Reportes** | Espera y atención promedio, por servicio, operador, hora y día. Monitor en vivo y exportación a CSV/Excel. |
 | **Integraciones** | API REST con OpenAPI/Swagger (`/api/docs`), API keys con permisos, **webhooks firmados (HMAC-SHA256) con reintentos**, Socket.IO. Ideal para ERP, CRM, WhatsApp, Zapier, Make o n8n. |
 | **SaaS** | Registro autónomo de organizaciones, datos aislados por organización, planes con límites (sucursales, pantallas, kioscos, usuarios, almacenamiento), superadministrador con modo soporte. |
+| **Plataforma (superadministrador)** | Varios **superadministradores** (alta, edición, invitación, baja). **Página principal configurable**: presentación del producto, directamente el **login** o redirección a otro sitio. Registro, demos e ingreso por código activables. **Marca de la plataforma** (nombre, logo, color, frase e imagen del ingreso, correo de soporte). Por organización: ver usuarios, **definir contraseñas** y generar **enlaces de acceso** de un solo uso. |
+| **Correo saliente (SMTP) desde el panel** | El superadministrador configura el servidor de toda la plataforma y **cada organización puede usar el suyo** (Configuración → Correo saliente), con proveedores precargados (Gmail, Microsoft 365, SES, Brevo, Mailgun, Zoho), contraseña cifrada y **correo de prueba**. Sin correo, las invitaciones muestran el **enlace para copiar o enviar por WhatsApp**. |
 | **Acceso por correo** | **Demo por correo** (organización de ejemplo con historial, operadores, publicidad y turnos, con vencimiento), verificación de email, **olvidé mi contraseña**, ingreso sin contraseña con **enlace o código de 6 dígitos**, invitación de usuarios por correo. SMTP con cualquier proveedor. |
 | **Portal de herramientas** | Al ingresar, un portal abre la consola, el **kiosco / triage** o el **panel TV** con un clic, copia enlaces o muestra el QR. Las TVs y tablets se **vinculan con un código de 6 dígitos** desde `/vincular`, sin escribir URLs largas; el equipo recuerda su pantalla. |
 | **Sonidos y audio** | 19 sonidos de llamado incluidos (escuchar y descargar), subida de audios propios (MP3, WAV, OGG, M4A) como tono de llamado o voz grabada, **música ambiental** y radios por streaming con atenuación en cada llamado, y guía para instalar más voces. |
@@ -65,7 +68,16 @@ npm run db:seed              # opcional: organización demo (demo@gestioncolas.l
 npm run dev                  # API en :3000 y web en :5173 (con proxy a la API)
 ```
 
-Sin SMTP configurado, los correos (verificación, recuperación, códigos, demos) se imprimen en la consola de la API con sus enlaces, para poder probar todos los flujos en desarrollo.
+Sin SMTP configurado, los correos (verificación, recuperación, códigos, demos) se imprimen en la consola de la API con sus enlaces, para poder probar todos los flujos en desarrollo. En producción el correo se configura desde **Plataforma → Ajustes → Correo saliente** (o con las variables `SMTP_*`).
+
+### Recuperar el acceso de superadministrador
+
+El superadministrador inicial se crea con `SUPERADMIN_EMAIL` / `SUPERADMIN_PASSWORD` solo si todavía no hay ninguno; después se administran en **Plataforma → Superadministradores**. Si se pierde el acceso:
+
+```bash
+docker compose exec app node apps/api/dist/db/admin-cli.js superadmin correo@empresa.com   # genera una contraseña nueva
+# sin Docker: node apps/api/dist/db/admin-cli.js superadmin correo@empresa.com 'NuevaClave123'
+```
 
 | Comando | Qué hace |
 | --- | --- |
@@ -82,7 +94,7 @@ Sin SMTP configurado, los correos (verificación, recuperación, códigos, demos
 
 | Ruta | Uso |
 | --- | --- |
-| `/` | Página pública del producto |
+| `/` | Página principal: presentación del producto, el login o una redirección (lo elige el superadministrador) |
 | `/registro`, `/login`, `/demo` | Alta de organización, inicio de sesión y demo por correo |
 | `/ingresar-con-correo`, `/olvide-contrasena` | Acceso con código por correo y recuperación de contraseña |
 | `/app` | Portal de herramientas (consola, kiosco, panel TV, administración) |
@@ -93,7 +105,8 @@ Sin SMTP configurado, los correos (verificación, recuperación, códigos, demos
 | `/pantalla/:token` | Pantalla de TV (enlace por pantalla) |
 | `/kiosco/:token` | Kiosco táctil · `?modo=movil` para fila virtual |
 | `/t/:token` | Seguimiento del turno del cliente |
-| `/plataforma` | Superadministrador (organizaciones y planes) |
+| `/plataforma` | Superadministrador: organizaciones, planes, superadministradores, página principal, marca y correo |
+| `/app/configuracion/correo` | Servidor de correo propio de la organización |
 | `/api/docs` | Documentación interactiva de la API |
 
 ## Documentación

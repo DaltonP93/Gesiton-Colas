@@ -1,14 +1,17 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
+  defaultPlatformSettings,
   defaultTenantSettings,
   hasRole,
   type MeDTO,
+  type PlatformBrand,
   type Role,
   type TenantSettings,
   type Terminology,
 } from '@gc/shared';
 import { api, session } from './api';
+import { usePublicConfig } from './queries';
 import { applyBranding } from './theme';
 
 interface AuthState {
@@ -16,6 +19,8 @@ interface AuthState {
   loading: boolean;
   settings: TenantSettings;
   terms: Terminology;
+  /** Marca de la plataforma (pantalla de ingreso, página principal y panel del superadministrador). */
+  platformBrand: PlatformBrand;
   login(email: string, password: string): Promise<MeDTO>;
   /** Devuelve `null` si hay que confirmar el correo antes de ingresar. */
   register(data: { organizationName: string; name: string; email: string; password: string }): Promise<MeDTO | null>;
@@ -29,6 +34,7 @@ interface AuthState {
 }
 
 const AuthContext = createContext<AuthState | null>(null);
+const DEFAULT_PLATFORM_BRAND = defaultPlatformSettings().brand;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
@@ -68,7 +74,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('gc:unauthorized', onUnauthorized);
   }, [logout]);
 
-  const settings = me?.tenant?.settings ?? defaultTenantSettings();
+  const { data: publicConfig } = usePublicConfig();
+  const platformBrand = publicConfig?.brand ?? DEFAULT_PLATFORM_BRAND;
+  // Sin organización (ingreso, página principal, plataforma) se usa la marca de la plataforma.
+  const settings = useMemo(() => {
+    if (me?.tenant) return me.tenant.settings;
+    const base = defaultTenantSettings();
+    return {
+      ...base,
+      branding: {
+        ...base.branding,
+        appName: platformBrand.appName,
+        logoUrl: platformBrand.logoUrl,
+        faviconUrl: platformBrand.faviconUrl,
+        primaryColor: platformBrand.primaryColor,
+      },
+    };
+  }, [me?.tenant, platformBrand]);
 
   useEffect(() => {
     applyBranding(settings.branding, { title: settings.branding.appName });
@@ -80,6 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       settings,
       terms: settings.terminology,
+      platformBrand,
       async login(email, password) {
         const res = await api.post<MeDTO & { token: string }>('/auth/login', { email, password });
         session.token = res.token;
@@ -118,7 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await refresh();
       },
     }),
-    [me, loading, settings, logout, refresh, queryClient],
+    [me, loading, settings, platformBrand, logout, refresh, queryClient],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

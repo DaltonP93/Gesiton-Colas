@@ -4,13 +4,12 @@ import { z } from 'zod';
 import { LOCALES } from '@gc/shared';
 import type { AppContext } from '../../context';
 import type { DbOrTx } from '../../db/client';
-import { branches, services, tenants, userBranches, userServices, users } from '../../db/schema';
+import { branches, services, userBranches, userServices, users } from '../../db/schema';
 import type { FastifyRequest } from 'fastify';
 import { hashPassword, sessionsResetNow, tenantIdOf } from '../../lib/auth';
 import { randomToken } from '../../lib/crypto';
-import { brandFrom, inviteMail } from '../../lib/emails';
-import { issueToken } from '../../lib/tokens';
-import { tenantSettings, toUserDTO } from '../../lib/dto';
+import { sendInvite } from '../../lib/invites';
+import { toUserDTO } from '../../lib/dto';
 import { badRequest, conflict, notFound } from '../../lib/errors';
 import { assertWithinLimit } from '../../lib/plans';
 import { idParam, updateSchema } from '../../lib/schemas';
@@ -76,19 +75,6 @@ export const userRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
     );
   });
 
-  async function sendInvite(userId: string, inviter: string) {
-    const [row] = await ctx.db
-      .select({ user: users, tenant: tenants })
-      .from(users)
-      .leftJoin(tenants, eq(tenants.id, users.tenantId))
-      .where(eq(users.id, userId));
-    if (!row) throw notFound('Usuario');
-    const base = ctx.config.PUBLIC_URL.replace(/\/$/, '');
-    const { token } = await issueToken(ctx.db, userId, 'invite');
-    const brand = brandFrom(row.tenant ? tenantSettings(row.tenant).branding : null, base);
-    await ctx.mailer.send(inviteMail(row.user.email, row.user.name, inviter, row.tenant?.name ?? brand.appName, `${base}/invitacion?token=${token}`, brand));
-  }
-
   const inviterName = (request: FastifyRequest) => (request.auth?.kind === 'user' ? request.auth.user.name : 'El administrador');
 
   app.post(
@@ -117,14 +103,15 @@ export const userRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
         await setAssignments(tx, tenantId, user!.id, branchIds, serviceIds);
         return dto(tx, user!.id);
       });
-      if (invite) await sendInvite(created.id, inviterName(request));
-      return reply.code(201).send(created);
+      // Si no hay correo configurado, la respuesta trae el enlace para compartirlo por otro medio.
+      const invitation = invite ? await sendInvite(ctx, created.id, inviterName(request)) : null;
+      return reply.code(201).send({ ...created, invitation });
     },
   );
 
   app.post(
     '/users/:id/invite',
-    { preHandler: admin, schema: { tags, summary: 'Reenviar la invitación por correo', params: idParam } },
+    { preHandler: admin, schema: { tags, summary: 'Reenviar la invitación por correo (devuelve también el enlace)', params: idParam } },
     async (request) => {
       const tenantId = tenantIdOf(request);
       const [target] = await ctx.db
@@ -133,8 +120,7 @@ export const userRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
         .where(and(eq(users.id, request.params.id), eq(users.tenantId, tenantId)));
       if (!target) throw notFound('Usuario');
       if (!target.invitePending) throw badRequest('El usuario ya aceptó la invitación');
-      await sendInvite(target.id, inviterName(request));
-      return { ok: true };
+      return { ok: true, ...(await sendInvite(ctx, target.id, inviterName(request))) };
     },
   );
 

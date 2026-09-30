@@ -5,6 +5,7 @@ import {
   Globe,
   Hash,
   LayoutGrid,
+  Mail,
   Palette,
   Plug,
   Sparkles,
@@ -15,7 +16,8 @@ import {
 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
 import { Link, Navigate, useParams } from 'react-router';
-import { Button, Loading, cx } from '../../components/ui';
+import { MailSettingsForm } from '../../components/MailSettingsForm';
+import { Button, Loading, PageHeader, cx } from '../../components/ui';
 import { useAuth } from '../../lib/auth';
 import { useBranches, useCounters, useServices, useUsers } from '../../lib/queries';
 import { BrandTab } from './customization/BrandTab';
@@ -31,7 +33,7 @@ const UsersPage = lazy(() => import('./UsersPage'));
 const IntegrationsPage = lazy(() => import('./IntegrationsPage'));
 
 type TabKey = 'marca' | 'region' | 'terminologia' | 'turnos' | 'cliente';
-type PageKey = 'sucursales' | 'servicios' | 'usuarios' | 'integraciones';
+type PageKey = 'sucursales' | 'servicios' | 'usuarios' | 'correo' | 'integraciones';
 export type ConfigSection = 'inicio' | TabKey | PageKey;
 
 interface SectionDef {
@@ -55,8 +57,22 @@ const PAGE_COMPONENTS: Record<PageKey, ComponentType> = {
   sucursales: BranchesPage,
   servicios: ServicesPage,
   usuarios: UsersPage,
+  correo: MailSection,
   integraciones: IntegrationsPage,
 };
+function MailSection() {
+  return (
+    <div>
+      <PageHeader
+        icon={<Mail />}
+        title="Correo saliente"
+        description="Servidor por el que salen las invitaciones, los códigos de acceso y la recuperación de contraseñas de su organización."
+      />
+      <MailSettingsForm scope="tenant" />
+    </div>
+  );
+}
+
 const isTab = (key: ConfigSection): key is TabKey => key in TAB_COMPONENTS;
 const isPage = (key: ConfigSection): key is PageKey => key in PAGE_COMPONENTS;
 
@@ -78,6 +94,7 @@ export default function ConfigurationPage() {
       { key: 'turnos', label: `Numeración de ${terms.tickets.toLowerCase()}`, short: 'Numeración', description: 'Dígitos, reinicio y rellamados', icon: <Hash />, group: 'Atención' },
       { key: 'cliente', label: `Datos del ${terms.customer.toLowerCase()}`, short: `Datos del ${terms.customer.toLowerCase()}`, description: 'Qué se pide al sacar turno', icon: <TextCursorInput />, group: 'Atención' },
       { key: 'usuarios', label: 'Usuarios', short: 'Usuarios', description: 'Equipo, roles e invitaciones', icon: <Users />, group: 'Equipo e integraciones' },
+      { key: 'correo', label: 'Correo saliente', short: 'Correo', description: 'Servidor SMTP para invitaciones y avisos', icon: <Mail />, group: 'Equipo e integraciones' },
       { key: 'integraciones', label: 'Integraciones y API', short: 'Integraciones', description: 'API keys, webhooks y documentación', icon: <Plug />, group: 'Equipo e integraciones' },
     ],
     [terms],
@@ -247,6 +264,7 @@ function Overview({ sections }: { sections: SectionDef[] }) {
     turnos: `${settings.tickets.digits} dígitos · ${settings.tickets.reset === 'daily' ? 'reinicio diario' : 'sin reinicio'}`,
     cliente: settings.customerFields.length ? `${settings.customerFields.length} campos propios` : 'Nombre, documento, teléfono y email',
     usuarios: users.data ? `${users.data.length} ${users.data.length === 1 ? 'usuario' : 'usuarios'}` : '…',
+    correo: 'Invitaciones, códigos de acceso y avisos',
     integraciones: 'API REST, webhooks y tiempo real',
   };
 

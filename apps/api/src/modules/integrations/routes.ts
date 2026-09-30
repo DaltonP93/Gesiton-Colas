@@ -4,11 +4,12 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { API_KEY_SCOPES, WEBHOOK_EVENTS } from '@gc/shared';
 import type { AppContext } from '../../context';
-import { apiKeys, webhookDeliveries, webhooks } from '../../db/schema';
+import { apiKeys, tenants, webhookDeliveries, webhooks } from '../../db/schema';
 import { API_KEY_PREFIX, tenantIdOf, userIdOf } from '../../lib/auth';
 import { randomToken, sha256 } from '../../lib/crypto';
 import { toApiKeyDTO, toWebhookDTO, toWebhookDeliveryDTO } from '../../lib/dto';
 import { badRequest, notFound } from '../../lib/errors';
+import { mailSettingsBody, mailStatus, mailTestBody, saveMailSettings, testMailSettings } from '../../lib/mailSettings';
 import { assertPublicUrl } from '../../lib/net';
 import { assertWithinLimit } from '../../lib/plans';
 import { idParam, updateSchema } from '../../lib/schemas';
@@ -182,6 +183,49 @@ export const integrationRoutes = (ctx: AppContext): FastifyPluginAsyncZod => asy
       await ctx.webhooks.processDue();
       const [updated] = await ctx.db.select().from(webhookDeliveries).where(eq(webhookDeliveries.id, row.id));
       return toWebhookDeliveryDTO(updated!);
+    },
+  );
+
+  /* ------------------------ Correo saliente (SMTP) -------------------- */
+  const mtags = ['Integraciones: correo saliente'];
+
+  app.get(
+    '/mail-settings',
+    { preHandler: admin, schema: { tags: mtags, summary: 'Servidor de correo propio de la organización y el que se usa hoy' } },
+    async (request) => {
+      const tenantId = tenantIdOf(request);
+      return mailStatus(ctx, tenantId, tenantId);
+    },
+  );
+
+  app.put(
+    '/mail-settings',
+    {
+      preHandler: admin,
+      schema: {
+        tags: mtags,
+        summary: 'Guardar el servidor de correo propio',
+        description: 'Las invitaciones, códigos de acceso y recuperaciones de contraseña de la organización salen por este servidor. Desactivado = se usa el de la plataforma.',
+        body: mailSettingsBody,
+      },
+    },
+    async (request) => {
+      const tenantId = tenantIdOf(request);
+      return saveMailSettings(ctx, tenantId, tenantId, request.body);
+    },
+  );
+
+  app.post(
+    '/mail-settings/test',
+    {
+      preHandler: admin,
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+      schema: { tags: mtags, summary: 'Probar el servidor de correo enviando un mensaje', body: mailTestBody },
+    },
+    async (request) => {
+      const tenantId = tenantIdOf(request);
+      const [tenant] = await ctx.db.select().from(tenants).where(eq(tenants.id, tenantId));
+      return testMailSettings(ctx, tenantId, request.body, await ctx.emailBrand(tenant));
     },
   );
 };

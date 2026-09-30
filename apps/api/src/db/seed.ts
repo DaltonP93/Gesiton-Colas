@@ -177,13 +177,19 @@ export async function createTenantWithDefaults(db: DbOrTx, input: NewTenantInput
   return { tenant: tenant!, admin: admin!, branch: branch!, services: createdServices, playlistId: playlist!.id };
 }
 
-/** Crea el superadministrador de la plataforma a partir de SUPERADMIN_EMAIL / SUPERADMIN_PASSWORD. */
+/**
+ * Crea el primer superadministrador a partir de SUPERADMIN_EMAIL / SUPERADMIN_PASSWORD.
+ * Si ya hay alguno (p. ej. se cambió el correo desde el panel), no crea otro: los demás
+ * se administran en Plataforma → Superadministradores, o con `admin-cli` si se perdió el acceso.
+ */
 export async function ensureSuperadmin(ctx: Pick<AppContext, 'config' | 'db' | 'log'>) {
   const { SUPERADMIN_EMAIL: email, SUPERADMIN_PASSWORD: password } = ctx.config;
   if (!email || !password) return;
   const normalized = email.toLowerCase().trim();
   const [existing] = await ctx.db.select({ id: users.id }).from(users).where(eq(users.email, normalized)).limit(1);
   if (existing) return;
+  const [anySuperadmin] = await ctx.db.select({ id: users.id }).from(users).where(eq(users.role, 'superadmin')).limit(1);
+  if (anySuperadmin) return;
   await ctx.db.insert(users).values({
     tenantId: null,
     email: normalized,

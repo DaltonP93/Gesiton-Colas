@@ -101,6 +101,40 @@ export const tenantSettingsSchema = z.object({
 export type TenantSettings = z.infer<typeof tenantSettingsSchema>;
 
 /* ------------------------------------------------------------------ */
+/* Imágenes superpuestas (logos, íconos, sellos) en TV y kiosco          */
+/* ------------------------------------------------------------------ */
+
+export const OVERLAY_POSITIONS = [
+  'top-left',
+  'top-center',
+  'top-right',
+  'middle-left',
+  'center',
+  'middle-right',
+  'bottom-left',
+  'bottom-center',
+  'bottom-right',
+] as const;
+export type OverlayPosition = (typeof OVERLAY_POSITIONS)[number];
+
+export const overlaySchema = z.object({
+  id: z.string().min(1).max(40),
+  /** Imagen subida (/uploads/...) o URL (vacía = todavía sin elegir, no se muestra). */
+  url: z.string().max(2048).default(''),
+  position: z.enum(OVERLAY_POSITIONS).default('top-right'),
+  /** Ancho en % del ancho de la pantalla. */
+  size: z.number().min(2).max(80).default(12),
+  opacity: z.number().min(0.1).max(1).default(1),
+  /** Separación desde el borde en % de la pantalla. */
+  margin: z.number().min(0).max(20).default(2),
+  /** Mostrar por encima de todo (sí) o detrás de los paneles y botones (no). */
+  front: z.boolean().default(true),
+});
+export type Overlay = z.infer<typeof overlaySchema>;
+
+const overlays = z.array(overlaySchema).max(12).default([]);
+
+/* ------------------------------------------------------------------ */
 /* Pantallas (TV / cartelería)                                          */
 /* ------------------------------------------------------------------ */
 
@@ -132,6 +166,8 @@ export const displayConfigSchema = z.object({
       position: z.enum(['bottom-left', 'bottom-right', 'top-left', 'top-right']).default('bottom-left'),
     })
     .prefault({}),
+  /** Logos, íconos o sellos ubicados donde se quiera sobre la pantalla. */
+  overlays,
   theme: z
     .object({
       background: color.default('#0f172a'),
@@ -301,8 +337,20 @@ export const kioskConfigSchema = z.object({
       seconds: z.number().int().min(10).max(3600).default(60),
       title: z.string().max(120).default('Toque la pantalla para sacar su turno'),
       showClock: z.boolean().default(true),
+      /**
+       * Qué se ve mientras nadie usa el kiosco:
+       * - `message`: el logo, la hora y el mensaje
+       * - `playlist`: imágenes y videos de una lista de Publicidad (galería o video promocional)
+       */
+      mode: z.enum(['message', 'playlist']).default('message'),
+      playlistId: z.string().nullable().default(null),
+      /** Muestra el mensaje «Toque la pantalla» sobre las imágenes y videos. */
+      showMessage: z.boolean().default(true),
+      /** Los videos de la pantalla de espera suenan (si no, se reproducen en silencio). */
+      sound: z.boolean().default(false),
     })
     .prefault({}),
+  overlays,
   print: z
     .object({
       enabled: z.boolean().default(true),
@@ -336,6 +384,9 @@ export const kioskConfigSchema = z.object({
       /** Cada botón usa el color de su servicio. */
       serviceColors: z.boolean().default(false),
       showIcons: z.boolean().default(true),
+      /** Ubicación del ícono dentro del botón. */
+      iconPosition: z.enum(['left', 'top', 'right']).default('left'),
+      iconSize: z.enum(['sm', 'md', 'lg', 'xl']).default('md'),
       logoSize: z.enum(['sm', 'md', 'lg', 'xl']).default('md'),
       /** Logo a la izquierda y sucursal a la derecha, o todo centrado. */
       headerAlign: z.enum(['split', 'center']).default('split'),

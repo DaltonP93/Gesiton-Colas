@@ -5,13 +5,17 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import { Link, useParams, useSearchParams } from 'react-router';
 import {
   RT,
+  defaultDisplayConfig,
+  isImageIcon,
   type CustomerField,
   type IssuedTicketDTO,
   type KioskBootstrapDTO,
   type PriorityDTO,
 } from '@gc/shared';
+import { OverlayLayer } from '../../components/Overlays';
 import { ServiceIcon } from '../../components/ServiceIcon';
 import { cx } from '../../components/ui';
+import { MediaPlayer } from '../display/MediaPlayer';
 import { ApiError, api, assetUrl, errorMessage } from '../../lib/api';
 import { translator } from '../../lib/i18n';
 import { connectSocket } from '../../lib/socket';
@@ -234,7 +238,8 @@ function Kiosk({ boot, token, refetch }: { boot: KioskBootstrapDTO; token: strin
 
   return (
     <div className="gc-kiosk relative flex min-h-screen flex-col select-none" style={style}>
-      <header className={cx('relative flex gap-4 px-6 pt-6 sm:px-10', centered ? 'flex-col items-center text-center' : 'items-center justify-between')}>
+      <OverlayLayer overlays={config.overlays} layer="back" fixed />
+      <header className={cx('relative z-[1] flex gap-4 px-6 pt-6 sm:px-10', centered ? 'flex-col items-center text-center' : 'items-center justify-between')}>
         {tenant.branding.logoUrl ? (
           <img src={assetUrl(tenant.branding.logoUrl)} alt={tenant.name} className={cx('object-contain', LOGO_SIZES[theme.logoSize], centered ? 'max-w-[80%]' : 'max-w-[50%]')} />
         ) : (
@@ -259,7 +264,7 @@ function Kiosk({ boot, token, refetch }: { boot: KioskBootstrapDTO; token: strin
         </div>
       </header>
 
-      <main className="flex flex-1 flex-col px-6 py-8 sm:px-10">
+      <main className="relative z-[1] flex flex-1 flex-col px-6 py-8 sm:px-10">
         {step.name === 'services' && (
           <ServicesStep
             services={services}
@@ -323,8 +328,9 @@ function Kiosk({ boot, token, refetch }: { boot: KioskBootstrapDTO; token: strin
           </div>
         )}
       </main>
-      {config.footerText && <footer className="px-6 pb-6 text-center text-[1.05em] font-medium opacity-75 sm:px-10">{config.footerText}</footer>}
-      {idle && <IdleScreen tenant={tenant} config={config} onWake={() => setIdle(false)} />}
+      {config.footerText && <footer className="relative z-[1] px-6 pb-6 text-center text-[1.05em] font-medium opacity-75 sm:px-10">{config.footerText}</footer>}
+      {idle && <IdleScreen tenant={tenant} config={config} playlist={boot.idlePlaylist} onWake={() => setIdle(false)} />}
+      <OverlayLayer overlays={config.overlays} layer="front" fixed />
     </div>
   );
 }
@@ -332,8 +338,24 @@ function Kiosk({ boot, token, refetch }: { boot: KioskBootstrapDTO; token: strin
 const LOGO_SIZES: Record<KioskTheme['logoSize'], string> = { sm: 'h-10', md: 'h-12 sm:h-16', lg: 'h-20 sm:h-24', xl: 'h-28 sm:h-36' };
 const LOGO_TEXT_SIZES: Record<KioskTheme['logoSize'], string> = { sm: 'text-xl', md: 'text-2xl', lg: 'text-3xl', xl: 'text-5xl' };
 
-/** Pantalla de espera: logo, hora y un mensaje. Se cierra al tocar. */
-function IdleScreen({ tenant, config, onWake }: { tenant: KioskBootstrapDTO['tenant']; config: KioskBootstrapDTO['kiosk']['config']; onWake: () => void }) {
+// Completo sin recortar (con fondo difuminado): sirve para fotos horizontales en un tótem vertical.
+const IDLE_MEDIA = { ...defaultDisplayConfig().media, fitMode: 'contain' as const };
+
+/**
+ * Pantalla de espera: logo, hora y un mensaje, o una galería de imágenes y videos
+ * (lista de Publicidad) con el mensaje encima. Se cierra al tocar.
+ */
+function IdleScreen({
+  tenant,
+  config,
+  playlist,
+  onWake,
+}: {
+  tenant: KioskBootstrapDTO['tenant'];
+  config: KioskBootstrapDTO['kiosk']['config'];
+  playlist: KioskBootstrapDTO['idlePlaylist'];
+  onWake: () => void;
+}) {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -341,6 +363,28 @@ function IdleScreen({ tenant, config, onWake }: { tenant: KioskBootstrapDTO['ten
   }, []);
   const locale = tenant.locale === 'pt' ? 'pt-BR' : tenant.locale;
   const tz = tenant.timezone && tenant.timezone !== 'UTC' ? tenant.timezone : undefined;
+  const time = now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', timeZone: tz });
+  const media = config.idle.mode === 'playlist' && playlist && playlist.items.length > 0 ? playlist : null;
+  const message = (
+    <p className="gc-breathe rounded-full px-10 py-5 text-[1.8em] font-bold shadow-xl" style={buttonColors(config.theme, config.theme.buttonBackground, config.theme.buttonText)}>
+      {config.idle.title}
+    </p>
+  );
+
+  if (media) {
+    return (
+      <button type="button" onClick={onWake} className="gc-fade-in absolute inset-0 z-20 block overflow-hidden bg-black text-left" aria-label={config.idle.title}>
+        <MediaPlayer items={media.items} settings={{ ...IDLE_MEDIA, muted: !config.idle.sound }} className="absolute inset-0" />
+        {config.idle.showClock && (
+          <span className="absolute top-6 right-6 rounded-2xl bg-black/45 px-5 py-2 text-[2.2em] leading-none font-black text-white tabular-nums backdrop-blur-sm">
+            {time}
+          </span>
+        )}
+        {config.idle.showMessage && <span className="absolute inset-x-0 bottom-[6vh] flex justify-center px-6">{message}</span>}
+      </button>
+    );
+  }
+
   return (
     <button
       type="button"
@@ -353,12 +397,8 @@ function IdleScreen({ tenant, config, onWake }: { tenant: KioskBootstrapDTO['ten
       ) : (
         <p className="text-[4em] font-extrabold">{tenant.branding.appName}</p>
       )}
-      {config.idle.showClock && (
-        <p className="text-[5em] leading-none font-black tabular-nums">{now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', timeZone: tz })}</p>
-      )}
-      <p className="gc-breathe rounded-full px-10 py-5 text-[1.8em] font-bold shadow-xl" style={buttonColors(config.theme, config.theme.buttonBackground, config.theme.buttonText)}>
-        {config.idle.title}
-      </p>
+      {config.idle.showClock && <p className="text-[5em] leading-none font-black tabular-nums">{time}</p>}
+      {message}
     </button>
   );
 }
@@ -447,8 +487,11 @@ function ServicesStep({
               <div className={cx('grid gap-5', columns)}>
                 {group.services.map((service) => {
                   const theme = config.theme;
-                  const tile = theme.buttonStyle === 'tile';
+                  // El mosaico siempre lleva el ícono arriba; en los demás estilos se elige la ubicación.
+                  const tile = theme.buttonStyle === 'tile' || theme.iconPosition === 'top';
                   const size = SIZES[theme.buttonSize];
+                  const [box, glyph] = (tile ? TOP_ICON : ROW_ICON)[theme.iconSize];
+                  const image = isImageIcon(service.icon);
                   const colors = theme.serviceColors ? buttonColors(theme, service.color) : buttonColors(theme, theme.buttonBackground, theme.buttonText);
                   return (
                     <button
@@ -458,16 +501,18 @@ function ServicesStep({
                       className={cx(
                         'group relative flex shadow-lg transition active:scale-[0.98] hover:brightness-110',
                         shapeClass(theme),
-                        tile ? cx('flex-col items-center justify-center gap-4 px-6 py-8 text-center', size.tile) : cx('items-center gap-5 px-7 py-6 text-left', size.row),
+                        tile
+                          ? cx('flex-col items-center justify-center gap-4 px-6 py-8 text-center', size.tile)
+                          : cx('items-center gap-5 px-7 py-6', theme.iconPosition === 'right' ? 'flex-row-reverse text-right' : 'text-left', size.row),
                       )}
                       style={colors}
                     >
                       {theme.showIcons && (
                         <span
-                          className={cx('grid shrink-0 place-items-center rounded-2xl shadow-sm', tile ? size.tileIcon : size.icon)}
+                          className={cx('grid shrink-0 place-items-center overflow-hidden rounded-2xl shadow-sm', box, image && 'p-1.5')}
                           style={theme.serviceColors || theme.buttonStyle === 'outline' ? { background: 'rgb(255 255 255 / 0.9)', color: service.color } : { background: '#ffffff', color: service.color }}
                         >
-                          <ServiceIcon name={service.icon} className={tile ? 'size-12' : 'size-8'} />
+                          <ServiceIcon name={service.icon} className={image ? 'size-full' : glyph} />
                         </span>
                       )}
                       <span className={cx('min-w-0', !tile && 'flex-1')}>
@@ -493,10 +538,24 @@ function ServicesStep({
   );
 }
 
-const SIZES: Record<KioskTheme['buttonSize'], { row: string; tile: string; icon: string; tileIcon: string; text: string }> = {
-  md: { row: 'min-h-24', tile: 'min-h-44', icon: 'size-14', tileIcon: 'size-20', text: '1.3em' },
-  lg: { row: 'min-h-32', tile: 'min-h-56', icon: 'size-16', tileIcon: 'size-24', text: '1.5em' },
-  xl: { row: 'min-h-40', tile: 'min-h-72', icon: 'size-20', tileIcon: 'size-28', text: '1.85em' },
+const SIZES: Record<KioskTheme['buttonSize'], { row: string; tile: string; text: string }> = {
+  md: { row: 'min-h-24', tile: 'min-h-44', text: '1.3em' },
+  lg: { row: 'min-h-32', tile: 'min-h-56', text: '1.5em' },
+  xl: { row: 'min-h-40', tile: 'min-h-72', text: '1.85em' },
+};
+
+/** Tamaño de la caja del ícono y del dibujo, al costado del texto o arriba. */
+const ROW_ICON: Record<KioskTheme['iconSize'], [string, string]> = {
+  sm: ['size-12', 'size-6'],
+  md: ['size-16', 'size-8'],
+  lg: ['size-20', 'size-11'],
+  xl: ['size-28', 'size-16'],
+};
+const TOP_ICON: Record<KioskTheme['iconSize'], [string, string]> = {
+  sm: ['size-16', 'size-8'],
+  md: ['size-24', 'size-12'],
+  lg: ['size-32', 'size-16'],
+  xl: ['size-40', 'size-20'],
 };
 
 function CustomerForm({ fields, t, onSubmit, shape }: { fields: CustomerField[]; t: ReturnType<typeof translator>; onSubmit: (data: Record<string, string>) => void; shape: string }) {

@@ -31,6 +31,7 @@ import {
 import { Link } from 'react-router';
 import { CopyField } from '../../components/CopyField';
 import { ImageField } from '../../components/ImageField';
+import { OverlaysEditor } from '../../components/Overlays';
 import { QrCode } from '../../components/QrCode';
 import {
   Badge,
@@ -488,6 +489,11 @@ function DisplayEditor({ display, onClose }: { display: DisplayDTO; onClose: () 
                       </Field>
                       <RangeInput label="Redondeo de esquinas" value={config.theme.radius} min={0} max={6} step={0.25} onChange={(radius) => set({ theme: { ...config.theme, radius } })} format={(v) => (v === 0 ? 'Rectas' : `${v}`)} />
                     </div>
+                  </div>
+                </Card>
+                <Card title="Logos e íconos en pantalla" description="Agregue su logo en otra esquina, logos de convenios, un ícono o un sello, y ubíquelos donde quiera.">
+                  <div className="@container">
+                    <OverlaysEditor value={config.overlays} onChange={(overlays) => set({ overlays })} />
                   </div>
                 </Card>
                 <Field label="CSS personalizado" hint="Para ajustes avanzados. La pantalla usa la clase .gc-display.">
