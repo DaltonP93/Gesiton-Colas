@@ -41,6 +41,9 @@ const TrackingPage = lazy(() => import('./features/tracking/TrackingPage'));
 const SurveyPage = lazy(() => import('./features/survey/SurveyPage'));
 const SurveysPage = lazy(() => import('./features/admin/SurveysPage'));
 const SurveyEditorPage = lazy(() => import('./features/admin/SurveyEditorPage'));
+const BillingPage = lazy(() => import('./features/admin/BillingPage'));
+const PaymentsPage = lazy(() => import('./features/admin/PaymentsPage'));
+const PaymentPage = lazy(() => import('./features/payment/PaymentPage'));
 
 function Lazy({ children }: { children: ReactNode }) {
   return <Suspense fallback={<Loading />}>{children}</Suspense>;
@@ -142,6 +145,8 @@ export const router = createBrowserRouter([
       { path: 'reportes', element: page(<ReportsPage />, 'manager', ['reports']) },
       { path: 'encuestas', element: page(<SurveysPage />, 'manager', ['surveys']) },
       { path: 'encuestas/:id', element: page(<SurveyEditorPage />, 'admin', ['surveys']) },
+      { path: 'cobros', element: page(<PaymentsPage />, 'manager', ['payments']) },
+      { path: 'facturacion', element: page(<BillingPage />, 'admin') },
       { path: 'perfil', element: page(<ProfilePage />) },
     ],
   },
@@ -167,6 +172,14 @@ export const router = createBrowserRouter([
     element: (
       <Lazy>
         <TrackingPage />
+      </Lazy>
+    ),
+  },
+  {
+    path: '/pago/:token',
+    element: (
+      <Lazy>
+        <PaymentPage />
       </Lazy>
     ),
   },

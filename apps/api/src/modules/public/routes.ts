@@ -220,6 +220,8 @@ export const publicRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
         priorities: prios.map(toPriorityDTO),
         customerFields: [...BUILTIN_CUSTOMER_FIELDS, ...settings.customerFields],
         idlePlaylist: await idlePlaylist(tenant.id, config),
+        prices:
+          settings.payments.showPriceOnKiosk && (await ctx.modulesOf(tenant)).includes('payments') ? { currency: settings.payments.currency } : null,
       };
     },
   );

@@ -85,6 +85,7 @@ Configure una URL en **Integraciones y API → Webhooks** y elija los eventos (o
 | `ticket.transferred` | Se derivó a otro servicio |
 | `ticket.requeued` | Se devolvió a la cola |
 | `queue.reset` | Cierre de jornada de una sucursal |
+| `payment.paid` | Se acreditó el pago de un turno (en línea o en el puesto): `payment` y `ticketId` |
 | `survey.answered` | Un cliente respondió una encuesta (`survey`, `response` con NPS, calificación, comentario y respuestas, y `ticket` si vino del turno) |
 
 Formato del cuerpo (`POST`, JSON):

@@ -30,7 +30,8 @@ Se encontraron y **corrigieron** los siguientes problemas:
 ## Medidas vigentes
 
 - Contraseñas con bcrypt; enlaces, códigos, API keys y secretos de vinculación guardados como hash.
-- Contraseñas SMTP cifradas con AES-256-GCM (clave derivada de `JWT_SECRET`).
+- Contraseñas SMTP, tokens de WhatsApp/SMS y claves de las pasarelas de pago cifradas con AES-256-GCM (clave derivada de `JWT_SECRET`; si cambia `JWT_SECRET` hay que volver a cargarlas).
+- Confirmaciones de pago verificadas (firma HMAC de Stripe, tokens de PagoPar y Bancard) y limitadas a la organización dueña de la pasarela; los pagos acreditados no cambian de estado.
 - Sesiones JWT con algoritmo fijo que se invalidan al cambiar o restablecer la contraseña.
 - Rol y estado del usuario leídos de la base en cada pedido; módulos y suspensión aplicados en la API.
 - Consultas parametrizadas, protección contra inyección de fórmulas en CSV, archivos subidos con nombres generados y servidos con `CSP sandbox`.

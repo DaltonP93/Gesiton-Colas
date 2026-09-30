@@ -4,6 +4,7 @@ import {
   BellRing,
   CheckCircle2,
   Coffee,
+  CreditCard,
   Megaphone,
   Pause,
   Play,
@@ -13,7 +14,7 @@ import {
   UserX,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { BUILTIN_CUSTOMER_FIELDS, type AgentWorkstationDTO, type IssuedTicketDTO, type TicketDTO } from '@gc/shared';
+import { BUILTIN_CUSTOMER_FIELDS, MANUAL_METHODS, MANUAL_METHOD_LABELS, formatMoney, type AgentWorkstationDTO, type IssuedTicketDTO, type ManualMethod, type TicketChargeDTO, type TicketDTO } from '@gc/shared';
 import {
   Badge,
   Button,
@@ -310,6 +311,8 @@ function CurrentTicket({
           </div>
         </div>
       </div>
+
+      <ChargeBox ticketId={ticket.id} />
 
       {customer.length > 0 && (
         <dl className="mt-5 grid gap-x-6 gap-y-2 rounded-ui bg-subtle p-4 text-sm sm:grid-cols-2">
@@ -630,5 +633,54 @@ function IssueModal({ open, onClose, branchId }: { open: boolean; onClose: () =>
         </div>
       </div>
     </Modal>
+  );
+}
+
+/** Importe del turno y registro del cobro en el puesto (módulo «Pagos»). */
+function ChargeBox({ ticketId }: { ticketId: string }) {
+  const { hasModule } = useAuth();
+  const { toast } = useFeedback();
+  const qc = useQueryClient();
+  const enabled = hasModule('payments');
+  const charge = useQuery({
+    queryKey: ['ticket-charge', ticketId],
+    queryFn: () => api.get<{ charge: TicketChargeDTO | null }>(`/tickets/${ticketId}/charge`),
+    enabled,
+    refetchInterval: 10_000,
+  });
+  const [method, setMethod] = useState<ManualMethod>('cash');
+  const record = useMutation({
+    mutationFn: () => api.post<{ charge: TicketChargeDTO | null }>(`/tickets/${ticketId}/charge/manual`, { method }),
+    onSuccess: (data) => {
+      qc.setQueryData(['ticket-charge', ticketId], data);
+      toast('Cobro registrado');
+    },
+    onError: (e) => toast(errorMessage(e), 'error'),
+  });
+  const c = charge.data?.charge;
+  if (!enabled || !c) return null;
+  return (
+    <div className={cx('mt-5 flex flex-wrap items-center gap-3 rounded-ui border p-4', c.status === 'paid' ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-amber-500/40 bg-amber-500/10')}>
+      <CreditCard className={cx('size-6 shrink-0', c.status === 'paid' ? 'text-emerald-600' : 'text-amber-600')} />
+      <div className="min-w-0 flex-1">
+        <p className="text-xs text-muted">{c.status === 'paid' ? 'Pagado' : 'Pendiente de pago'}</p>
+        <p className="text-xl font-bold tabular-nums">{formatMoney(c.amount, c.currency)}</p>
+        {c.status === 'paid' && c.method && <p className="text-xs text-muted">{MANUAL_METHOD_LABELS[c.method as ManualMethod] ?? c.method}</p>}
+      </div>
+      {c.status === 'pending' && (
+        <div className="flex items-center gap-2">
+          <Select aria-label="Forma de pago" value={method} onChange={(e) => setMethod(e.target.value as ManualMethod)} className="w-40">
+            {MANUAL_METHODS.map((m) => (
+              <option key={m} value={m}>
+                {MANUAL_METHOD_LABELS[m]}
+              </option>
+            ))}
+          </Select>
+          <Button variant="secondary" loading={record.isPending} onClick={() => record.mutate()}>
+            Registrar cobro
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
