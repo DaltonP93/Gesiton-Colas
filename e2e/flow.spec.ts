@@ -91,7 +91,7 @@ test('flujo completo: registro, kiosco, llamado en pantalla y seguimiento', asyn
   // 7. Publicidad: agregar un video de YouTube a la biblioteca
   await page.goto('/app/contenido');
   await page.getByRole('button', { name: 'Desde URL' }).click();
-  await page.getByLabel('URL').fill('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+  await page.getByRole('textbox', { name: 'Enlace' }).fill('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
   await expect(page.getByText('YouTube').first()).toBeVisible();
   await page.getByRole('button', { name: 'Agregar a la biblioteca' }).click();
   await expect(page.getByText('YouTube dQw4w9WgXcQ', { exact: true })).toBeVisible();
