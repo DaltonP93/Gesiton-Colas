@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MEDIA_GUIDES,
+  guideForProvider,
+  mediaUrlHint,
   LEGAL_TEMPLATES,
   LEGAL_VARIABLES,
   LICENSE_VARIABLES,
@@ -304,5 +307,26 @@ describe('documentos legales', () => {
     expect(defaultPrivacyNotice('Clínica Sur', { ...privacy, retentionDays: 45 })).toContain('a los 45 días');
     expect(defaultPrivacyNotice('Clínica Sur', privacy)).toContain('Se conservan solo mientras sean necesarios');
     expect(defaultPrivacyNotice('Clínica Sur', privacy)).toMatch(/borrado de sus datos a Clínica Sur\.$/);
+  });
+});
+
+describe('guía de plataformas de medios', () => {
+  it('cada plataforma que se detecta tiene su guía', () => {
+    for (const url of ['https://youtu.be/abc123def45', 'https://vimeo.com/123456', 'https://www.tiktok.com/@a/video/123', 'https://www.instagram.com/reel/ABC/', 'https://drive.google.com/file/d/ID/view', 'https://x.com/v.mp4', 'https://x.com/i.png', 'https://x.com/a.mp3', 'https://suempresa.com/tablero', 'https://x.com/live/index.m3u8']) {
+      const d = detectMedia(url)!;
+      expect(guideForProvider(d.provider, d.kind), url).toBeDefined();
+    }
+    expect(new Set(MEDIA_GUIDES.map((g) => g.id)).size).toBe(MEDIA_GUIDES.length);
+  });
+
+  it('avisa los enlaces que no sirven tal como están', () => {
+    expect(mediaUrlHint('https://vm.tiktok.com/ZMabc/')?.guide).toBe('tiktok');
+    expect(mediaUrlHint('https://www.instagram.com/cuenta/')?.warning).toContain('publicación o un reel');
+    expect(mediaUrlHint('https://www.youtube.com/@canal')?.warning).toContain('canal');
+    expect(mediaUrlHint('https://drive.google.com/drive/folders/ABC')?.guide).toBe('google-drive');
+    expect(mediaUrlHint('http://tablero.local/', 'https:')?.warning).toContain('http://');
+    expect(mediaUrlHint('http://tablero.local/', 'http:')).toBeNull();
+    expect(mediaUrlHint('https://www.youtube.com/watch?v=abc123def45')).toBeNull();
+    expect(mediaUrlHint('no es una url')).toBeNull();
   });
 });
