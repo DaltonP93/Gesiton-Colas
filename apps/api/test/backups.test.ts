@@ -101,6 +101,8 @@ describe('copias de seguridad', () => {
     const url = new URL(DB_URL);
     url.pathname = `/${SCRATCH}`;
     const uploads = mkdtempSync(path.join(os.tmpdir(), 'gc-restored-'));
+    // Un archivo posterior a la copia: después de restaurar no debe quedar.
+    writeFileSync(path.join(uploads, 'posterior.txt'), 'no estaba en la copia');
     const config = { ...app.ctx.config, DATABASE_URL: url.toString(), UPLOAD_DIR: uploads };
     const scratch = new pg.Pool({ connectionString: url.toString(), max: 1 });
     try {
@@ -113,6 +115,7 @@ describe('copias de seguridad', () => {
       // El listado de copias no viaja dentro de la copia.
       expect((await scratch.query('SELECT count(*)::int AS n FROM backups')).rows[0].n).toBe(0);
       expect(existsSync(path.join(uploads, 'logo.txt'))).toBe(true);
+      expect(existsSync(path.join(uploads, 'posterior.txt'))).toBe(false);
       // Restaurar de nuevo sobre la misma base también funciona.
       await restoreBackupArchive(config, path.join(dir, file), () => undefined);
       expect((await scratch.query("SELECT count(*)::int AS n FROM tenants WHERE name = 'Copias SA'")).rows[0].n).toBe(1);

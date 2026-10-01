@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { appointments, tickets } from '../src/db/schema';
+import { appointments, auditLogs, tickets } from '../src/db/schema';
 import { addDays, dayInTimezone, localToUtc } from '../src/lib/tz';
 import { api, createTestApp, registerTenant, type TenantSession } from './helpers';
 
@@ -156,10 +156,19 @@ describe('módulo de citas', () => {
       `${d}/${m}/${y};08:30;1.111.111;Carlos Gómez;0981222333;${services[0]!.name};${branch.code};E-1;Dr. Acosta`,
       `${day};9:00;2222222;Sofía Díaz;;${services[1]!.prefix};Casa central;E-2;`,
       `${day};25:00;3333333;Hora mala;;${services[0]!.name};${branch.code};E-3;`,
+      // Fecha que no existe (no debe pasar al 3 de marzo).
+      `31/02/2026;10:00;4444444;Fecha imposible;;${services[0]!.name};${branch.code};E-4;`,
     ].join('\n');
     const result = await api(app, org, 'POST', '/appointments/import', { csv });
     expect(result.status).toBe(200);
-    expect(result.body).toMatchObject({ created: 2, updated: 0, errors: [{ line: 4, message: 'Fecha u hora inválida' }] });
+    expect(result.body).toMatchObject({
+      created: 2,
+      updated: 0,
+      errors: [
+        { line: 4, message: 'Fecha u hora inválida' },
+        { line: 5, message: 'Fecha u hora inválida' },
+      ],
+    });
     const again = await api(app, org, 'POST', '/appointments/import', { csv });
     expect(again.body).toMatchObject({ created: 0, updated: 2 });
     const list = await api(app, org, 'GET', `/appointments?from=${day}&to=${day}`);
@@ -244,5 +253,16 @@ describe('módulo de citas', () => {
     expect(erased.body.appointments).toBe(1);
     const after = await api(app, org, 'GET', `/appointments/${appt.body.id}`);
     expect(after.body.customer).toEqual({});
+
+    // La auditoría no guarda el documento que se pidió borrar ni los datos del cliente de las citas.
+    await new Promise((r) => setTimeout(r, 100));
+    const logs = await app.ctx.db.select().from(auditLogs).where(eq(auditLogs.tenantId, org.tenantId));
+    const erase = logs.find((l) => l.action === 'privacy.erase');
+    expect(erase?.changes).toEqual({ field: 'document' });
+    const created = logs.filter((l) => l.action === 'appointment.create');
+    expect(created.length).toBeGreaterThan(0);
+    for (const l of created) expect((l.changes as { customer?: unknown }).customer).toBe('(datos personales omitidos)');
+    expect(JSON.stringify(logs.map((l) => l.changes))).not.toContain('9191919');
+    expect(JSON.stringify(logs.map((l) => l.changes))).not.toContain('9.191.919');
   });
 });

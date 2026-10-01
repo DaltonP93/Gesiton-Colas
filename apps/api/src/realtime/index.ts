@@ -1,5 +1,5 @@
 import type { Server as HttpServer } from 'node:http';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { Server, type Socket } from 'socket.io';
 import { hasRole } from '@gc/shared';
 import type { FastifyBaseLogger } from 'fastify';
@@ -64,7 +64,12 @@ export class Realtime {
       const heartbeat = setInterval(touch, 60_000);
       socket.on('disconnect', () => {
         clearInterval(heartbeat);
-        void touch();
+        // La hora de la desconexión no es señal de vida: si ya se avisó que se cortó, no la cuenta como «volvió».
+        void this.db
+          .update(displays)
+          .set({ lastSeenAt: new Date() })
+          .where(and(eq(displays.id, display.id), isNull(displays.offlineAlertedAt)))
+          .catch(() => undefined);
       });
       socket.emit('ready', { kind: 'display', id: display.id });
       return;
@@ -80,7 +85,11 @@ export class Realtime {
       const heartbeat = setInterval(touch, 60_000);
       socket.on('disconnect', () => {
         clearInterval(heartbeat);
-        void touch();
+        void this.db
+          .update(kiosks)
+          .set({ lastSeenAt: new Date() })
+          .where(and(eq(kiosks.id, kiosk.id), isNull(kiosks.offlineAlertedAt)))
+          .catch(() => undefined);
       });
       socket.emit('ready', { kind: 'kiosk', id: kiosk.id });
       return;

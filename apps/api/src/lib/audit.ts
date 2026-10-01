@@ -21,6 +21,9 @@ export interface AuditEntry {
 /* ------------------------------------------------------------------ */
 
 const SECRET_KEY = /pass(word)?|secret|token|api[-_]?key|private|^key$|csc|cert|p12|pfx|webhookSecret|authorization/i;
+/** Datos de clientes (citas, facturas, importaciones): no se guardan en la auditoría, que dura más que el plazo de conservación. */
+const PERSONAL_KEY = /^(customer|receiver|csv)$/;
+export const PERSONAL_OMITTED = '(datos personales omitidos)';
 
 /** Copia de los datos enviados sin contraseñas ni claves, con textos y listas acotados. */
 export function sanitize(value: unknown, depth = 0): unknown {
@@ -35,6 +38,7 @@ export function sanitize(value: unknown, depth = 0): unknown {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
     if (SECRET_KEY.test(k)) out[k] = v === '' || v === null || v === undefined ? v : '••••';
+    else if (PERSONAL_KEY.test(k)) out[k] = v === null || v === undefined ? v : PERSONAL_OMITTED;
     else out[k] = sanitize(v, depth + 1);
   }
   return out;
@@ -248,7 +252,9 @@ export class Audit {
         }
         // Las acciones de la plataforma sobre una organización también se ven en esa organización.
         const tenantId = route.startsWith('/platform/tenants/:id') ? (params.id ?? null) : route.startsWith('/platform') ? null : who.tenantId;
-        this.record({ ...who, tenantId, action: meta.action, entity: meta.entity, entityId: params.id ?? createdId, summary, changes: body });
+        // Borrado a pedido: no se guarda el dato que se pidió borrar (solo qué tipo de dato).
+        const changes = key === 'POST /privacy/erase' ? { field: body?.field ?? null } : body;
+        this.record({ ...who, tenantId, action: meta.action, entity: meta.entity, entityId: params.id ?? createdId, summary, changes });
       } catch (error) {
         this.log.error({ err: error }, 'auditoría: error en el registro automático');
       }

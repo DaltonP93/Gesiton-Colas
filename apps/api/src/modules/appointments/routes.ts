@@ -136,8 +136,10 @@ function parseDay(value: string): string | null {
   const dmy = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(value);
   const [y, m, d] = iso ? [iso[1], iso[2], iso[3]] : dmy ? [dmy[3], dmy[2], dmy[1]] : [];
   if (!y || !m || !d) return null;
-  const out = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-  return Number.isNaN(Date.parse(`${out}T00:00:00Z`)) ? null : out;
+  // Date normaliza fechas imposibles (31/02 → 03/03): se exige que el día exista.
+  const date = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d)));
+  if (date.getUTCFullYear() !== Number(y) || date.getUTCMonth() !== Number(m) - 1 || date.getUTCDate() !== Number(d)) return null;
+  return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
 }
 
 function parseTime(value: string): number | null {

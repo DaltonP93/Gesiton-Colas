@@ -1,5 +1,7 @@
+import type { AddressInfo } from 'node:net';
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
+import { io as ioClient } from 'socket.io-client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { displays } from '../src/db/schema';
 import { withinAlertWindow } from '../src/lib/deviceMonitor';
@@ -77,5 +79,43 @@ describe('alertas de equipos desconectados', () => {
     const test = await api(app, org, 'POST', '/alerts/devices/test');
     expect(test.status).toBe(200);
     expect(alertsTo('soporte@equipos.test')).toHaveLength(1);
+  });
+});
+
+describe('desconexión del equipo', () => {
+  it('la hora de la desconexión no cuenta como que volvió', async () => {
+    const rtApp = await createTestApp();
+    await rtApp.listen({ port: 0, host: '127.0.0.1' });
+    const port = (rtApp.server.address() as AddressInfo).port;
+    try {
+      const session = await registerTenant(rtApp, 'Equipos Socket');
+      const display = (await api(rtApp, session, 'GET', '/displays')).body[0];
+      const connect = () => {
+        const socket = ioClient(`http://127.0.0.1:${port}`, { auth: { kind: 'display', token: display.token }, transports: ['websocket'] });
+        return new Promise<typeof socket>((resolve, reject) => {
+          socket.on('ready', () => resolve(socket));
+          socket.on('connect_error', reject);
+        });
+      };
+      const lastSeen = async () => (await rtApp.ctx.db.select({ at: displays.lastSeenAt }).from(displays).where(eq(displays.id, display.id)))[0]!.at!;
+
+      // Sin alerta previa, la desconexión actualiza «visto por última vez».
+      let socket = await connect();
+      const old = new Date(Date.now() - 10 * 60_000);
+      await rtApp.ctx.db.update(displays).set({ lastSeenAt: old, offlineAlertedAt: null }).where(eq(displays.id, display.id));
+      socket.disconnect();
+      await new Promise((r) => setTimeout(r, 300));
+      expect((await lastSeen()).getTime()).toBeGreaterThan(old.getTime());
+
+      // Ya avisada como desconectada: la desconexión tardía no la marca como recuperada.
+      socket = await connect();
+      const alerted = new Date(Date.now() - 60_000);
+      await rtApp.ctx.db.update(displays).set({ lastSeenAt: old, offlineAlertedAt: alerted }).where(eq(displays.id, display.id));
+      socket.disconnect();
+      await new Promise((r) => setTimeout(r, 300));
+      expect((await lastSeen()).getTime()).toBe(old.getTime());
+    } finally {
+      await rtApp.close();
+    }
   });
 });

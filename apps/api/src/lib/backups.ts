@@ -125,8 +125,12 @@ export async function restoreBackupArchive(config: AppConfig, archive: string, l
     await run(bin(config, 'psql'), ['--no-psqlrc', '--quiet', '-v', 'ON_ERROR_STOP=1', '--single-transaction', '-f', path.join(work, 'reset.sql'), '-f', path.join(work, 'restore.sql')], env);
     if (manifest.uploads && existsSync(path.join(work, manifest.uploads))) {
       log('Restaurando los archivos subidos…');
-      await mkdir(path.resolve(config.UPLOAD_DIR), { recursive: true });
-      await cp(path.join(work, manifest.uploads), path.resolve(config.UPLOAD_DIR), { recursive: true, force: true });
+      const uploads = path.resolve(config.UPLOAD_DIR);
+      await mkdir(uploads, { recursive: true });
+      // Se vacía primero (sin borrar la carpeta: suele ser un volumen montado) para que no queden
+      // archivos posteriores a la copia, cuyos registros ya no existen en la base restaurada.
+      for (const entry of await readdir(uploads)) await rm(path.join(uploads, entry), { recursive: true, force: true });
+      await cp(path.join(work, manifest.uploads), uploads, { recursive: true, force: true });
     }
     return { createdAt: manifest.createdAt ?? null, uploads: Boolean(manifest.uploads) };
   } finally {
