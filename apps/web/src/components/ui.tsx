@@ -1,4 +1,4 @@
-import { Loader2, X } from 'lucide-react';
+import { EllipsisVertical, Loader2, X } from 'lucide-react';
 import {
   createContext,
   forwardRef,
@@ -401,6 +401,63 @@ export function Tabs<T extends string>({
           {t.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+export interface MenuItem {
+  label: ReactNode;
+  icon?: ReactNode;
+  onSelect: () => void;
+  danger?: boolean;
+  disabled?: boolean;
+}
+
+/** Botón «más acciones» con un menú desplegable (se cierra al elegir, al tocar afuera o con Escape). */
+export function Menu({ items, label = 'Más acciones', align = 'right' }: { items: (MenuItem | false | null | undefined)[]; label?: string; align?: 'left' | 'right' }) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const visible = items.filter((i): i is MenuItem => Boolean(i));
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent | TouchEvent) => !root.current?.contains(e.target as Node) && setOpen(false);
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('touchstart', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('touchstart', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+  if (!visible.length) return null;
+  return (
+    <div ref={root} className="relative">
+      <IconButton label={label} aria-haspopup="menu" aria-expanded={open} icon={<EllipsisVertical className="size-4" />} onClick={() => setOpen((o) => !o)} />
+      {open && (
+        <div role="menu" className={cx('gc-fade-in absolute top-full z-40 mt-1 min-w-52 rounded-ui border border-border bg-surface p-1 shadow-xl', align === 'right' ? 'right-0' : 'left-0')}>
+          {visible.map((item, i) => (
+            <button
+              key={i}
+              type="button"
+              role="menuitem"
+              disabled={item.disabled}
+              onClick={() => {
+                setOpen(false);
+                item.onSelect();
+              }}
+              className={cx(
+                'flex w-full items-center gap-2 rounded-[calc(var(--gc-radius)-4px)] px-3 py-2 text-left text-sm hover:bg-subtle disabled:opacity-50 [&_svg]:size-4',
+                item.danger && 'text-red-600',
+              )}
+            >
+              {item.icon}
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

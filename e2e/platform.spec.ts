@@ -74,8 +74,8 @@ test('crea una organización con invitación y agrega superadministradores', asy
   await expect(invited).toHaveURL(/\/app/);
   await invited.context().close();
 
-  // El uso de la organización se ve en la tabla y sus usuarios se pueden administrar.
-  const row = page.getByRole('row', { name: /Clínica Invitada/ });
+  // El uso de la organización se ve en la lista y sus usuarios se pueden administrar.
+  const row = page.getByRole('listitem').filter({ hasText: 'Clínica Invitada' });
   await expect(row).toBeVisible();
   await row.getByRole('button', { name: 'Usuarios' }).click();
   await expect(page.getByRole('dialog').getByText(adminEmail)).toBeVisible();
