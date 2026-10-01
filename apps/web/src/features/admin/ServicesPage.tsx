@@ -1,6 +1,6 @@
 import { ClipboardList, FolderTree, Pencil, Plus, Star, Trash2 } from 'lucide-react';
 import { useId, useState, type FormEvent, type ReactNode } from 'react';
-import type { DepartmentDTO, PriorityDTO, ServiceDTO } from '@gc/shared';
+import { CURRENCY_DECIMALS, fromMinor, toMinor, type Currency, type DepartmentDTO, type PriorityDTO, type ServiceDTO } from '@gc/shared';
 import { IconPicker } from '../../components/IconPicker';
 import { ServiceIcon } from '../../components/ServiceIcon';
 import {
@@ -165,6 +165,8 @@ interface ServiceForm {
   estimatedMinutes: string;
   sortOrder: string;
   active: boolean;
+  /** Precio en la unidad principal (vacío = sin cobro). */
+  price: string;
 }
 
 function serviceForm(s: ServiceDTO | null, nextOrder: number): ServiceForm {
@@ -179,6 +181,7 @@ function serviceForm(s: ServiceDTO | null, nextOrder: number): ServiceForm {
     estimatedMinutes: String(s?.estimatedMinutes ?? 5),
     sortOrder: String(s?.sortOrder ?? nextOrder),
     active: s?.active ?? true,
+    price: '',
   };
 }
 
@@ -278,10 +281,13 @@ function ServicesTab() {
 }
 
 function ServiceFormModal({ initial, departments, onClose }: { initial: ServiceForm; departments: DepartmentDTO[]; onClose: () => void }) {
-  const { terms, settings } = useAuth();
+  const { terms, settings, hasModule } = useAuth();
+  const currency = settings.payments.currency;
   const { toast } = useFeedback();
   const save = useSave<ServiceDTO>('services', ['services', 'branches']);
-  const [form, setForm] = useState(initial);
+  const services = useServices();
+  const current = services.data?.find((x) => x.id === initial.id);
+  const [form, setForm] = useState(() => ({ ...initial, price: current?.price ? String(fromMinor(current.price, currency)) : '' }));
   const formId = useId();
   const isNew = !form.id;
   const set = <K extends keyof ServiceForm>(key: K, value: ServiceForm[K]) => setForm((f) => ({ ...f, [key]: value }));
@@ -301,6 +307,7 @@ function ServiceFormModal({ initial, departments, onClose }: { initial: ServiceF
         estimatedMinutes: Math.min(600, Math.max(1, toInt(form.estimatedMinutes, 5))),
         sortOrder: toInt(form.sortOrder, 0),
         active: form.active,
+        ...(hasModule('payments') ? { price: parsePrice(form.price, currency) } : {}),
       });
       toast(isNew ? `Se creó «${form.name.trim()}».` : 'Cambios guardados.');
       onClose();
@@ -363,6 +370,18 @@ function ServiceFormModal({ initial, departments, onClose }: { initial: ServiceF
           </span>
           <IconPicker value={form.icon} onChange={(icon) => set('icon', icon)} labelledBy={`${formId}-icon`} />
         </div>
+
+        {hasModule('payments') && (
+          <Field label={`Precio (${currency})`} hint="Vacío o 0 = sin cobro. Con precio, el cliente puede pagar en línea o en el puesto.">
+            <Input
+              inputMode="decimal"
+              className="max-w-52"
+              value={form.price}
+              onChange={(e) => set('price', e.target.value)}
+              placeholder="50.000"
+            />
+          </Field>
+        )}
 
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Minutos estimados" hint="Promedio por atención; se usa para estimar la espera.">
@@ -682,4 +701,11 @@ function PriorityFormModal({ initial, onClose }: { initial: PriorityForm; onClos
       </form>
     </FormModal>
   );
+}
+
+/** «50.000» (guaraníes) o «12,50» / «12.50» → unidad mínima de la moneda; vacío o 0 = sin precio. */
+function parsePrice(text: string, currency: Currency): number | null {
+  const clean = CURRENCY_DECIMALS[currency] === 0 ? text.replace(/\D/g, '') : text.replace(/[^\d.,]/g, '').replace(/[.,](?=\d{3}(\D|$))/g, '').replace(',', '.');
+  const value = Number(clean);
+  return clean && Number.isFinite(value) && value > 0 ? toMinor(value, currency) : null;
 }

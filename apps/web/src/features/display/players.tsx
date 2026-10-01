@@ -288,6 +288,15 @@ export function VimeoPlayer({ media, volume, muted, onEnded, onError }: PlayerPr
 /* Contenido embebido: TikTok, Instagram, Canva, Slides, web...        */
 /* ------------------------------------------------------------------ */
 
+/** Contenido del mismo origen que la aplicación: se aísla por completo (sin acceso a la sesión). */
+function sameOrigin(src: string) {
+  try {
+    return new URL(src, window.location.href).origin === window.location.origin;
+  } catch {
+    return true;
+  }
+}
+
 export function EmbedPlayer({ media }: PlayerProps) {
   const src = (media.embedUrl ?? media.url).replace(/\{\{host\}\}/g, window.location.hostname);
   return (
@@ -296,7 +305,7 @@ export function EmbedPlayer({ media }: PlayerProps) {
       title={media.name}
       allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
       // Sin allow-top-navigation: el contenido no puede sacar a la pantalla de la página.
-      sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"
+      sandbox={sameOrigin(src) ? 'allow-scripts allow-presentation' : 'allow-scripts allow-same-origin allow-presentation allow-popups'}
       referrerPolicy="strict-origin-when-cross-origin"
       className="absolute inset-0 size-full border-0 bg-white"
     />

@@ -3,7 +3,8 @@ import { createBrowserRouter, Navigate, useLocation, useSearchParams } from 'rea
 import { Loading } from './components/ui';
 import { useAuth } from './lib/auth';
 import { usePublicConfig } from './lib/queries';
-import type { Role } from '@gc/shared';
+import { MODULES, type ModuleId, type Role } from '@gc/shared';
+import { ModuleOff } from './components/ModuleOff';
 import { AdminLayout } from './features/admin/AdminLayout';
 import {
   AcceptInvitePage,
@@ -37,6 +38,12 @@ const AgentConsole = lazy(() => import('./features/agent/AgentConsole'));
 const DisplayPage = lazy(() => import('./features/display/DisplayPage'));
 const KioskPage = lazy(() => import('./features/kiosk/KioskPage'));
 const TrackingPage = lazy(() => import('./features/tracking/TrackingPage'));
+const SurveyPage = lazy(() => import('./features/survey/SurveyPage'));
+const SurveysPage = lazy(() => import('./features/admin/SurveysPage'));
+const SurveyEditorPage = lazy(() => import('./features/admin/SurveyEditorPage'));
+const BillingPage = lazy(() => import('./features/admin/BillingPage'));
+const PaymentsPage = lazy(() => import('./features/admin/PaymentsPage'));
+const PaymentPage = lazy(() => import('./features/payment/PaymentPage'));
 
 function Lazy({ children }: { children: ReactNode }) {
   return <Suspense fallback={<Loading />}>{children}</Suspense>;
@@ -77,9 +84,16 @@ function LegacyConfig({ section }: { section?: string }) {
   return <Navigate to={`/app/configuracion/${target}`} replace />;
 }
 
-const page = (el: ReactNode, role?: Role) => (
+/** Muestra la página solo si la organización tiene alguno de los módulos activos. */
+function RequireModule({ modules, children }: { modules: ModuleId[]; children: ReactNode }) {
+  const { hasModule } = useAuth();
+  if (modules.some(hasModule)) return <>{children}</>;
+  return <ModuleOff name={modules.map((m) => MODULES[m].name).join(' / ')} />;
+}
+
+const page = (el: ReactNode, role?: Role, modules?: ModuleId[]) => (
   <RequireAuth role={role}>
-    <Lazy>{el}</Lazy>
+    <Lazy>{modules ? <RequireModule modules={modules}>{el}</RequireModule> : el}</Lazy>
   </RequireAuth>
 );
 
@@ -111,9 +125,9 @@ export const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: page(<PortalPage />) },
-      { path: 'resumen', element: page(<DashboardPage />, 'manager') },
-      { path: 'vincular', element: page(<PairDevicePage />, 'manager') },
-      { path: 'sonidos', element: page(<SoundsPage />, 'manager') },
+      { path: 'resumen', element: page(<DashboardPage />, 'manager', ['reports']) },
+      { path: 'vincular', element: page(<PairDevicePage />, 'manager', ['displays', 'kiosks']) },
+      { path: 'sonidos', element: page(<SoundsPage />, 'manager', ['displays']) },
       { path: 'atencion', element: page(<AgentConsole />) },
       { path: 'monitor', element: page(<MonitorPage />, 'manager') },
       { path: 'configuracion', element: page(<ConfigurationPage />, 'admin') },
@@ -124,11 +138,15 @@ export const router = createBrowserRouter([
       { path: 'usuarios', element: <LegacyConfig section="usuarios" /> },
       { path: 'integraciones', element: <LegacyConfig section="integraciones" /> },
       { path: 'personalizacion', element: <LegacyConfig /> },
-      { path: 'pantallas', element: page(<DisplaysPage />, 'manager') },
-      { path: 'kioscos', element: page(<KiosksPage />, 'manager') },
-      { path: 'contenido', element: page(<MediaPage />, 'manager') },
-      { path: 'listas', element: page(<PlaylistsPage />, 'manager') },
-      { path: 'reportes', element: page(<ReportsPage />, 'manager') },
+      { path: 'pantallas', element: page(<DisplaysPage />, 'manager', ['displays']) },
+      { path: 'kioscos', element: page(<KiosksPage />, 'manager', ['kiosks']) },
+      { path: 'contenido', element: page(<MediaPage />, 'manager', ['advertising']) },
+      { path: 'listas', element: page(<PlaylistsPage />, 'manager', ['advertising']) },
+      { path: 'reportes', element: page(<ReportsPage />, 'manager', ['reports']) },
+      { path: 'encuestas', element: page(<SurveysPage />, 'manager', ['surveys']) },
+      { path: 'encuestas/:id', element: page(<SurveyEditorPage />, 'admin', ['surveys']) },
+      { path: 'cobros', element: page(<PaymentsPage />, 'manager', ['payments']) },
+      { path: 'facturacion', element: page(<BillingPage />, 'admin') },
       { path: 'perfil', element: page(<ProfilePage />) },
     ],
   },
@@ -154,6 +172,30 @@ export const router = createBrowserRouter([
     element: (
       <Lazy>
         <TrackingPage />
+      </Lazy>
+    ),
+  },
+  {
+    path: '/pago/:token',
+    element: (
+      <Lazy>
+        <PaymentPage />
+      </Lazy>
+    ),
+  },
+  {
+    path: '/encuesta/:token',
+    element: (
+      <Lazy>
+        <SurveyPage />
+      </Lazy>
+    ),
+  },
+  {
+    path: '/encuesta/s/:token',
+    element: (
+      <Lazy>
+        <SurveyPage general />
       </Lazy>
     ),
   },

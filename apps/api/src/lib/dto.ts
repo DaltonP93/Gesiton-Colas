@@ -52,9 +52,11 @@ export function toTenantDTO(t: Tenant): TenantDTO {
     name: t.name,
     plan: t.plan,
     status: t.status,
+    suspendedReason: t.status === 'suspended' ? (t.suspendedReason ?? 'manual') : null,
     settings: tenantSettings(t),
     isDemo: t.isDemo,
     demoExpiresAt: iso(t.demoExpiresAt),
+    moduleOverrides: t.modules ?? {},
     createdAt: t.createdAt.toISOString(),
   };
 }
@@ -109,6 +111,7 @@ export const toServiceDTO = (s: Service): ServiceDTO => ({
   active: s.active,
   sortOrder: s.sortOrder,
   estimatedMinutes: s.estimatedMinutes,
+  price: s.price ?? null,
 });
 
 export const toPriorityDTO = (p: Priority): PriorityDTO => ({

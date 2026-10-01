@@ -115,11 +115,15 @@ export async function testMailSettings(ctx: AppContext, scope: string, body: z.i
   let password = body.password;
   if (password === undefined) {
     const current = await loadRow(ctx, scope);
+    // La contraseña guardada solo se usa con el mismo servidor y usuario: no se puede «enviar» a otro host.
+    if (current?.passwordEnc && (current.host !== body.host || current.port !== body.port || current.username !== body.username)) {
+      throw badRequest('Cambió el servidor, el puerto o el usuario: escriba la contraseña para probar.');
+    }
     password = current ? (decryptSecret(ctx.config.JWT_SECRET, current.passwordEnc, 'smtp') ?? '') : '';
   }
   const smtp: SmtpConfig = { ...body, password };
   try {
-    await ctx.mailer.test(smtp, testMail(body.to, `${body.host}:${body.port}`, brand));
+    await ctx.mailer.test(smtp, testMail(body.to, `${body.host}:${body.port}`, brand), { publicOnly: scope !== PLATFORM_MAIL_SCOPE });
   } catch (error) {
     if (error instanceof MailError) throw badRequest(error.detail);
     throw error;

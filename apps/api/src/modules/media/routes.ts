@@ -72,8 +72,11 @@ const playlistBody = z.object({
 
 export const mediaRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app) => {
   const tags = ['Publicidad y contenido'];
+  // La biblioteca también guarda logos, fondos e íconos: solo las listas dependen del módulo de publicidad.
   const read = ctx.auth.require({ role: 'manager', scope: 'displays:write' });
   const write = ctx.auth.require({ role: 'manager', scope: 'displays:write' });
+  const pRead = ctx.auth.require({ role: 'manager', scope: 'displays:write', module: 'advertising' });
+  const pWrite = ctx.auth.require({ role: 'manager', scope: 'displays:write', module: 'advertising' });
 
   async function refreshPlaylistDisplays(tenantId: string, playlistIds: string[]) {
     if (playlistIds.length === 0) return;
@@ -292,7 +295,7 @@ export const mediaRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (ap
     });
   }
 
-  app.get('/playlists', { preHandler: read, schema: { tags: ptags } }, async (request) => {
+  app.get('/playlists', { preHandler: pRead, schema: { tags: ptags } }, async (request) => {
     const rows = await ctx.db
       .select()
       .from(playlists)
@@ -301,7 +304,7 @@ export const mediaRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (ap
     return Promise.all(rows.map((p) => loadPlaylist(ctx.db, p.id)));
   });
 
-  app.get('/playlists/:id', { preHandler: read, schema: { tags: ptags, params: idParam } }, async (request) => {
+  app.get('/playlists/:id', { preHandler: pRead, schema: { tags: ptags, params: idParam } }, async (request) => {
     const [row] = await ctx.db
       .select({ id: playlists.id })
       .from(playlists)
@@ -310,7 +313,7 @@ export const mediaRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (ap
     return loadPlaylist(ctx.db, row.id);
   });
 
-  app.post('/playlists', { preHandler: write, schema: { tags: ptags, body: playlistBody } }, async (request, reply) => {
+  app.post('/playlists', { preHandler: pWrite, schema: { tags: ptags, body: playlistBody } }, async (request, reply) => {
     const tenantId = tenantIdOf(request);
     const { items, ...data } = request.body;
     const [row] = await ctx.db
@@ -323,7 +326,7 @@ export const mediaRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (ap
 
   app.put(
     '/playlists/:id',
-    { preHandler: write, schema: { tags: ptags, summary: 'Actualizar lista (los ítems enviados reemplazan a los actuales)', params: idParam, body: updateSchema(playlistBody) } },
+    { preHandler: pWrite, schema: { tags: ptags, summary: 'Actualizar lista (los ítems enviados reemplazan a los actuales)', params: idParam, body: updateSchema(playlistBody) } },
     async (request) => {
       const tenantId = tenantIdOf(request);
       const { items, ...data } = request.body;
@@ -339,7 +342,7 @@ export const mediaRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (ap
     },
   );
 
-  app.delete('/playlists/:id', { preHandler: write, schema: { tags: ptags, params: idParam } }, async (request, reply) => {
+  app.delete('/playlists/:id', { preHandler: pWrite, schema: { tags: ptags, params: idParam } }, async (request, reply) => {
     const tenantId = tenantIdOf(request);
     const affected = await ctx.db
       .select({ id: displays.id })

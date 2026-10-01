@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router';
-import type { DisplayDTO, KioskDTO, Role } from '@gc/shared';
+import type { DisplayDTO, KioskDTO, Role, ModuleId } from '@gc/shared';
 import { QrCode } from '../../components/QrCode';
 import { Button, Card, EmptyState, IconButton, Input, Modal, cx } from '../../components/ui';
 import { api } from '../../lib/api';
@@ -47,11 +47,12 @@ interface Tool {
   icon: ReactNode;
   role: Role;
   tone: string;
+  module?: ModuleId;
 }
 
 /** Portal de inicio: acceso directo a todas las herramientas del sistema. */
 export default function PortalPage() {
-  const { me, terms, can, settings, refresh } = useAuth();
+  const { me, terms, can, hasModule, settings, refresh } = useAuth();
   const navigate = useNavigate();
   const [code, setCode] = useState('');
   const isManager = can('manager');
@@ -64,15 +65,16 @@ export default function PortalPage() {
   const allTools: Tool[] = [
     { to: '/app/atencion', title: 'Consola de atención', description: `Llame, atienda y derive ${terms.tickets.toLowerCase()}`, icon: <Headset />, role: 'agent', tone: '#2563eb' },
     { to: '/app/monitor', title: 'Monitor en vivo', description: 'Cola y puestos en tiempo real', icon: <Activity />, role: 'manager', tone: '#0891b2' },
-    { to: '/app/resumen', title: 'Resumen del día', description: 'Indicadores y actividad de hoy', icon: <LayoutDashboard />, role: 'manager', tone: '#7c3aed' },
-    { to: '/app/reportes', title: 'Reportes', description: 'Tiempos, servicios y operadores', icon: <BarChart3 />, role: 'manager', tone: '#16a34a' },
-    { to: '/app/contenido', title: 'Publicidad', description: 'Videos, imágenes y plataformas', icon: <Video />, role: 'manager', tone: '#ea580c' },
-    { to: '/app/sonidos', title: 'Sonidos de llamado', description: 'Tonos, audios propios y música', icon: <Music />, role: 'manager', tone: '#db2777' },
+    { to: '/app/resumen', title: 'Resumen del día', description: 'Indicadores y actividad de hoy', icon: <LayoutDashboard />, role: 'manager', tone: '#7c3aed', module: 'reports' },
+    { to: '/app/reportes', title: 'Reportes', description: 'Tiempos, servicios y operadores', icon: <BarChart3 />, role: 'manager', tone: '#16a34a', module: 'reports' },
+    { to: '/app/contenido', title: 'Publicidad', description: 'Videos, imágenes y plataformas', icon: <Video />, role: 'manager', tone: '#ea580c', module: 'advertising' },
+    { to: '/app/sonidos', title: 'Sonidos de llamado', description: 'Tonos, audios propios y música', icon: <Music />, role: 'manager', tone: '#db2777', module: 'displays' },
     { to: '/app/configuracion/marca', title: 'Marca y apariencia', description: 'Logo, colores, menú y tipografía', icon: <Palette />, role: 'admin', tone: '#9333ea' },
     { to: '/app/configuracion', title: 'Configuración', description: `${terms.branches}, ${terms.services.toLowerCase()} y usuarios`, icon: <Building2 />, role: 'admin', tone: '#475569' },
-    { to: '/app/configuracion/integraciones', title: 'Integraciones y API', description: 'API keys, webhooks y documentación', icon: <Plug />, role: 'admin', tone: '#0f766e' },
+    { to: '/app/configuracion/integraciones', title: 'Integraciones y API', description: 'API keys, webhooks y documentación', icon: <Plug />, role: 'admin', tone: '#0f766e', module: 'integrations' },
   ];
-  const tools = allTools.filter((t) => can(t.role));
+  const tools = allTools.filter((t) => can(t.role) && (!t.module || hasModule(t.module)));
+  const devices = hasModule('displays') || hasModule('kiosks');
 
   function pair(e: FormEvent) {
     e.preventDefault();
@@ -131,11 +133,11 @@ export default function PortalPage() {
         ))}
       </section>
 
-      {isManager && (
+      {isManager && devices && (
         <>
-          <div className="grid gap-6 xl:grid-cols-2">
-            <DisplaysLauncher />
-            <KiosksLauncher />
+          <div className={cx('grid gap-6', hasModule('displays') && hasModule('kiosks') && 'xl:grid-cols-2')}>
+            {hasModule('displays') && <DisplaysLauncher />}
+            {hasModule('kiosks') && <KiosksLauncher />}
           </div>
 
           <Card>

@@ -29,6 +29,12 @@ import { catalogRoutes } from './modules/catalog/routes';
 import { deviceRoutes } from './modules/devices/routes';
 import { integrationRoutes } from './modules/integrations/routes';
 import { mediaRoutes } from './modules/media/routes';
+import { notificationRoutes } from './modules/notifications/routes';
+import { numberingRoutes } from './modules/numbering/routes';
+import { privacyRoutes } from './modules/privacy/routes';
+import { surveyRoutes } from './modules/surveys/routes';
+import { billingRoutes } from './modules/billing/routes';
+import { paymentRoutes } from './modules/payments/routes';
 import { pairingRoutes } from './modules/pairing/routes';
 import { platformRoutes } from './modules/platform/routes';
 import { publicRoutes } from './modules/public/routes';
@@ -42,6 +48,27 @@ declare module 'fastify' {
     ctx: AppContext;
   }
 }
+
+/**
+ * Política de contenido del panel, las pantallas y los kioscos. Solo se ejecuta código propio
+ * (más la API de YouTube); imágenes, videos y páginas embebidas pueden venir de cualquier origen
+ * porque la publicidad usa muchas plataformas. Limita el daño de cualquier inyección de HTML.
+ */
+const WEB_CSP = [
+  "default-src 'self'",
+  // YouTube (reproductor) y Bancard (checkout de pagos en un iframe).
+  "script-src 'self' https://www.youtube.com https://s.ytimg.com https://vpos.infonet.com.py https://vpos.infonet.com.py:8888",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  'img-src * data: blob:',
+  'media-src * data: blob:',
+  'frame-src *',
+  "connect-src 'self' http: https: ws: wss: blob: data:",
+  "worker-src 'self' blob:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join('; ');
 
 export interface BuildOptions {
   config: AppConfig;
@@ -58,7 +85,9 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
           transport: config.NODE_ENV === 'development' ? { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss' } } : undefined,
         }
       : false,
-    trustProxy: true,
+    // Solo se confía en X-Forwarded-For si se configuró el proxy (si no, cualquiera falsificaría su IP).
+    // Fastify acepta también un número (saltos de proxy) aunque sus tipos no lo declaren.
+    trustProxy: config.TRUST_PROXY as boolean | string[],
     // En producción no se registra cada petición (menos ruido); los errores sí se registran.
     logController: new LogController({ disableRequestLogging: config.NODE_ENV === 'production' }),
     bodyLimit: 2 * 1024 * 1024,
@@ -155,6 +184,12 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
       await api.register(catalogRoutes(ctx));
       await api.register(userRoutes(ctx));
       await api.register(ticketRoutes(ctx));
+      await api.register(numberingRoutes(ctx));
+      await api.register(privacyRoutes(ctx));
+      await api.register(notificationRoutes(ctx));
+      await api.register(surveyRoutes(ctx));
+      await api.register(billingRoutes(ctx));
+      await api.register(paymentRoutes(ctx));
       await api.register(agentRoutes(ctx));
       await api.register(deviceRoutes(ctx));
       await api.register(mediaRoutes(ctx));
@@ -170,19 +205,27 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
   // Frontend compilado (SPA) servido desde la misma instancia en producción.
   const webDist = config.WEB_DIST ? path.resolve(config.WEB_DIST) : null;
   if (webDist && existsSync(path.join(webDist, 'index.html'))) {
-    await app.register(fastifyStatic, { root: webDist, prefix: '/', maxAge: '1h' });
+    await app.register(fastifyStatic, {
+      root: webDist,
+      prefix: '/',
+      maxAge: '1h',
+      setHeaders(res, filePath) {
+        if (filePath.endsWith('.html')) res.header('content-security-policy', WEB_CSP);
+      },
+    });
     app.setNotFoundHandler((request, reply) => {
       const path = (request.raw.url ?? '').split('?')[0]!;
       // Las rutas de la API, archivos subidos y recursos con extensión inexistentes devuelven 404.
       if (path.startsWith('/api/') || path.startsWith('/uploads/') || /\.[a-z0-9]{1,8}$/i.test(path)) {
         return reply.code(404).send({ error: 'not_found', message: 'Ruta no encontrada' });
       }
-      return reply.header('cache-control', 'no-cache').sendFile('index.html', webDist);
+      return reply.header('cache-control', 'no-cache').header('content-security-policy', WEB_CSP).sendFile('index.html', webDist);
     });
   }
 
   // Solo para pruebas automatizadas: permite leer los correos enviados sin SMTP.
   if (config.DEV_OUTBOX && ctx.mailer.envDriver === 'log') {
+    app.log.warn('DEV_OUTBOX activo: /api/v1/dev/outbox expone los correos sin autenticación. No lo use en una instalación real.');
     app.get('/api/v1/dev/outbox', { schema: { hide: true } }, async () => ctx.mailer.outbox());
   }
   if (config.NODE_ENV === 'production' && ctx.mailer.envDriver === 'log' && (await ctx.mailer.resolve(null)).source === 'none') {
@@ -191,12 +234,16 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
 
   ctx.rt.attach(app.server);
   const stopMaintenance = config.NODE_ENV !== 'test' ? startMaintenance(ctx) : () => undefined;
-  if (config.NODE_ENV !== 'test') ctx.webhooks.start();
+  if (config.NODE_ENV !== 'test') {
+    ctx.webhooks.start();
+    ctx.notifier.start();
+  }
   await ensureSuperadmin(ctx);
 
   app.addHook('onClose', async () => {
     stopMaintenance();
     ctx.webhooks.stop();
+    ctx.notifier.stop();
     ctx.rt.close();
     await pool?.pool.end();
   });

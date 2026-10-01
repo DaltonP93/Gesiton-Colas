@@ -692,9 +692,12 @@ async function printPoster(url: string, appName: string, logo: string | null) {
     <p>Escanee el código con la cámara y siga su turno en vivo</p>
     <img class="qr" src="${qr}">
     <p style="font-size:14px">${esc(url)}</p>
-    <script>window.onload=()=>setTimeout(()=>window.print(),300)</script>
   </body></html>`);
   win.document.close();
+  // Se imprime desde esta ventana: la política de contenido no permite scripts en línea.
+  const images = Array.from(win.document.images);
+  await Promise.all(images.map((img) => (img.complete ? null : new Promise((resolve) => ((img.onload = resolve), (img.onerror = resolve))))));
+  setTimeout(() => win.print(), 300);
 }
 
 /** Temas rápidos del kiosco (el primero usa los colores de la marca). */

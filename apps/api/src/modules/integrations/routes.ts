@@ -23,7 +23,8 @@ const webhookBody = z.object({
 });
 
 export const integrationRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app) => {
-  const admin = ctx.auth.require({ role: 'admin' });
+  const admin = ctx.auth.require({ role: 'admin', module: 'integrations' });
+  const mailAdmin = ctx.auth.require({ role: 'admin' });
 
   async function assertUrl(url: string) {
     if (ctx.config.WEBHOOKS_ALLOW_PRIVATE) return;
@@ -191,7 +192,7 @@ export const integrationRoutes = (ctx: AppContext): FastifyPluginAsyncZod => asy
 
   app.get(
     '/mail-settings',
-    { preHandler: admin, schema: { tags: mtags, summary: 'Servidor de correo propio de la organización y el que se usa hoy' } },
+    { preHandler: mailAdmin, schema: { tags: mtags, summary: 'Servidor de correo propio de la organización y el que se usa hoy' } },
     async (request) => {
       const tenantId = tenantIdOf(request);
       return mailStatus(ctx, tenantId, tenantId);
@@ -201,7 +202,7 @@ export const integrationRoutes = (ctx: AppContext): FastifyPluginAsyncZod => asy
   app.put(
     '/mail-settings',
     {
-      preHandler: admin,
+      preHandler: mailAdmin,
       schema: {
         tags: mtags,
         summary: 'Guardar el servidor de correo propio',
@@ -218,7 +219,7 @@ export const integrationRoutes = (ctx: AppContext): FastifyPluginAsyncZod => asy
   app.post(
     '/mail-settings/test',
     {
-      preHandler: admin,
+      preHandler: mailAdmin,
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
       schema: { tags: mtags, summary: 'Probar el servidor de correo enviando un mensaje', body: mailTestBody },
     },

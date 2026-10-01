@@ -139,3 +139,25 @@ export function testMail(to: string, server: string, brand: EmailBrand): MailMes
   });
   return { to, subject: `Prueba de correo · ${brand.appName}`, html, text, fromName: brand.appName, tag: 'test' };
 }
+
+export function invoiceMail(
+  to: string,
+  name: string,
+  invoice: { number: string; description: string; amount: string; dueDate: string; organization: string },
+  url: string,
+  instructions: string,
+  brand: EmailBrand,
+): MailMessage {
+  const { html, text } = layout({
+    brand,
+    title: `Factura ${invoice.number}`,
+    intro: [
+      greet(name),
+      `Emitimos la factura ${invoice.number} de ${invoice.organization}: ${invoice.description}.`,
+      `Monto: ${invoice.amount}. Vence el ${invoice.dueDate}.`,
+    ],
+    cta: { label: 'Ver y pagar', url },
+    outro: instructions ? [instructions] : [],
+  });
+  return { to, subject: `Factura ${invoice.number} · ${invoice.amount}`, html, text, fromName: brand.appName, tag: 'invoice' };
+}

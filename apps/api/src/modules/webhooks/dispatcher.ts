@@ -5,7 +5,7 @@ import type { WebhookEvent } from '@gc/shared';
 import type { Database } from '../../db/client';
 import { webhookDeliveries, webhooks, type Webhook, type WebhookDelivery } from '../../db/schema';
 import { hmacSha256 } from '../../lib/crypto';
-import { assertPublicUrl } from '../../lib/net';
+import { outboundRequest } from '../../lib/net';
 
 /** Espera entre reintentos (segundos): 30s, 2m, 10m, 1h, 6h. */
 const BACKOFF = [30, 120, 600, 3600, 21_600];
@@ -38,6 +38,8 @@ export class WebhookDispatcher {
     private readonly db: Database,
     private readonly log: FastifyBaseLogger,
     private readonly allowPrivate: boolean,
+    /** Si devuelve `false` la organización no envía webhooks (módulo de integraciones apagado). */
+    private readonly enabledFor: (tenantId: string) => Promise<boolean> = async () => true,
   ) {}
 
   start(intervalMs = 10_000) {
@@ -52,6 +54,7 @@ export class WebhookDispatcher {
   }
 
   async dispatch(tenantId: string, event: WebhookEvent, data: unknown) {
+    if (!(await this.enabledFor(tenantId))) return 0;
     const targets = await this.db
       .select()
       .from(webhooks)
@@ -128,14 +131,15 @@ export class WebhookDispatcher {
   /** Envía un payload firmado. Cabeceras: X-GC-Event, X-GC-Delivery, X-GC-Timestamp, X-GC-Signature. */
   async send(webhook: Pick<Webhook, 'url' | 'secret'>, payload: WebhookPayload): Promise<DeliveryResult> {
     try {
-      if (!this.allowPrivate) await assertPublicUrl(webhook.url);
       const body = JSON.stringify(payload);
       const timestamp = Math.floor(Date.now() / 1000).toString();
       const signature = hmacSha256(webhook.secret, `${timestamp}.${body}`);
-      const response = await fetch(webhook.url, {
+      // La IP se valida al conectar (no solo al guardar), así un cambio de DNS no llega a la red interna.
+      const response = await outboundRequest(webhook.url, {
         method: 'POST',
-        redirect: 'manual',
-        signal: AbortSignal.timeout(TIMEOUT_MS),
+        timeoutMs: TIMEOUT_MS,
+        allowPrivate: this.allowPrivate,
+        maxBytes: 4096,
         headers: {
           'content-type': 'application/json',
           'user-agent': 'GestionColas-Webhooks/3.0',
@@ -146,11 +150,13 @@ export class WebhookDispatcher {
         },
         body,
       });
-      await response.body?.cancel().catch(() => undefined);
       const ok = response.status >= 200 && response.status < 300;
       return { ok, status: response.status, error: ok ? null : `HTTP ${response.status}` };
     } catch (error) {
-      return { ok: false, status: null, error: error instanceof Error ? error.message.slice(0, 500) : 'Error desconocido' };
+      const code = (error as { code?: string }).code;
+      // A las organizaciones no se les devuelven detalles internos de la conexión.
+      const message = code === 'EPRIVATE' ? 'La URL apunta a una dirección privada' : error instanceof Error ? error.message.slice(0, 200) : 'Error desconocido';
+      return { ok: false, status: null, error: message };
     }
   }
 }

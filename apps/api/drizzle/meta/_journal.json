@@ -22,6 +22,34 @@
       "when": 1790775948851,
       "tag": "0002_platform_settings_mail",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790794224646,
+      "tag": "0003_modules",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790795686974,
+      "tag": "0004_notifications",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790797066086,
+      "tag": "0005_surveys",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790798382199,
+      "tag": "0006_payments",
+      "breakpoints": true
     }
   ]
 }

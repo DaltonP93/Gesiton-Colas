@@ -1,3 +1,5 @@
+import type { Currency } from './currency';
+import type { TicketChargeDTO } from './payments';
 import type { DisplayConfig, KioskConfig, TenantSettings, Branding, Terminology, CustomerField } from './config';
 import type {
   ApiKeyScope,
@@ -9,6 +11,7 @@ import type {
   TicketStatus,
   WebhookEvent,
 } from './enums';
+import type { ModuleId, ModuleOverrides } from './modules';
 import type { PlanId, PlanLimits } from './plans';
 import type { Schedule } from './schedule';
 
@@ -21,10 +24,14 @@ export interface TenantDTO {
   name: string;
   plan: PlanId;
   status: 'active' | 'suspended';
+  /** `billing`: por falta de pago (se reactiva al pagar). */
+  suspendedReason: 'billing' | 'manual' | null;
   settings: TenantSettings;
   /** Organización de demostración creada desde "Probar demo". */
   isDemo: boolean;
   demoExpiresAt: ISODate | null;
+  /** Ajustes de módulos que hizo el superadministrador (sin clave = lo que diga el plan). */
+  moduleOverrides: ModuleOverrides;
   createdAt: ISODate;
 }
 
@@ -51,6 +58,10 @@ export interface MeDTO {
   user: UserDTO;
   tenant: TenantDTO | null;
   limits: PlanLimits | null;
+  /** Módulos activos de la organización (vacío sin organización). */
+  modules: ModuleId[];
+  /** La plataforma factura los planes (muestra «Plan y facturación» a los administradores). */
+  billing: boolean;
 }
 
 export interface BranchDTO {
@@ -85,6 +96,8 @@ export interface ServiceDTO {
   sortOrder: number;
   /** Minutos estimados por atención (para calcular la espera). */
   estimatedMinutes: number;
+  /** Precio en la unidad mínima de la moneda de la organización (módulo «Pagos»); null = sin cobro. */
+  price: number | null;
 }
 
 export interface PriorityDTO {
@@ -271,6 +284,8 @@ export interface KioskBootstrapDTO {
   customerFields: CustomerField[];
   /** Lista de publicidad de la pantalla de espera (si el kiosco la usa). */
   idlePlaylist: PlaylistDTO | null;
+  /** Mostrar el precio de los servicios (módulo «Pagos»). */
+  prices: { currency: Currency } | null;
 }
 
 export interface IssuedTicketDTO {
@@ -292,6 +307,12 @@ export interface PublicTicketDTO {
   calledAt: ISODate | null;
   finishedAt: ISODate | null;
   tenant: PublicTenantDTO;
+  /** Avisos por WhatsApp/SMS: si se ofrecen y el teléfono anotado (enmascarado). */
+  notify: { available: boolean; phone: string | null };
+  /** Encuesta de satisfacción del turno (cuando terminó la atención). */
+  survey: { url: string; answered: boolean } | null;
+  /** Cobro del turno (módulo «Pagos»). */
+  charge: TicketChargeDTO | null;
 }
 
 export interface PairingDTO {
@@ -385,4 +406,22 @@ export type PlatformUserDTO = UserDTO;
 export interface AccessLinkDTO {
   url: string;
   expiresAt: ISODate;
+}
+
+/** Estado de la numeración de turnos en el período actual. */
+export interface NumberingStatusDTO {
+  /** Período vigente (día, semana, mes, año o `all`). */
+  period: string;
+  settings: import('./config').TicketSettings;
+  rows: {
+    branchId: string;
+    branchName: string;
+    /** Id del servicio, o `*` si la numeración es compartida por la sucursal. */
+    scopeKey: string;
+    label: string;
+    /** Turnos emitidos en el período. */
+    issued: number;
+    lastCode: string | null;
+    nextCode: string;
+  }[];
 }

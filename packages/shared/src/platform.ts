@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import { DEFAULT_PLAN_MODULES, MODULE_IDS } from './modules';
+import { PLAN_IDS, type PlanId } from './plans';
+import { CURRENCIES } from './currency';
+import { billingSettingsSchema } from './payments';
 
 const color = z.string().regex(/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i, 'Color hexadecimal inválido');
 
@@ -33,6 +37,21 @@ export const platformBrandSchema = z.object({
 });
 export type PlatformBrand = z.infer<typeof platformBrandSchema>;
 
+/** Monedas para precios de planes y cobros. */
+
+/** Configuración comercial de un plan: módulos incluidos y precio mensual. */
+const planConfig = (id: PlanId) =>
+  z
+    .object({
+      modules: z.array(z.enum(MODULE_IDS)).default(DEFAULT_PLAN_MODULES[id]),
+      monthlyPrice: z.number().min(0).max(1_000_000_000).default(0),
+      currency: z.enum(CURRENCIES).default('PYG'),
+    })
+    .prefault({});
+export type PlanConfig = z.infer<ReturnType<typeof planConfig>>;
+
+export const platformPlansSchema = z.object(Object.fromEntries(PLAN_IDS.map((id) => [id, planConfig(id)])) as Record<PlanId, ReturnType<typeof planConfig>>);
+
 export const platformSettingsSchema = z.object({
   homePage: z.enum(HOME_PAGES).default('landing'),
   homeRedirectUrl: z.string().max(2048).default(''),
@@ -43,6 +62,10 @@ export const platformSettingsSchema = z.object({
   /** Ingreso con un código enviado por correo, sin contraseña. */
   allowEmailLogin: z.boolean().default(true),
   brand: platformBrandSchema.prefault({}),
+  /** Módulos y precio de cada plan. */
+  plans: platformPlansSchema.prefault({}),
+  /** Facturación de los planes a las organizaciones. */
+  billing: billingSettingsSchema.prefault({}),
 });
 export type PlatformSettings = z.infer<typeof platformSettingsSchema>;
 

@@ -1,7 +1,7 @@
 import { and, eq, sql } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import type { StatsSummaryDTO } from '@gc/shared';
+import { hasRole, type StatsSummaryDTO } from '@gc/shared';
 import type { AppContext } from '../../context';
 import { branches, tenants } from '../../db/schema';
 import { tenantIdOf } from '../../lib/auth';
@@ -28,7 +28,7 @@ function csvCell(value: unknown): string {
 
 export const reportRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app) => {
   const tags = ['Reportes'];
-  const read = ctx.auth.require({ role: 'manager', scope: 'reports:read' });
+  const read = ctx.auth.require({ role: 'manager', scope: 'reports:read', module: 'reports' });
 
   async function scope(tenantId: string, query: z.infer<typeof rangeQuery>) {
     const [tenant] = await ctx.db.select().from(tenants).where(eq(tenants.id, tenantId));
@@ -165,7 +165,15 @@ export const reportRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
         'customer_name', 'customer_document', 'customer_phone', 'customer_email', 'created_at', 'called_at',
         'started_at', 'finished_at', 'wait_seconds', 'service_seconds', 'notes',
       ];
-      const lines = [headers.map(csvCell).join(','), ...(rows.rows as Record<string, unknown>[]).map((r) => keys.map((k) => csvCell(r[k])).join(','))];
+      // Los datos personales del cliente solo los exportan los administradores (y las API keys con permiso de reportes).
+      const auth = request.auth;
+      const withPersonalData = auth?.kind === 'apiKey' || (auth ? hasRole(auth.role, 'admin') : false);
+      const personal = new Set(['customer_name', 'customer_document', 'customer_phone', 'customer_email']);
+      const columns = keys.map((k, i) => ({ key: k, header: headers[i]! })).filter((c) => withPersonalData || !personal.has(c.key));
+      const lines = [
+        columns.map((c) => csvCell(c.header)).join(','),
+        ...(rows.rows as Record<string, unknown>[]).map((r) => columns.map((c) => csvCell(r[c.key])).join(',')),
+      ];
       return reply
         .header('content-type', 'text/csv; charset=utf-8')
         .header('content-disposition', `attachment; filename="turnos_${from}_${to}.csv"`)

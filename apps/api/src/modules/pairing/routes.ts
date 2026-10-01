@@ -5,7 +5,8 @@ import { z } from 'zod';
 import type { PairingDTO, PairingStatusDTO } from '@gc/shared';
 import type { AppContext } from '../../context';
 import { devicePairings, displays, kiosks } from '../../db/schema';
-import { tenantIdOf } from '../../lib/auth';
+import { assertModuleActive, tenantIdOf } from '../../lib/auth';
+import { createThrottle } from '../../lib/throttle';
 import { randomToken, safeEqual, sha256 } from '../../lib/crypto';
 import { badRequest, notFound } from '../../lib/errors';
 
@@ -16,6 +17,7 @@ const PAIRING_TTL_MS = 15 * 60_000;
  * desde el portal se ingresa el código y se elige qué pantalla o kiosco será ese equipo.
  */
 export const pairingRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app) => {
+  const claimThrottle = createThrottle({ maxFails: 10, windowMs: 10 * 60_000, lockMs: 10 * 60_000, message: 'Demasiados códigos incorrectos.' });
   const tags = ['Vinculación de dispositivos'];
 
   app.post(
@@ -101,7 +103,10 @@ export const pairingRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (
     },
     async (request) => {
       const tenantId = tenantIdOf(request);
+      // Evita probar códigos al azar para quedarse con equipos de otras organizaciones.
+      claimThrottle.check(tenantId);
       const { code, type, targetId } = request.body;
+      if (request.auth?.tenant) await assertModuleActive(ctx.modulesOf, request.auth.tenant, type === 'display' ? 'displays' : 'kiosks');
       const table = type === 'display' ? displays : kiosks;
       const [target] = await ctx.db
         .select({ id: table.id, name: table.name })
@@ -114,7 +119,11 @@ export const pairingRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (
         .set({ tenantId, targetType: type, targetId, claimedAt: new Date() })
         .where(and(eq(devicePairings.code, code), gt(devicePairings.expiresAt, new Date()), isNull(devicePairings.claimedAt)))
         .returning({ id: devicePairings.id });
-      if (!claimed) throw badRequest('El código no es válido o venció. Verifique el número que muestra el dispositivo.');
+      if (!claimed) {
+        claimThrottle.fail(tenantId);
+        throw badRequest('El código no es válido o venció. Verifique el número que muestra el dispositivo.');
+      }
+      claimThrottle.success(tenantId);
       return { ok: true, name: target.name };
     },
   );

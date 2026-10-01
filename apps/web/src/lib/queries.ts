@@ -10,7 +10,6 @@ import type {
   MediaDTO,
   PlaylistDTO,
   PriorityDTO,
-  PublicConfigDTO,
   QueueSnapshotDTO,
   ServiceDTO,
   UserDTO,
@@ -18,6 +17,7 @@ import type {
 } from '@gc/shared';
 import { RT } from '@gc/shared';
 import { api, session } from './api';
+import { useAuth } from './auth';
 import { connectSocket } from './socket';
 
 const list = <T,>(path: string) => () => api.get<T[]>(path);
@@ -32,12 +32,28 @@ export const useCounters = (branchId?: string | null) =>
     queryFn: list<CounterDTO>(branchId ? `/counters?branchId=${branchId}` : '/counters'),
   });
 export const useUsers = () => useQuery({ queryKey: ['users'], queryFn: list<UserDTO>('/users') });
-export const useDisplays = () => useQuery({ queryKey: ['displays'], queryFn: list<DisplayDTO>('/displays') });
-export const useKiosks = () => useQuery({ queryKey: ['kiosks'], queryFn: list<KioskDTO>('/kiosks') });
+// Pantallas, kioscos y listas solo se consultan si la organización tiene el módulo activo.
+export const useDisplays = () => {
+  const { hasModule } = useAuth();
+  return useQuery({ queryKey: ['displays'], queryFn: list<DisplayDTO>('/displays'), enabled: hasModule('displays') });
+};
+export const useKiosks = () => {
+  const { hasModule } = useAuth();
+  return useQuery({ queryKey: ['kiosks'], queryFn: list<KioskDTO>('/kiosks'), enabled: hasModule('kiosks') });
+};
 export const useMedia = () => useQuery({ queryKey: ['media'], queryFn: list<MediaDTO>('/media') });
-export const usePlaylists = () => useQuery({ queryKey: ['playlists'], queryFn: list<PlaylistDTO>('/playlists') });
-export const useApiKeys = () => useQuery({ queryKey: ['api-keys'], queryFn: list<ApiKeyDTO>('/api-keys') });
-export const useWebhooks = () => useQuery({ queryKey: ['webhooks'], queryFn: list<WebhookDTO>('/webhooks') });
+export const usePlaylists = () => {
+  const { hasModule } = useAuth();
+  return useQuery({ queryKey: ['playlists'], queryFn: list<PlaylistDTO>('/playlists'), enabled: hasModule('advertising') });
+};
+export const useApiKeys = () => {
+  const { hasModule } = useAuth();
+  return useQuery({ queryKey: ['api-keys'], queryFn: list<ApiKeyDTO>('/api-keys'), enabled: hasModule('integrations') });
+};
+export const useWebhooks = () => {
+  const { hasModule } = useAuth();
+  return useQuery({ queryKey: ['webhooks'], queryFn: list<WebhookDTO>('/webhooks'), enabled: hasModule('integrations') });
+};
 
 export function useQueue(branchId: string | null | undefined, serviceIds: string[] = []) {
   const qs = serviceIds.length ? `?serviceIds=${serviceIds.join(',')}` : '';
@@ -97,8 +113,4 @@ export function useStaffRealtime(branchId: string | null | undefined, onEvent?: 
   }, [branchId, qc]);
 }
 
-export type PublicConfig = PublicConfigDTO;
-
-/** Opciones públicas de la instalación: página de inicio, registro, demo y marca de la pantalla de ingreso. */
-export const usePublicConfig = () =>
-  useQuery({ queryKey: ['public-config'], queryFn: () => api.public<PublicConfig>('/public/config'), staleTime: 5 * 60_000 });
+export { usePublicConfig, type PublicConfig } from './publicConfig';

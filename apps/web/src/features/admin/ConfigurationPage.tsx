@@ -2,10 +2,12 @@ import {
   Building2,
   ChevronRight,
   ClipboardList,
+  CreditCard,
   Globe,
   Hash,
   LayoutGrid,
   Mail,
+  MessageCircle,
   Palette,
   Plug,
   Sparkles,
@@ -16,6 +18,7 @@ import {
 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
 import { Link, Navigate, useParams } from 'react-router';
+import type { ModuleId } from '@gc/shared';
 import { MailSettingsForm } from '../../components/MailSettingsForm';
 import { Button, Loading, PageHeader, cx } from '../../components/ui';
 import { useAuth } from '../../lib/auth';
@@ -31,9 +34,11 @@ const BranchesPage = lazy(() => import('./BranchesPage'));
 const ServicesPage = lazy(() => import('./ServicesPage'));
 const UsersPage = lazy(() => import('./UsersPage'));
 const IntegrationsPage = lazy(() => import('./IntegrationsPage'));
+const NotificationsPage = lazy(() => import('./NotificationsPage'));
+const PaymentsSettingsPage = lazy(() => import('./PaymentsSettingsPage'));
 
 type TabKey = 'marca' | 'region' | 'terminologia' | 'turnos' | 'cliente';
-type PageKey = 'sucursales' | 'servicios' | 'usuarios' | 'correo' | 'integraciones';
+type PageKey = 'sucursales' | 'servicios' | 'usuarios' | 'correo' | 'avisos' | 'cobros' | 'integraciones';
 export type ConfigSection = 'inicio' | TabKey | PageKey;
 
 interface SectionDef {
@@ -44,6 +49,8 @@ interface SectionDef {
   description: string;
   icon: ReactNode;
   group: string;
+  /** Solo se muestra si la organización tiene el módulo activo. */
+  module?: ModuleId;
 }
 
 const TAB_COMPONENTS: Record<TabKey, ComponentType<TabProps>> = {
@@ -58,6 +65,8 @@ const PAGE_COMPONENTS: Record<PageKey, ComponentType> = {
   servicios: ServicesPage,
   usuarios: UsersPage,
   correo: MailSection,
+  avisos: NotificationsPage,
+  cobros: PaymentsSettingsPage,
   integraciones: IntegrationsPage,
 };
 function MailSection() {
@@ -81,10 +90,11 @@ const isPage = (key: ConfigSection): key is PageKey => key in PAGE_COMPONENTS;
 
 export default function ConfigurationPage() {
   const { section = 'inicio' } = useParams();
-  const { terms } = useAuth();
+  const { terms, hasModule } = useAuth();
 
   const sections: SectionDef[] = useMemo(
-    () => [
+    () => (
+      [
       { key: 'inicio', label: 'Resumen', short: 'Resumen', description: 'Toda la configuración de un vistazo', icon: <LayoutGrid />, group: '' },
       { key: 'marca', label: 'Marca y apariencia', short: 'Marca', description: 'Logo, colores, tipografía, menú y fondo', icon: <Palette />, group: 'Organización' },
       { key: 'region', label: 'Idioma y zona horaria', short: 'Idioma', description: 'Idioma de pantallas y kioscos, hora local', icon: <Globe />, group: 'Organización' },
@@ -95,9 +105,12 @@ export default function ConfigurationPage() {
       { key: 'cliente', label: `Datos del ${terms.customer.toLowerCase()}`, short: `Datos del ${terms.customer.toLowerCase()}`, description: 'Qué se pide al sacar turno', icon: <TextCursorInput />, group: 'Atención' },
       { key: 'usuarios', label: 'Usuarios', short: 'Usuarios', description: 'Equipo, roles e invitaciones', icon: <Users />, group: 'Equipo e integraciones' },
       { key: 'correo', label: 'Correo saliente', short: 'Correo', description: 'Servidor SMTP para invitaciones y avisos', icon: <Mail />, group: 'Equipo e integraciones' },
-      { key: 'integraciones', label: 'Integraciones y API', short: 'Integraciones', description: 'API keys, webhooks y documentación', icon: <Plug />, group: 'Equipo e integraciones' },
-    ],
-    [terms],
+      { key: 'avisos', label: 'Avisos por WhatsApp y SMS', short: 'WhatsApp y SMS', description: 'Mensajes al sacar turno, al acercarse y al llamar', icon: <MessageCircle />, group: 'Equipo e integraciones', module: 'notifications' },
+      { key: 'cobros', label: 'Cobros y pagos', short: 'Cobros', description: 'Pasarela (Bancard, PagoPar, Stripe) y cobro en el puesto', icon: <CreditCard />, group: 'Equipo e integraciones', module: 'payments' },
+      { key: 'integraciones', label: 'Integraciones y API', short: 'Integraciones', description: 'API keys, webhooks y documentación', icon: <Plug />, group: 'Equipo e integraciones', module: 'integrations' },
+      ] as SectionDef[]
+    ).filter((s) => !s.module || hasModule(s.module)),
+    [terms, hasModule],
   );
 
   const current = sections.find((s) => s.key === section);
@@ -264,7 +277,9 @@ function Overview({ sections }: { sections: SectionDef[] }) {
     turnos: `${settings.tickets.digits} dígitos · ${settings.tickets.reset === 'daily' ? 'reinicio diario' : 'sin reinicio'}`,
     cliente: settings.customerFields.length ? `${settings.customerFields.length} campos propios` : 'Nombre, documento, teléfono y email',
     usuarios: users.data ? `${users.data.length} ${users.data.length === 1 ? 'usuario' : 'usuarios'}` : '…',
-    correo: 'Invitaciones, códigos de acceso y avisos',
+    correo: 'Invitaciones, códigos de acceso y recuperación',
+    cobros: `Moneda ${settings.payments.currency}${settings.payments.online ? ' · pago en línea' : ''}`,
+    avisos: Object.values(settings.notifications.events).filter((e) => e.enabled).length + ' avisos activos',
     integraciones: 'API REST, webhooks y tiempo real',
   };
 

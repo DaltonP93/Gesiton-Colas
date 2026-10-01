@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { BellRing, CheckCircle2, Clock, Loader2, MapPin, Users, XCircle } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router';
-import { RT, type PublicTicketDTO } from '@gc/shared';
+import { BadgeCheck, BellRing, CheckCircle2, ChevronRight, Clock, CreditCard, Heart, Loader2, MapPin, MessageCircle, Star, Users, XCircle } from 'lucide-react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { Link, useParams } from 'react-router';
+import { RT, formatMoney, type PublicTicketDTO } from '@gc/shared';
 import { ApiError, api, assetUrl } from '../../lib/api';
 import { translator } from '../../lib/i18n';
 import { connectSocket } from '../../lib/socket';
@@ -165,8 +165,32 @@ export default function TrackingPage() {
           </p>
         </div>
 
+        {ticket.charge && <ChargeCard token={token} charge={ticket.charge} payable={!['cancelled', 'no_show'].includes(ticket.status)} t={t} />}
+
+        {ticket.survey && (
+          <div className="mt-4">
+            {ticket.survey.answered ? (
+              <p className="flex items-center justify-center gap-2 rounded-2xl bg-surface px-4 py-4 text-sm font-semibold shadow">
+                <Heart className="size-5 fill-rose-500 text-rose-500" /> {t('track.surveyDone')}
+              </p>
+            ) : (
+              <Link to={ticket.survey.url} className="gc-pop flex items-center gap-4 rounded-2xl bg-surface p-5 text-left shadow-lg ring-2 ring-primary/30">
+                <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-amber-400/20">
+                  <Star className="size-7 fill-amber-400 text-amber-400" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-lg font-bold">{t('track.surveyTitle')}</span>
+                  <span className="block text-sm text-muted">{t('track.surveyHint')}</span>
+                </span>
+                <ChevronRight className="size-6 shrink-0 text-primary" aria-label={t('track.surveyOpen')} />
+              </Link>
+            )}
+          </div>
+        )}
+
         {active && (
           <div className="mt-4 space-y-3">
+            {ticket.status === 'waiting' && ticket.notify.available && <PhoneOptIn token={token} phone={ticket.notify.phone} t={t} onSaved={() => void query.refetch()} />}
             {typeof Notification !== 'undefined' && (
               <button
                 type="button"
@@ -190,6 +214,129 @@ export default function TrackingPage() {
           </div>
         )}
       </main>
+    </div>
+  );
+}
+
+/** El cliente deja su teléfono para recibir los avisos por WhatsApp o SMS. */
+function PhoneOptIn({ token, phone, t, onSaved }: { token: string; phone: string | null; t: ReturnType<typeof translator>; onSaved: () => void }) {
+  const [editing, setEditing] = useState(!phone);
+  const [value, setValue] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      await api.public(`/public/tickets/${token}/notify`, { phone: value });
+      setEditing(false);
+      setValue('');
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo guardar');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!editing && phone) {
+    return (
+      <div className="flex items-center gap-3 rounded-2xl bg-surface px-4 py-4 shadow">
+        <MessageCircle className="size-5 shrink-0 text-emerald-600" />
+        <p className="min-w-0 flex-1 text-sm font-semibold">{t('track.phoneOn', { phone })}</p>
+        <button type="button" onClick={() => setEditing(true)} className="shrink-0 text-xs font-medium text-primary underline-offset-2 hover:underline">
+          {t('track.phoneChange')}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={(e) => void submit(e)} className="rounded-2xl bg-surface p-4 text-left shadow">
+      <p className="flex items-center gap-2 font-semibold">
+        <MessageCircle className="size-5 text-primary" /> {t('track.phoneTitle')}
+      </p>
+      <p className="mt-1 text-sm text-muted">{t('track.phoneHint')}</p>
+      <div className="mt-3 flex gap-2">
+        <input
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel"
+          required
+          minLength={6}
+          maxLength={30}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder={t('track.phonePlaceholder')}
+          aria-label={t('track.phonePlaceholder')}
+          className="min-w-0 flex-1 rounded-xl border border-border bg-bg px-3 py-2.5 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+        />
+        <button type="submit" disabled={saving || value.trim().length < 6} className="shrink-0 rounded-xl bg-primary px-4 py-2.5 font-semibold text-primary-fg disabled:opacity-50">
+          {saving ? <Loader2 className="size-5 animate-spin" /> : t('track.phoneSave')}
+        </button>
+      </div>
+      {error && (
+        <p role="alert" className="mt-2 text-sm text-red-600">
+          {error}
+        </p>
+      )}
+    </form>
+  );
+}
+
+/** Importe del turno y pago en línea (módulo «Pagos»). */
+/** Se puede pagar mientras espera, durante la atención y también después (si quedó pendiente). */
+function ChargeCard({ token, charge, payable, t }: { token: string; charge: NonNullable<PublicTicketDTO['charge']>; payable: boolean; t: ReturnType<typeof translator> }) {
+  const [paying, setPaying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const amount = formatMoney(charge.amount, charge.currency);
+
+  async function pay() {
+    setPaying(true);
+    setError(null);
+    try {
+      const { url } = await api.public<{ url: string }>(`/public/tickets/${token}/pay`, {});
+      window.location.assign(url);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'No se pudo iniciar el pago');
+      setPaying(false);
+    }
+  }
+
+  return (
+    <div className="mt-4 rounded-2xl bg-surface p-4 shadow">
+      <div className="flex items-center gap-3">
+        <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+          <CreditCard className="size-6" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-muted">{t('track.charge')}</p>
+          <p className="text-2xl font-extrabold tabular-nums">{amount}</p>
+        </div>
+        {charge.status === 'paid' && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-3 py-1 text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+            <BadgeCheck className="size-4" /> {t('track.paid')}
+          </span>
+        )}
+      </div>
+      {charge.status === 'pending' && payable && (
+        <div className="mt-3">
+          {charge.online ? (
+            <button type="button" onClick={() => void pay()} disabled={paying} className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 font-bold text-primary-fg disabled:opacity-60">
+              {paying ? <Loader2 className="size-5 animate-spin" /> : <CreditCard className="size-5" />} {t('track.payNow')}
+            </button>
+          ) : (
+            <p className="text-sm text-muted">{t('track.payAtCounter')}</p>
+          )}
+          {error && (
+            <p role="alert" className="mt-2 text-sm text-red-600">
+              {error}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

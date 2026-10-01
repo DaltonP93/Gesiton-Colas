@@ -1,3 +1,4 @@
+import bcrypt from 'bcryptjs';
 import { eq } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -11,12 +12,16 @@ import { toTenantDTO, toUserDTO } from '../../lib/dto';
 import { demoMail, emailLoginMail, resetPasswordMail, verifyEmailMail } from '../../lib/emails';
 import { MailError, type MailMessage } from '../../lib/mailer';
 import { AppError, badRequest, conflict, forbidden, unauthorized } from '../../lib/errors';
+import { createThrottle } from '../../lib/throttle';
 import { consumeCode, consumeToken, issueToken, peekToken } from '../../lib/tokens';
 import { userScope } from '../tickets/queue';
 
 const email = z.string().trim().toLowerCase().email().max(200);
 const password = z.string().min(8, 'La contraseña debe tener al menos 8 caracteres').max(200);
 const token = z.string().min(20).max(200);
+
+/** Hash de una contraseña cualquiera: se compara aunque el usuario no exista para no revelarlo por el tiempo de respuesta. */
+const DUMMY_HASH = bcrypt.hashSync('gestion-colas-dummy', 10);
 
 /** Respuesta idéntica exista o no la cuenta: evita revelar qué correos están registrados. */
 const SENT = { ok: true, message: 'Si el correo está registrado, recibirá un mensaje en unos minutos.' };
@@ -26,6 +31,8 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
   const authLimit = { rateLimit: { max: 20, timeWindow: '1 minute' } };
   const mailLimit = { rateLimit: { max: 5, timeWindow: '1 minute' } };
   const base = ctx.config.PUBLIC_URL.replace(/\/$/, '');
+  // Bloqueo por cuenta: 5 intentos fallidos en 15 minutos bloquean 15 minutos (luego el doble).
+  const loginThrottle = createThrottle({ maxFails: 5, windowMs: 15 * 60_000, lockMs: 15 * 60_000, message: 'Demasiados intentos fallidos para esta cuenta.' });
 
   async function me(userId: string, tenantOverride?: string | null): Promise<MeDTO> {
     const [user] = await ctx.db.select().from(users).where(eq(users.id, userId)).limit(1);
@@ -37,6 +44,8 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
       user: toUserDTO(user, scope.branchIds, scope.serviceIds),
       tenant: tenant ? toTenantDTO(tenant) : null,
       limits: tenant ? PLANS[tenant.plan] : null,
+      modules: tenant ? await ctx.modulesOf(tenant) : [],
+      billing: tenant ? (await ctx.platform.get()).billing.enabled : false,
     };
   }
 
@@ -78,7 +87,8 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
   /** Verifica que la cuenta pueda iniciar sesión y devuelve el token + datos de sesión. */
   async function startSession(user: User, tenant: Tenant | null, options: { markVerified?: boolean } = {}) {
     if (!user.active) throw forbidden('El usuario está deshabilitado');
-    if (tenant && user.role !== 'superadmin') assertTenantAvailable(tenant);
+    // Suspendida por falta de pago: el administrador puede entrar para pagar.
+    if (tenant && user.role !== 'superadmin') assertTenantAvailable(tenant, { allowBilling: user.role === 'admin' });
     const patch: Partial<typeof users.$inferInsert> = { lastLoginAt: new Date() };
     if (options.markVerified && !user.emailVerifiedAt) patch.emailVerifiedAt = new Date();
     await ctx.db.update(users).set(patch).where(eq(users.id, user.id));
@@ -165,7 +175,7 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
       const existing = await findUser(body.email);
       if (existing) {
         // Ya tiene cuenta: se le envía un acceso por correo en lugar de crear otra demo.
-        if (existing.user.active) {
+        if (existing.user.active && (await ctx.platform.get()).allowEmailLogin) {
           const { token: link, code } = await issueToken(ctx.db, existing.user.id, 'email_login', { withCode: true });
           await mail(emailLoginMail(existing.user.email, existing.user.name, `${base}/acceso?token=${link}`, code!, await brandOf(existing.tenant)), existing.user.tenantId);
         }
@@ -187,15 +197,23 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
     '/auth/login',
     { config: authLimit, schema: { tags, summary: 'Iniciar sesión con contraseña', security: [], body: z.object({ email, password: z.string().min(1).max(200) }) } },
     async (request) => {
+      const key = request.body.email;
+      loginThrottle.check(key);
       const found = await findUser(request.body.email);
-      const valid = found && found.user.hasPassword && (await verifyPassword(request.body.password, found.user.passwordHash));
+      const valid = found?.user.hasPassword
+        ? await verifyPassword(request.body.password, found.user.passwordHash)
+        : (await verifyPassword(request.body.password, DUMMY_HASH), false);
       if (found && !found.user.hasPassword && !found.user.invitePending) {
         throw new AppError(400, 'no_password', 'Esta cuenta todavía no tiene contraseña. Ingrese con un código por correo o elija una con «¿Olvidó su contraseña?».');
       }
       if (found?.user.invitePending) {
         throw new AppError(403, 'invite_pending', 'Acepte la invitación que le enviamos por correo para elegir su contraseña.');
       }
-      if (!found || !valid) throw unauthorized('Email o contraseña incorrectos');
+      if (!found || !valid) {
+        loginThrottle.fail(key);
+        throw unauthorized('Email o contraseña incorrectos');
+      }
+      loginThrottle.success(key);
       if (ctx.config.EMAIL_VERIFICATION === 'required' && !found.user.emailVerifiedAt && found.user.role !== 'superadmin') {
         throw new AppError(403, 'email_not_verified', 'Confirme su correo electrónico para ingresar. Revise su bandeja de entrada.');
       }
@@ -235,11 +253,22 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
       const body = request.body;
       let userId: string;
       if ('token' in body) {
+        // Los enlaces de acceso también los genera el superadministrador: valen aunque el código por correo esté apagado.
         userId = await consumeToken(ctx.db, body.token, 'email_login');
       } else {
+        if (!(await ctx.platform.get()).allowEmailLogin) throw forbidden('El ingreso con código por correo está deshabilitado');
+        loginThrottle.check(`code:${body.email}`);
         const found = await findUser(body.email);
-        if (!found) throw badRequest('El código no es válido o venció. Solicite uno nuevo.');
-        await consumeCode(ctx.db, found.user.id, body.code);
+        if (!found) {
+          loginThrottle.fail(`code:${body.email}`);
+          throw badRequest('El código no es válido o venció. Solicite uno nuevo.');
+        }
+        try {
+          await consumeCode(ctx.db, found.user.id, body.code);
+        } catch (error) {
+          loginThrottle.fail(`code:${body.email}`);
+          throw error;
+        }
         userId = found.user.id;
       }
       const { user, tenant } = await loadUser(userId);
@@ -356,7 +385,7 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
 
   /* ---------------------------- Perfil propio ------------------------- */
 
-  app.get('/auth/me', { preHandler: ctx.auth.require(), schema: { tags, summary: 'Usuario actual, organización y límites del plan' } }, async (request) => {
+  app.get('/auth/me', { preHandler: ctx.auth.require({ allowBillingSuspended: true }), schema: { tags, summary: 'Usuario actual, organización y límites del plan' } }, async (request) => {
     if (request.auth?.kind !== 'user') throw badRequest('Disponible solo para usuarios');
     return me(request.auth.userId, request.auth.tenantId);
   });

@@ -1,8 +1,14 @@
 import { z } from 'zod';
 import { ALERT_SOUNDS, DISPLAY_LAYOUTS, LOCALES } from './enums';
+import { notificationSettingsSchema } from './notifications';
+import { tenantPaymentSettingsSchema } from './payments';
 
 const color = z.string().regex(/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i, 'Color hexadecimal inválido');
-const cssText = z.string().max(50_000);
+/** CSS propio: no puede contener «<» (evita cerrar la etiqueta <style> e inyectar HTML). */
+const cssText = z
+  .string()
+  .max(50_000)
+  .refine((v) => !v.includes('<'), 'El CSS no puede contener el carácter «<»');
 
 /* ------------------------------------------------------------------ */
 /* Configuración de la organización (tenant)                           */
@@ -63,8 +69,16 @@ export type CustomerField = z.infer<typeof customerFieldSchema>;
 export const ticketSettingsSchema = z.object({
   /** Cantidad de dígitos del número (A001 = 3). */
   digits: z.number().int().min(1).max(6).default(3),
-  /** Reinicio de la numeración. */
-  reset: z.enum(['daily', 'never']).default('daily'),
+  /** Cada cuánto vuelve a empezar la numeración (además del reinicio manual). */
+  reset: z.enum(['daily', 'weekly', 'monthly', 'yearly', 'never']).default('daily'),
+  /** Número con el que empieza (y al que vuelve al reiniciar). */
+  startAt: z.number().int().min(0).max(99_999).default(1),
+  /**
+   * Qué pasa al llegar al máximo de dígitos (A999 con 3 dígitos):
+   * - `wrap`: vuelve al número inicial (A001)
+   * - `grow`: sigue con un dígito más (A1000)
+   */
+  overflow: z.enum(['wrap', 'grow']).default('wrap'),
   /** Numeración independiente por servicio o compartida por sucursal. */
   scope: z.enum(['service', 'branch']).default('service'),
   /** Veces que se puede rellamar antes de marcar "no se presentó" automáticamente (0 = nunca). */
@@ -89,6 +103,16 @@ export const onboardingSchema = z.object({
 });
 export type Onboarding = z.infer<typeof onboardingSchema>;
 
+/** Protección de datos personales de los clientes. */
+export const privacySettingsSchema = z.object({
+  /**
+   * Días que se conservan los datos del cliente (nombre, documento, teléfono, email y campos propios)
+   * en cada turno. Después se borran y queda solo la estadística. 0 = no se borran.
+   */
+  retentionDays: z.number().int().min(0).max(3650).default(0),
+});
+export type PrivacySettings = z.infer<typeof privacySettingsSchema>;
+
 export const tenantSettingsSchema = z.object({
   branding: brandingSchema.prefault({}),
   terminology: terminologySchema.prefault({}),
@@ -97,6 +121,10 @@ export const tenantSettingsSchema = z.object({
   locale: z.enum(LOCALES).default('es'),
   timezone: z.string().max(64).default('UTC'),
   onboarding: onboardingSchema.prefault({}),
+  privacy: privacySettingsSchema.prefault({}),
+  /** Avisos por WhatsApp / SMS (módulo «notifications»). */
+  notifications: notificationSettingsSchema.prefault({}),
+  payments: tenantPaymentSettingsSchema.prefault({}),
 });
 export type TenantSettings = z.infer<typeof tenantSettingsSchema>;
 

@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import { and, eq, isNull } from 'drizzle-orm';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { SignJWT, jwtVerify } from 'jose';
-import { hasRole, type ApiKeyScope, type Role } from '@gc/shared';
+import { MODULES, hasRole, type ApiKeyScope, type ModuleId, type Role } from '@gc/shared';
 import type { AppConfig } from '../config';
 import type { Database } from '../db/client';
 import { apiKeys, tenants, users, type Tenant, type User } from '../db/schema';
@@ -24,6 +24,20 @@ export interface RequireOptions {
   role?: Role;
   /** Si se indica, las API keys con este permiso también pueden acceder. */
   scope?: ApiKeyScope;
+  /** Módulo que la organización debe tener activo. */
+  module?: ModuleId;
+  /** Permitir el acceso aunque la organización esté suspendida por falta de pago (para poder pagar). */
+  allowBillingSuspended?: boolean;
+}
+
+/** Calcula los módulos activos de una organización (lo provee el contexto de la aplicación). */
+export type ModulesResolver = (tenant: Tenant) => Promise<ModuleId[]>;
+
+/** Falla si la organización no tiene el módulo activo. */
+export async function assertModuleActive(resolver: ModulesResolver, tenant: Tenant, module: ModuleId) {
+  if (!(await resolver(tenant)).includes(module)) {
+    throw new AppError(403, 'module_disabled', `El módulo «${MODULES[module].name}» no está activo para su organización. Contacte al administrador de la plataforma.`);
+  }
 }
 
 export const API_KEY_PREFIX = 'gc_';
@@ -36,7 +50,7 @@ export async function verifyPassword(password: string, hash: string) {
   return bcrypt.compare(password, hash);
 }
 
-export function createAuth(config: AppConfig, db: Database) {
+export function createAuth(config: AppConfig, db: Database, modulesOf?: ModulesResolver) {
   const secret = new TextEncoder().encode(config.JWT_SECRET);
 
   async function signToken(user: Pick<User, 'id' | 'tenantId' | 'role'>) {
@@ -132,7 +146,12 @@ export function createAuth(config: AppConfig, db: Database) {
       } else if (options.role && !hasRole(auth.role, options.role)) {
         throw forbidden();
       }
-      if (auth.tenant && auth.role !== 'superadmin') assertTenantAvailable(auth.tenant);
+      if (auth.tenant && auth.role !== 'superadmin') assertTenantAvailable(auth.tenant, { allowBilling: options.allowBillingSuspended && auth.kind === 'user' });
+      if (modulesOf && auth.tenant && !(options.allowBillingSuspended && auth.tenant.status !== 'active')) {
+        // Las API keys solo funcionan con el módulo de integraciones activo.
+        if (auth.kind === 'apiKey') await assertModuleActive(modulesOf, auth.tenant, 'integrations');
+        if (options.module) await assertModuleActive(modulesOf, auth.tenant, options.module);
+      }
     };
   }
 
@@ -142,8 +161,14 @@ export function createAuth(config: AppConfig, db: Database) {
 export type Auth = ReturnType<typeof createAuth>;
 
 /** Falla si la organización está suspendida o si su demo venció. */
-export function assertTenantAvailable(tenant: Pick<Tenant, 'status' | 'isDemo' | 'demoExpiresAt'>) {
-  if (tenant.status !== 'active') throw forbidden('La organización está suspendida. Contacte al soporte.');
+export function assertTenantAvailable(tenant: Pick<Tenant, 'status' | 'isDemo' | 'demoExpiresAt'> & { suspendedReason?: string | null }, options: { allowBilling?: boolean } = {}) {
+  if (tenant.status !== 'active') {
+    if (tenant.suspendedReason === 'billing') {
+      if (options.allowBilling) return;
+      throw new AppError(403, 'billing_suspended', 'La organización está suspendida por falta de pago. Un administrador puede regularizarla en «Plan y facturación».');
+    }
+    throw forbidden('La organización está suspendida. Contacte al soporte.');
+  }
   if (tenant.isDemo && tenant.demoExpiresAt && tenant.demoExpiresAt.getTime() < Date.now()) {
     throw new AppError(403, 'demo_expired', 'La demo venció. Contáctenos para continuar con un plan y conservar su configuración.');
   }

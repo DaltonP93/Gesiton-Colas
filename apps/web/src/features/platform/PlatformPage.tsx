@@ -1,8 +1,8 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Building2, HardDrive, LogIn, LogOut, MonitorPlay, Plus, Search, Settings2, Shield, ShieldCheck, Ticket, UserCog, Users } from 'lucide-react';
+import { Blocks, Building2, HardDrive, LogIn, LogOut, MonitorPlay, Plus, Receipt, Search, Settings2, Shield, ShieldCheck, Ticket, UserCog, Users } from 'lucide-react';
 import { useEffect, useId, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
-import { PLAN_IDS, PLANS, type InviteResultDTO, type PlanId, type TenantDTO } from '@gc/shared';
+import { MODULES, PLAN_IDS, PLANS, type InviteResultDTO, type ModuleId, type PlanId, type PlatformSettings, type TenantDTO } from '@gc/shared';
 import { InviteResultModal } from '../../components/InviteResult';
 import {
   Badge,
@@ -25,7 +25,9 @@ import {
 } from '../../components/ui';
 import { assetUrl } from '../../lib/api';
 import { AdminsTab } from './AdminsTab';
+import { BillingTab } from './BillingTab';
 import { PlatformSettingsTab } from './PlatformSettingsTab';
+import { TenantModulesModal } from './TenantModulesModal';
 import { TenantUsersModal } from './TenantUsersModal';
 import { api, errorMessage } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
@@ -41,13 +43,15 @@ interface PlatformStats {
 }
 
 type PlatformTenant = TenantDTO & {
+  /** Módulos activos (plan + ajustes). */
+  modules: ModuleId[];
   storageBytes: number;
   usage: { users: number; branches: number; displays: number; tickets30d: number };
 };
 
 type TenantPatch = { id: string; name?: string; plan?: PlanId; status?: TenantDTO['status']; isDemo?: boolean; extendDemoDays?: number };
 
-type PlatformTab = 'organizaciones' | 'administradores' | 'ajustes';
+type PlatformTab = 'organizaciones' | 'facturacion' | 'administradores' | 'ajustes';
 
 const PLAN_COLORS: Record<PlanId, string> = {
   free: '#64748b',
@@ -72,7 +76,7 @@ export default function PlatformPage() {
   const [creating, setCreating] = useState(false);
   const [tab, setTab] = useState<PlatformTab>(() => {
     const hash = window.location.hash.slice(1);
-    return hash === 'administradores' || hash === 'ajustes' ? hash : 'organizaciones';
+    return hash === 'administradores' || hash === 'ajustes' || hash === 'facturacion' ? hash : 'organizaciones';
   });
   const changeTab = (next: PlatformTab) => {
     setTab(next);
@@ -81,6 +85,7 @@ export default function PlatformPage() {
 
   const titles: Record<PlatformTab, { title: string; description: string }> = {
     organizaciones: { title: 'Organizaciones', description: 'Administre las organizaciones (clientes) de la plataforma: planes, estado, usuarios y soporte.' },
+    facturacion: { title: 'Facturación', description: 'Facturas de los planes a las organizaciones, cobros, vencimientos y la pasarela con la que pagan.' },
     administradores: { title: 'Superadministradores', description: 'Personas con acceso total a la plataforma: todas las organizaciones, planes y ajustes.' },
     ajustes: { title: 'Ajustes de la plataforma', description: 'Qué se ve en la dirección principal, quién puede registrarse, la marca del ingreso y el correo saliente.' },
   };
@@ -150,6 +155,7 @@ export default function PlatformPage() {
             onChange={changeTab}
             tabs={[
               { value: 'organizaciones', label: 'Organizaciones', icon: <Building2 className="size-4" /> },
+              { value: 'facturacion', label: 'Facturación', icon: <Receipt className="size-4" /> },
               { value: 'administradores', label: 'Superadministradores', icon: <UserCog className="size-4" /> },
               { value: 'ajustes', label: 'Ajustes', icon: <Settings2 className="size-4" /> },
             ]}
@@ -161,6 +167,7 @@ export default function PlatformPage() {
             <TenantsCard onCreate={() => setCreating(true)} />
           </>
         )}
+        {tab === 'facturacion' && <BillingTab />}
         {tab === 'administradores' && <AdminsTab />}
         {tab === 'ajustes' && <PlatformSettingsTab />}
       </main>
@@ -216,6 +223,8 @@ function TenantsCard({ onCreate }: { onCreate: () => void }) {
   const q = useDebounced(search.trim());
   const [entering, setEntering] = useState<string | null>(null);
   const [viewingUsers, setViewingUsers] = useState<PlatformTenant | null>(null);
+  const [editingModules, setEditingModules] = useState<PlatformTenant | null>(null);
+  const platformSettings = useQuery({ queryKey: ['platform', 'settings'], queryFn: () => api.get<PlatformSettings>('/platform/settings') });
 
   const tenants = useQuery({
     queryKey: ['platform', 'tenants', q],
@@ -409,6 +418,9 @@ function TenantsCard({ onCreate }: { onCreate: () => void }) {
                   <td className="whitespace-nowrap text-muted">{formatDateTime(tenant.createdAt)}</td>
                   <td>
                     <div className="flex justify-end gap-1.5">
+                      <Button size="sm" variant="ghost" icon={<Blocks className="size-4" />} onClick={() => setEditingModules(tenant)} title={tenant.modules.map((m) => MODULES[m].name).join(', ')}>
+                        Módulos <span className="text-xs text-muted tabular-nums">{tenant.modules.length}</span>
+                      </Button>
                       <Button size="sm" variant="ghost" icon={<Users className="size-4" />} onClick={() => setViewingUsers(tenant)}>
                         Usuarios
                       </Button>
@@ -424,6 +436,9 @@ function TenantsCard({ onCreate }: { onCreate: () => void }) {
         </Table>
       )}
       {viewingUsers && <TenantUsersModal tenant={viewingUsers} onClose={() => setViewingUsers(null)} onEnter={() => enter(viewingUsers)} />}
+      {editingModules && platformSettings.data && (
+        <TenantModulesModal tenant={editingModules} planModules={platformSettings.data.plans[editingModules.plan].modules} onClose={() => setEditingModules(null)} />
+      )}
     </Card>
   );
 }

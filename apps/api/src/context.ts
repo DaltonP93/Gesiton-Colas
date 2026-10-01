@@ -1,12 +1,16 @@
 import type { FastifyBaseLogger } from 'fastify';
-import { RT, type TicketDTO, type WebhookEvent } from '@gc/shared';
+import { RT, effectiveModules, type ModuleId, type TicketDTO, type WebhookEvent } from '@gc/shared';
 import type { AppConfig } from './config';
 import type { Database } from './db/client';
-import type { Tenant } from './db/schema';
+import { eq } from 'drizzle-orm';
+import { tenants, tickets, type Tenant } from './db/schema';
 import { createAuth, type Auth } from './lib/auth';
 import { tenantSettings, toCallDTO } from './lib/dto';
 import { brandFrom, type EmailBrand } from './lib/emails';
 import { createMailer, type Mailer } from './lib/mailer';
+import { Notifier } from './lib/notifier';
+import { Payments } from './lib/payments/service';
+import { surveyLinkFor } from './lib/surveys';
 import { createPlatformSettings, type PlatformSettingsStore } from './lib/platformSettings';
 import { createStorage, type Storage } from './lib/storage';
 import { WebhookDispatcher } from './modules/webhooks/dispatcher';
@@ -25,6 +29,12 @@ export interface AppContext {
   log: FastifyBaseLogger;
   /** Marca de los correos: la de la organización o, sin organización, la de la plataforma. */
   emailBrand(tenant: Tenant | null | undefined): Promise<EmailBrand>;
+  /** Módulos activos de una organización: los de su plan con los ajustes del superadministrador. */
+  modulesOf(tenant: Pick<Tenant, 'plan' | 'modules'>): Promise<ModuleId[]>;
+  /** Avisos al cliente por WhatsApp / SMS. */
+  notifier: Notifier;
+  /** Pasarelas, cobros y facturación de la plataforma. */
+  payments: Payments;
   /** Notifica un cambio de turno a pantallas, operadores, seguimiento público y webhooks. */
   publishTicket(
     tenantId: string,
@@ -54,13 +64,53 @@ export function toPublicTicketEvent(t: TicketDTO) {
 }
 
 export function createContext(config: AppConfig, db: Database, log: FastifyBaseLogger): AppContext {
-  const auth = createAuth(config, db);
+  const platform = createPlatformSettings(db);
+  const modulesOf = async (tenant: Pick<Tenant, 'plan' | 'modules'>) => {
+    const { plans } = await platform.get();
+    return effectiveModules(plans[tenant.plan]?.modules ?? plans.free.modules, tenant.modules);
+  };
+  const auth = createAuth(config, db, modulesOf);
   const rt = new Realtime(db, auth, log, config.CORS_ORIGINS);
-  const webhooks = new WebhookDispatcher(db, log, config.WEBHOOKS_ALLOW_PRIVATE);
+  const webhooks = new WebhookDispatcher(db, log, config.WEBHOOKS_ALLOW_PRIVATE, async (tenantId) => {
+    const [tenant] = await db.select({ plan: tenants.plan, modules: tenants.modules }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+    return tenant ? (await modulesOf(tenant)).includes('integrations') : false;
+  });
   const storage = createStorage(config);
   const mailer = createMailer(config, db, log);
-  const platform = createPlatformSettings(db);
+  const notifier = new Notifier({ config, db, log, modulesOf });
+  notifier.surveyLink = async (tenant, ticket) => ((await modulesOf(tenant)).includes('surveys') ? surveyLinkFor(db, config.PUBLIC_URL, tenant, ticket) : null);
   const publicUrl = config.PUBLIC_URL.replace(/\/$/, '');
+  const emailBrand = async (tenant: Tenant | null | undefined) => {
+    if (tenant) return brandFrom(tenantSettings(tenant).branding, publicUrl);
+    const { brand } = await platform.get();
+    return brandFrom({ appName: brand.appName, logoUrl: brand.logoUrl, primaryColor: brand.primaryColor }, publicUrl);
+  };
+  const payments = new Payments({
+    config,
+    db,
+    log,
+    mailer,
+    platformSettings: () => platform.get(),
+    emailBrand,
+    onTicketPaid(payment) {
+      void webhooks
+        .dispatch(payment.tenantId, 'payment.paid', {
+          payment: { id: payment.id, amount: payment.amount, currency: payment.currency, provider: payment.provider, method: payment.method, reference: payment.reference, paidAt: payment.paidAt },
+          ticketId: payment.ticketId,
+        })
+        .catch((error) => log.error({ err: error }, 'webhooks: pago'));
+      if (!payment.ticketId) return;
+      void db
+        .select({ token: tickets.publicToken, branchId: tickets.branchId })
+        .from(tickets)
+        .where(eq(tickets.id, payment.ticketId))
+        .then(([t]) => {
+          if (!t) return;
+          rt.emit(rooms.track(t.token), RT.ticketUpdated, { event: 'payment.paid', status: 'paid' });
+          rt.emit(rooms.staff(t.branchId), RT.ticketUpdated, { event: 'payment.paid', ticket: { id: payment.ticketId } });
+        });
+    },
+  });
 
   return {
     config,
@@ -71,12 +121,11 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
     webhooks,
     mailer,
     platform,
+    modulesOf,
+    notifier,
+    payments,
     log,
-    async emailBrand(tenant) {
-      if (tenant) return brandFrom(tenantSettings(tenant).branding, publicUrl);
-      const { brand } = await platform.get();
-      return brandFrom({ appName: brand.appName, logoUrl: brand.logoUrl, primaryColor: brand.primaryColor }, publicUrl);
-    },
+    emailBrand,
     publishTicket(tenantId, event, ticket, extra = {}, options = {}) {
       const call = toCallDTO(ticket);
       if (!options.announceName) call.customerName = null;
@@ -91,12 +140,13 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
         rt.emit(deviceRoom, RT.ticketCreated, { ticket: publicTicket });
         rt.emit(staffRoom, RT.ticketCreated, { ticket });
       }
-      rt.emit(deviceRoom, RT.ticketUpdated, { event, ticket: publicTicket });
+      rt.emit([deviceRoom, rooms.kioskBranch(ticket.branchId)], RT.ticketUpdated, { event, ticket: publicTicket });
       rt.emit(staffRoom, RT.ticketUpdated, { event, ticket });
       rt.emit(rooms.track(ticket.publicToken), RT.ticketUpdated, { event, status: ticket.status });
       webhooks
         .dispatch(tenantId, event, { ticket, ...extra })
         .catch((error) => log.error({ err: error }, 'webhooks: dispatch'));
+      notifier.onTicketEvent(tenantId, event, ticket).catch((error) => log.error({ err: error }, 'avisos: evento'));
     },
     refreshDevices(tenantId, target) {
       if (target?.displayId) rt.emit(rooms.display(target.displayId), RT.displayConfig, {});

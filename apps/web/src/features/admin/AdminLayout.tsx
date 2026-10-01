@@ -3,6 +3,7 @@ import {
   BarChart3,
   ChevronsLeft,
   ChevronsRight,
+  CreditCard,
   Headset,
   LayoutGrid,
   LogOut,
@@ -10,17 +11,19 @@ import {
   Menu,
   MonitorPlay,
   Music,
+  Receipt,
   Settings,
   Shield,
   Sparkles,
+  Star,
   Tablet,
   UserRound,
   Video,
   X,
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
-import type { Role } from '@gc/shared';
+import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
+import type { Role, ModuleId } from '@gc/shared';
 import { cx } from '../../components/ui';
 import { api, assetUrl } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
@@ -33,6 +36,10 @@ interface NavItem {
   end?: boolean;
   /** Otras rutas que marcan este ítem como activo. */
   also?: string[];
+  /** Se muestra si la organización tiene alguno de estos módulos activos. */
+  module?: ModuleId[];
+  /** Condición adicional para mostrarlo. */
+  when?: boolean;
 }
 
 const COLLAPSED_KEY = 'gc.nav.collapsed';
@@ -52,12 +59,13 @@ function isActive(pathname: string, item: NavItem) {
 }
 
 export function AdminLayout() {
-  const { me, settings, can, logout, impersonate } = useAuth();
+  const { me, settings, can, hasModule, logout, impersonate } = useAuth();
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsedState] = useState(readCollapsed);
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const branding = settings.branding;
+  const billingSuspended = me?.user.role !== 'superadmin' && me?.tenant?.status === 'suspended' && me.tenant.suspendedReason === 'billing';
 
   const setCollapsed = (value: boolean) => {
     setCollapsedState(value);
@@ -75,25 +83,32 @@ export function AdminLayout() {
         { to: '/app', label: 'Inicio', icon: <LayoutGrid />, role: 'agent', end: true },
         { to: '/app/atencion', label: 'Atención', icon: <Headset />, role: 'agent' },
         { to: '/app/monitor', label: 'Monitor en vivo', icon: <Activity />, role: 'manager' },
-        { to: '/app/reportes', label: 'Reportes', icon: <BarChart3 />, role: 'manager', also: ['/app/resumen'] },
+        { to: '/app/reportes', label: 'Reportes', icon: <BarChart3 />, role: 'manager', also: ['/app/resumen'], module: ['reports'] },
+        { to: '/app/encuestas', label: 'Encuestas', icon: <Star />, role: 'manager', module: ['surveys'] },
+        { to: '/app/cobros', label: 'Cobros', icon: <CreditCard />, role: 'manager', module: ['payments'] },
       ],
     },
     {
       title: 'Pantallas y contenido',
       items: [
-        { to: '/app/pantallas', label: 'Pantallas', icon: <MonitorPlay />, role: 'manager', also: ['/app/vincular'] },
-        { to: '/app/kioscos', label: 'Kioscos', icon: <Tablet />, role: 'manager' },
-        { to: '/app/contenido', label: 'Publicidad', icon: <Video />, role: 'manager', also: ['/app/listas'] },
-        { to: '/app/sonidos', label: 'Sonidos', icon: <Music />, role: 'manager' },
+        { to: '/app/pantallas', label: 'Pantallas', icon: <MonitorPlay />, role: 'manager', also: ['/app/vincular'], module: ['displays'] },
+        { to: '/app/kioscos', label: 'Kioscos', icon: <Tablet />, role: 'manager', module: ['kiosks'] },
+        { to: '/app/contenido', label: 'Publicidad', icon: <Video />, role: 'manager', also: ['/app/listas'], module: ['advertising'] },
+        { to: '/app/sonidos', label: 'Sonidos', icon: <Music />, role: 'manager', module: ['displays'] },
       ],
     },
     {
       title: 'Administración',
-      items: [{ to: '/app/configuracion', label: 'Configuración', icon: <Settings />, role: 'admin', also: ['/app/bienvenida'] }],
+      items: [
+        { to: '/app/configuracion', label: 'Configuración', icon: <Settings />, role: 'admin', also: ['/app/bienvenida'] },
+        { to: '/app/facturacion', label: 'Plan y facturación', icon: <Receipt />, role: 'admin', when: Boolean(me?.billing) },
+      ],
     },
   ];
 
-  const visibleGroups = groups.map((g) => ({ ...g, items: g.items.filter((i) => can(i.role)) })).filter((g) => g.items.length > 0);
+  const visibleGroups = groups
+    .map((g) => ({ ...g, items: g.items.filter((i) => can(i.role) && (!i.module || i.module.some(hasModule)) && i.when !== false) }))
+    .filter((g) => g.items.length > 0);
 
   // En el menú del celular siempre se muestran los textos.
   const renderNav = (compact: boolean) => (
@@ -301,7 +316,8 @@ export function AdminLayout() {
           <span className="truncate font-semibold">{branding.appName}</span>
         </header>
         <main className="mx-auto w-full max-w-[96rem] flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-          <Outlet />
+          {/* Suspendida por falta de pago: solo queda disponible «Plan y facturación». */}
+          {billingSuspended && pathname !== '/app/facturacion' ? <Navigate to="/app/facturacion" replace /> : <Outlet />}
         </main>
       </div>
     </div>
