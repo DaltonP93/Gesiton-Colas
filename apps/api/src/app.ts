@@ -35,6 +35,7 @@ import { privacyRoutes } from './modules/privacy/routes';
 import { surveyRoutes } from './modules/surveys/routes';
 import { billingRoutes } from './modules/billing/routes';
 import { paymentRoutes } from './modules/payments/routes';
+import { auditRoutes } from './modules/audit/routes';
 import { pairingRoutes } from './modules/pairing/routes';
 import { platformRoutes } from './modules/platform/routes';
 import { publicRoutes } from './modules/public/routes';
@@ -179,6 +180,8 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
 
   await app.register(
     async (api) => {
+      // Registro de auditoría de todos los cambios (lo hereda cada módulo).
+      api.addHook('onSend', ctx.audit.hook());
       await api.register(authRoutes(ctx));
       await api.register(tenantRoutes(ctx));
       await api.register(catalogRoutes(ctx));
@@ -190,6 +193,7 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
       await api.register(surveyRoutes(ctx));
       await api.register(billingRoutes(ctx));
       await api.register(paymentRoutes(ctx));
+      await api.register(auditRoutes(ctx));
       await api.register(agentRoutes(ctx));
       await api.register(deviceRoutes(ctx));
       await api.register(mediaRoutes(ctx));

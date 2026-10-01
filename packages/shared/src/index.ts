@@ -13,3 +13,4 @@ export * from './surveys';
 export * from './currency';
 export * from './payments';
 export * from './billing';
+export * from './audit';

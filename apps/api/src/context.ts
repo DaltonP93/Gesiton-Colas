@@ -8,6 +8,7 @@ import { createAuth, type Auth } from './lib/auth';
 import { tenantSettings, toCallDTO } from './lib/dto';
 import { brandFrom, type EmailBrand } from './lib/emails';
 import { createMailer, type Mailer } from './lib/mailer';
+import { Audit } from './lib/audit';
 import { Notifier } from './lib/notifier';
 import { Payments } from './lib/payments/service';
 import { surveyLinkFor } from './lib/surveys';
@@ -35,6 +36,8 @@ export interface AppContext {
   notifier: Notifier;
   /** Pasarelas, cobros y facturación de la plataforma. */
   payments: Payments;
+  /** Registro de auditoría: quién cambió qué. */
+  audit: Audit;
   /** Notifica un cambio de turno a pantallas, operadores, seguimiento público y webhooks. */
   publishTicket(
     tenantId: string,
@@ -78,6 +81,7 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
   const storage = createStorage(config);
   const mailer = createMailer(config, db, log);
   const notifier = new Notifier({ config, db, log, modulesOf });
+  const audit = new Audit(db, log);
   notifier.surveyLink = async (tenant, ticket) => ((await modulesOf(tenant)).includes('surveys') ? surveyLinkFor(db, config.PUBLIC_URL, tenant, ticket) : null);
   const publicUrl = config.PUBLIC_URL.replace(/\/$/, '');
   const emailBrand = async (tenant: Tenant | null | undefined) => {
@@ -92,6 +96,7 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
     mailer,
     platformSettings: () => platform.get(),
     emailBrand,
+    audit,
     onTicketPaid(payment) {
       void webhooks
         .dispatch(payment.tenantId, 'payment.paid', {
@@ -124,6 +129,7 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
     modulesOf,
     notifier,
     payments,
+    audit,
     log,
     emailBrand,
     publishTicket(tenantId, event, ticket, extra = {}, options = {}) {

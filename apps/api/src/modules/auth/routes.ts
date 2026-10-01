@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { eq } from 'drizzle-orm';
+import type { FastifyRequest } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { LOCALES, PLANS, type MeDTO } from '@gc/shared';
@@ -84,8 +85,21 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
     }
   }
 
+  function auditLogin(request: FastifyRequest, user: User, how: string) {
+    ctx.audit.record({
+      tenantId: user.tenantId,
+      actor: { kind: 'user', id: user.id, name: user.name, email: user.email, role: user.role },
+      action: 'auth.login',
+      entity: 'auth',
+      entityId: user.id,
+      summary: `Ingresó ${how}`,
+      ip: request.ip,
+      userAgent: request.headers['user-agent'] ?? null,
+    });
+  }
+
   /** Verifica que la cuenta pueda iniciar sesión y devuelve el token + datos de sesión. */
-  async function startSession(user: User, tenant: Tenant | null, options: { markVerified?: boolean } = {}) {
+  async function startSession(user: User, tenant: Tenant | null, options: { markVerified?: boolean; request?: FastifyRequest; how?: string } = {}) {
     if (!user.active) throw forbidden('El usuario está deshabilitado');
     // Suspendida por falta de pago: el administrador puede entrar para pagar.
     if (tenant && user.role !== 'superadmin') assertTenantAvailable(tenant, { allowBilling: user.role === 'admin' });
@@ -93,6 +107,7 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
     if (options.markVerified && !user.emailVerifiedAt) patch.emailVerifiedAt = new Date();
     await ctx.db.update(users).set(patch).where(eq(users.id, user.id));
     const sessionToken = await ctx.auth.signToken(user);
+    if (options.request && options.how) auditLogin(options.request, user, options.how);
     return { token: sessionToken, ...(await me(user.id)) };
   }
 
@@ -147,7 +162,7 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
       if (verification === 'required') {
         return reply.code(201).send({ verificationRequired: true, email: admin.email });
       }
-      return reply.code(201).send(await startSession(admin, tenant));
+      return reply.code(201).send(await startSession(admin, tenant, { request, how: 'al crear la organización' }));
     },
   );
 
@@ -211,13 +226,25 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
       }
       if (!found || !valid) {
         loginThrottle.fail(key);
+        if (found) {
+          ctx.audit.record({
+            tenantId: found.user.tenantId,
+            actor: { kind: 'user', id: found.user.id, name: found.user.name, email: found.user.email, role: found.user.role },
+            action: 'auth.login_failed',
+            entity: 'auth',
+            entityId: found.user.id,
+            summary: 'Contraseña incorrecta al ingresar',
+            ip: request.ip,
+            userAgent: request.headers['user-agent'] ?? null,
+          });
+        }
         throw unauthorized('Email o contraseña incorrectos');
       }
       loginThrottle.success(key);
       if (ctx.config.EMAIL_VERIFICATION === 'required' && !found.user.emailVerifiedAt && found.user.role !== 'superadmin') {
         throw new AppError(403, 'email_not_verified', 'Confirme su correo electrónico para ingresar. Revise su bandeja de entrada.');
       }
-      return startSession(found.user, found.tenant);
+      return startSession(found.user, found.tenant, { request, how: 'con contraseña' });
     },
   );
 
@@ -272,7 +299,7 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
         userId = found.user.id;
       }
       const { user, tenant } = await loadUser(userId);
-      return startSession(user, tenant, { markVerified: true });
+      return startSession(user, tenant, { markVerified: true, request, how: 'con un código o enlace por correo' });
     },
   );
 
@@ -284,7 +311,7 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
     async (request) => {
       const userId = await consumeToken(ctx.db, request.body.token, 'verify_email');
       const { user, tenant } = await loadUser(userId);
-      return startSession(user, tenant, { markVerified: true });
+      return startSession(user, tenant, { markVerified: true, request, how: 'al confirmar su correo' });
     },
   );
 
@@ -340,7 +367,7 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
         })
         .where(eq(users.id, userId));
       const { user, tenant } = await loadUser(userId);
-      return startSession(user, tenant, { markVerified: true });
+      return startSession(user, tenant, { markVerified: true, request, how: 'al restablecer su contraseña' });
     },
   );
 
@@ -379,7 +406,7 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
         })
         .where(eq(users.id, userId));
       const { user, tenant } = await loadUser(userId);
-      return startSession(user, tenant, { markVerified: true });
+      return startSession(user, tenant, { markVerified: true, request, how: 'al aceptar la invitación' });
     },
   );
 

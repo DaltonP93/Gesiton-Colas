@@ -34,6 +34,7 @@ Se encontraron y **corrigieron** los siguientes problemas:
 - Confirmaciones de pago verificadas (firma HMAC de Stripe, tokens de PagoPar y Bancard) y limitadas a la organización dueña de la pasarela; los pagos acreditados no cambian de estado.
 - Sesiones JWT con algoritmo fijo que se invalidan al cambiar o restablecer la contraseña.
 - Rol y estado del usuario leídos de la base en cada pedido; módulos y suspensión aplicados en la API.
+- **Registro de auditoría** (Configuración → Registro de actividad; Plataforma → Actividad): cada cambio guarda quién lo hizo, cuándo, desde qué IP y los datos enviados (sin contraseñas ni claves), además de los ingresos y los intentos fallidos. Lo que hace un superadministrador dentro de una organización queda marcado como «Soporte» y la organización lo ve. Se conserva un año.
 - Consultas parametrizadas, protección contra inyección de fórmulas en CSV, archivos subidos con nombres generados y servidos con `CSP sandbox`.
 - Política de contenido (CSP) en el panel, las pantallas y los kioscos: solo se ejecuta código propio y la API de YouTube.
 

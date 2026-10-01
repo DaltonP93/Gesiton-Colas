@@ -16,6 +16,8 @@ import {
 } from 'drizzle-orm/pg-core';
 import type {
   ApiKeyScope,
+  AuditActorKind,
+  AuditEntity,
   CustomerData,
   DisplayConfig,
   KioskConfig,
@@ -716,6 +718,31 @@ export const paymentGateways = pgTable(
   (t) => [uniqueIndex('payment_gateways_webhook_idx').on(t.webhookToken)],
 );
 
+/** Registro de auditoría: quién cambió qué (organización o plataforma). */
+export const auditLogs = pgTable(
+  'audit_logs',
+  {
+    id: id(),
+    /** null = acción de la plataforma (superadministrador). */
+    tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }),
+    actorKind: text('actor_kind').$type<AuditActorKind>().notNull(),
+    actorId: uuid('actor_id'),
+    actorName: text('actor_name').notNull(),
+    actorEmail: text('actor_email'),
+    actorRole: text('actor_role'),
+    support: boolean('support').notNull().default(false),
+    action: text('action').notNull(),
+    entity: text('entity').$type<AuditEntity>().notNull(),
+    entityId: text('entity_id'),
+    summary: text('summary').notNull(),
+    changes: jsonb('changes').$type<Record<string, unknown>>(),
+    ip: text('ip'),
+    userAgent: text('user_agent'),
+    createdAt: createdAt(),
+  },
+  (t) => [index('audit_logs_tenant_idx').on(t.tenantId, t.createdAt), index('audit_logs_entity_idx').on(t.entity, t.entityId), index('audit_logs_created_idx').on(t.createdAt)],
+);
+
 export type Tenant = typeof tenants.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Branch = typeof branches.$inferSelect;
@@ -738,5 +765,6 @@ export type NotifyMessageRow = typeof notifyMessages.$inferSelect;
 export type Survey = typeof surveys.$inferSelect;
 export type SurveyResponse = typeof surveyResponses.$inferSelect;
 export type Invoice = typeof invoices.$inferSelect;
+export type AuditLog = typeof auditLogs.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
 export type PaymentGatewayRow = typeof paymentGateways.$inferSelect;

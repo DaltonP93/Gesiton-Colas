@@ -1,6 +1,6 @@
 import { and, isNotNull, lt, or, sql } from 'drizzle-orm';
 import type { AppContext } from '../context';
-import { authTokens, devicePairings, tenants, webhookDeliveries } from '../db/schema';
+import { auditLogs, authTokens, devicePairings, tenants, webhookDeliveries } from '../db/schema';
 
 /** Días que se conservan las demos vencidas antes de borrarlas definitivamente. */
 const DEMO_RETENTION_DAYS = 30;
@@ -8,6 +8,8 @@ const DEMO_RETENTION_DAYS = 30;
 const WEBHOOK_RETENTION_DAYS = 30;
 /** Días que se conserva, como máximo, el historial de avisos por WhatsApp/SMS (teléfono y texto enviado). */
 const NOTIFY_RETENTION_DAYS = 90;
+/** Días que se conserva el registro de auditoría. */
+const AUDIT_RETENTION_DAYS = 365;
 
 /** Limpieza periódica: enlaces vencidos, vinculaciones viejas y demos abandonadas. */
 export async function runMaintenance(ctx: Pick<AppContext, 'db' | 'log'> & Partial<Pick<AppContext, 'payments'>>) {
@@ -38,6 +40,7 @@ export async function runMaintenance(ctx: Pick<AppContext, 'db' | 'log'> & Parti
       AND m.status <> 'pending'
       AND m.created_at < now() - make_interval(days => least(${NOTIFY_RETENTION_DAYS}, coalesce(nullif((o.settings->'privacy'->>'retentionDays')::int, 0), ${NOTIFY_RETENTION_DAYS})))`);
   if (messages.rowCount) ctx.log.info({ count: messages.rowCount }, 'mantenimiento: historial de avisos vencido borrado');
+  await ctx.db.delete(auditLogs).where(lt(auditLogs.createdAt, new Date(now.getTime() - AUDIT_RETENTION_DAYS * 24 * 3600 * 1000)));
   // Facturación: factura del mes y suspensión por falta de pago (si el superadministrador lo activó).
   await ctx.payments?.runCycle();
 }
