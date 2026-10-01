@@ -1,4 +1,5 @@
 import {
+  BellRing,
   Building2,
   ChevronRight,
   ClipboardList,
@@ -38,9 +39,10 @@ const UsersPage = lazy(() => import('./UsersPage'));
 const IntegrationsPage = lazy(() => import('./IntegrationsPage'));
 const NotificationsPage = lazy(() => import('./NotificationsPage'));
 const PaymentsSettingsPage = lazy(() => import('./PaymentsSettingsPage'));
+const AlertsSettingsPage = lazy(() => import('./AlertsSettingsPage'));
 
 type TabKey = 'marca' | 'region' | 'terminologia' | 'turnos' | 'cliente';
-type PageKey = 'sucursales' | 'servicios' | 'usuarios' | 'actividad' | 'correo' | 'avisos' | 'cobros' | 'integraciones';
+type PageKey = 'sucursales' | 'servicios' | 'alertas' | 'usuarios' | 'actividad' | 'correo' | 'avisos' | 'cobros' | 'integraciones';
 export type ConfigSection = 'inicio' | TabKey | PageKey;
 
 interface SectionDef {
@@ -67,6 +69,7 @@ const PAGE_COMPONENTS: Record<PageKey, ComponentType> = {
   servicios: ServicesPage,
   usuarios: UsersPage,
   actividad: ActivitySection,
+  alertas: AlertsSettingsPage,
   correo: MailSection,
   avisos: NotificationsPage,
   cobros: PaymentsSettingsPage,
@@ -115,6 +118,7 @@ export default function ConfigurationPage() {
       { key: 'servicios', label: `${terms.services} y prioridades`, short: terms.services, description: 'Qué se atiende y quién pasa primero', icon: <ClipboardList />, group: 'Atención' },
       { key: 'turnos', label: `Numeración de ${terms.tickets.toLowerCase()}`, short: 'Numeración', description: 'Dígitos, reinicio y rellamados', icon: <Hash />, group: 'Atención' },
       { key: 'cliente', label: `Datos del ${terms.customer.toLowerCase()}`, short: `Datos del ${terms.customer.toLowerCase()}`, description: 'Qué se pide al sacar turno', icon: <TextCursorInput />, group: 'Atención' },
+      { key: 'alertas', label: 'Alertas de equipos', short: 'Alertas', description: 'Aviso si una TV o un kiosco se desconecta', icon: <BellRing />, group: 'Atención' },
       { key: 'usuarios', label: 'Usuarios', short: 'Usuarios', description: 'Equipo, roles e invitaciones', icon: <Users />, group: 'Equipo e integraciones' },
       { key: 'actividad', label: 'Registro de actividad', short: 'Actividad', description: 'Quién cambió qué y cuándo', icon: <History />, group: 'Equipo e integraciones' },
       { key: 'correo', label: 'Correo saliente', short: 'Correo', description: 'Servidor SMTP para invitaciones y avisos', icon: <Mail />, group: 'Equipo e integraciones' },
@@ -291,6 +295,7 @@ function Overview({ sections }: { sections: SectionDef[] }) {
     cliente: settings.customerFields.length ? `${settings.customerFields.length} campos propios` : 'Nombre, documento, teléfono y email',
     usuarios: users.data ? `${users.data.length} ${users.data.length === 1 ? 'usuario' : 'usuarios'}` : '…',
     actividad: 'Cambios e ingresos del último año',
+    alertas: settings.alerts.devices.enabled ? `A los ${settings.alerts.devices.minutes} min sin conexión` : 'Desactivadas',
     correo: 'Invitaciones, códigos de acceso y recuperación',
     cobros: `Moneda ${settings.payments.currency}${settings.payments.online ? ' · pago en línea' : ''}`,
     avisos: Object.values(settings.notifications.events).filter((e) => e.enabled).length + ' avisos activos',

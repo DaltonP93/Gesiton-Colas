@@ -9,6 +9,7 @@ import { tenantSettings, toCallDTO } from './lib/dto';
 import { brandFrom, type EmailBrand } from './lib/emails';
 import { createMailer, type Mailer } from './lib/mailer';
 import { Audit } from './lib/audit';
+import { DeviceMonitor } from './lib/deviceMonitor';
 import { Notifier } from './lib/notifier';
 import { Payments } from './lib/payments/service';
 import { surveyLinkFor } from './lib/surveys';
@@ -38,6 +39,8 @@ export interface AppContext {
   payments: Payments;
   /** Registro de auditoría: quién cambió qué. */
   audit: Audit;
+  /** Alertas de TVs y kioscos desconectados. */
+  devices: DeviceMonitor;
   /** Notifica un cambio de turno a pantallas, operadores, seguimiento público y webhooks. */
   publishTicket(
     tenantId: string,
@@ -130,6 +133,7 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
     notifier,
     payments,
     audit,
+    devices: new DeviceMonitor({ config, db, log, mailer, notifier, modulesOf, emailBrand, onChange: (tenantId) => rt.emit(rooms.tenant(tenantId), RT.devicesStatus, {}) }),
     log,
     emailBrand,
     publishTicket(tenantId, event, ticket, extra = {}, options = {}) {

@@ -64,6 +64,13 @@
       "when": 1790856750520,
       "tag": "0008_audit_logs",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790857024552,
+      "tag": "0009_device_alerts",
+      "breakpoints": true
     }
   ]
 }

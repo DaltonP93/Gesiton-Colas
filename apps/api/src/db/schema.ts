@@ -380,6 +380,8 @@ export const displays = pgTable(
     config: jsonb('config').$type<DisplayConfig>().notNull(),
     playlistId: uuid('playlist_id').references(() => playlists.id, { onDelete: 'set null' }),
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
+    /** Se avisó que está desconectada (se limpia al volver). */
+    offlineAlertedAt: timestamp('offline_alerted_at', { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -398,6 +400,8 @@ export const kiosks = pgTable(
     token: text('token').notNull(),
     config: jsonb('config').$type<KioskConfig>().notNull(),
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
+    /** Se avisó que está desconectado (se limpia al volver). */
+    offlineAlertedAt: timestamp('offline_alerted_at', { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

@@ -425,3 +425,12 @@ export interface NumberingStatusDTO {
     nextCode: string;
   }[];
 }
+
+/** Equipo (TV o kiosco) desconectado. */
+export interface OfflineDeviceDTO {
+  id: string;
+  kind: 'display' | 'kiosk';
+  name: string;
+  branch: string;
+  lastSeenAt: string;
+}

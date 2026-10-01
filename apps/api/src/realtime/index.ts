@@ -74,7 +74,14 @@ export class Realtime {
       const [kiosk] = await this.db.select().from(kiosks).where(eq(kiosks.token, token)).limit(1);
       if (!kiosk) throw new Error('kiosco inválido');
       await socket.join([rooms.kioskBranch(kiosk.branchId), rooms.kiosk(kiosk.id), rooms.devices(kiosk.tenantId)]);
-      await this.db.update(kiosks).set({ lastSeenAt: new Date() }).where(eq(kiosks.id, kiosk.id));
+      // Igual que las pantallas: latido cada minuto para saber si sigue conectado.
+      const touch = () => this.db.update(kiosks).set({ lastSeenAt: new Date() }).where(eq(kiosks.id, kiosk.id)).catch(() => undefined);
+      await touch();
+      const heartbeat = setInterval(touch, 60_000);
+      socket.on('disconnect', () => {
+        clearInterval(heartbeat);
+        void touch();
+      });
       socket.emit('ready', { kind: 'kiosk', id: kiosk.id });
       return;
     }

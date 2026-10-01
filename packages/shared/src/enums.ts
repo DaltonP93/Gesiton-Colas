@@ -95,6 +95,8 @@ export const RT = {
   displayConfig: 'display.config',
   kioskConfig: 'kiosk.config',
   tenantSettings: 'tenant.settings',
+  /** Cambió el estado de conexión de las TVs o kioscos. */
+  devicesStatus: 'devices.status',
 } as const;
 
 /**

@@ -113,6 +113,26 @@ export const privacySettingsSchema = z.object({
 });
 export type PrivacySettings = z.infer<typeof privacySettingsSchema>;
 
+/** Alertas cuando una TV o un kiosco se desconecta. */
+export const deviceAlertSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    /** Minutos sin conexión antes de avisar. */
+    minutes: z.number().int().min(2).max(120).default(5),
+    /** Días (0 = domingo) y horario en que se avisa: fuera de horario las TVs suelen estar apagadas. */
+    days: z.array(z.number().int().min(0).max(6)).max(7).default([1, 2, 3, 4, 5, 6]),
+    from: z.string().regex(/^\d{2}:\d{2}$/).default('07:00'),
+    to: z.string().regex(/^\d{2}:\d{2}$/).default('20:00'),
+    /** Correos que reciben la alerta (vacío = los administradores). */
+    emails: z.array(z.email().max(200)).max(10).default([]),
+    /** Teléfonos para WhatsApp/SMS (módulo «Avisos»). */
+    phones: z.array(z.string().trim().max(30)).max(5).default([]),
+    /** Avisar también cuando vuelve a conectarse. */
+    recovery: z.boolean().default(true),
+  })
+  .prefault({});
+export type DeviceAlertSettings = z.infer<typeof deviceAlertSchema>;
+
 export const tenantSettingsSchema = z.object({
   branding: brandingSchema.prefault({}),
   terminology: terminologySchema.prefault({}),
@@ -125,6 +145,7 @@ export const tenantSettingsSchema = z.object({
   /** Avisos por WhatsApp / SMS (módulo «notifications»). */
   notifications: notificationSettingsSchema.prefault({}),
   payments: tenantPaymentSettingsSchema.prefault({}),
+  alerts: z.object({ devices: deviceAlertSchema }).prefault({}),
 });
 export type TenantSettings = z.infer<typeof tenantSettingsSchema>;
 

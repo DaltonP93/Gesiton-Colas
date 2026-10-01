@@ -161,3 +161,25 @@ export function invoiceMail(
   });
   return { to, subject: `Factura ${invoice.number} · ${invoice.amount}`, html, text, fromName: brand.appName, tag: 'invoice' };
 }
+
+export function deviceAlertMail(
+  to: string,
+  name: string,
+  alert: { organization: string; offline: { name: string; kind: string; branch: string; since: string }[]; recovered: { name: string; kind: string; branch: string }[] },
+  url: string,
+  brand: EmailBrand,
+): MailMessage {
+  const offline = alert.offline.map((d) => `• ${d.kind} «${d.name}» (${d.branch}): sin conexión desde ${d.since}.`);
+  const recovered = alert.recovered.map((d) => `• ${d.kind} «${d.name}» (${d.branch}) volvió a conectarse.`);
+  const title = alert.offline.length ? (alert.offline.length === 1 ? 'Un equipo se desconectó' : `${alert.offline.length} equipos se desconectaron`) : 'Los equipos volvieron a conectarse';
+  const { html, text } = layout({
+    brand,
+    title,
+    intro: [greet(name), ...offline, ...recovered],
+    cta: { label: 'Ver los equipos', url },
+    outro: alert.offline.length
+      ? ['Revise que la TV o la tablet esté encendida, con la página abierta y con conexión a Internet. Si se reinició, ábrala de nuevo desde el enlace o vincúlela con un código.']
+      : [],
+  });
+  return { to, subject: `${title} · ${alert.organization}`, html, text, fromName: brand.appName, tag: 'device_alert' };
+}

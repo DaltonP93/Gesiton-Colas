@@ -36,6 +36,7 @@ import { surveyRoutes } from './modules/surveys/routes';
 import { billingRoutes } from './modules/billing/routes';
 import { paymentRoutes } from './modules/payments/routes';
 import { auditRoutes } from './modules/audit/routes';
+import { alertRoutes } from './modules/alerts/routes';
 import { pairingRoutes } from './modules/pairing/routes';
 import { platformRoutes } from './modules/platform/routes';
 import { publicRoutes } from './modules/public/routes';
@@ -194,6 +195,7 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
       await api.register(billingRoutes(ctx));
       await api.register(paymentRoutes(ctx));
       await api.register(auditRoutes(ctx));
+      await api.register(alertRoutes(ctx));
       await api.register(agentRoutes(ctx));
       await api.register(deviceRoutes(ctx));
       await api.register(mediaRoutes(ctx));
@@ -241,6 +243,7 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
   if (config.NODE_ENV !== 'test') {
     ctx.webhooks.start();
     ctx.notifier.start();
+    ctx.devices.start();
   }
   await ensureSuperadmin(ctx);
 
@@ -248,6 +251,7 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
     stopMaintenance();
     ctx.webhooks.stop();
     ctx.notifier.stop();
+    ctx.devices.stop();
     ctx.rt.close();
     await pool?.pool.end();
   });
