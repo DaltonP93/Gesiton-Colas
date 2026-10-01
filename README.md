@@ -131,3 +131,5 @@ docker compose exec app node apps/api/dist/db/admin-cli.js superadmin correo@emp
 - [Despliegue y dispositivos](docs/DESPLIEGUE.md): producción, S3, TV, kioscos e impresoras.
 - [Migración desde la versión anterior](docs/MIGRACION.md).
 - [Pagos y facturación](docs/PAGOS.md): planes, cobros a clientes y pasarelas.
+- [Factura electrónica SIFEN](docs/SIFEN.md): emisor, timbrado, certificado, CSC, pruebas y producción.
+- [Hoja de ruta](docs/HOJA-DE-RUTA.md): próximos pasos y pendientes (incluida la licencia / EULA).
