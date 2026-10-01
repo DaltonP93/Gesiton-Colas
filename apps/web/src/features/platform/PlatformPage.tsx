@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BadgeCheck, Blocks, Building2, CalendarPlus, DatabaseBackup, FileText, HardDrive, History, LogIn, LogOut, MonitorPlay, PauseCircle, PlayCircle, Plus, Receipt, Scale, Search, Settings2, Shield, ShieldCheck, Ticket, UserCog, Users } from 'lucide-react';
+import { BadgeCheck, Blocks, Building2, CalendarPlus, DatabaseBackup, FileText, HardDrive, History, LogIn, LogOut, Megaphone, MonitorPlay, PauseCircle, PlayCircle, Plus, Receipt, Scale, Search, Settings2, Shield, ShieldCheck, Ticket, UserCog, Users } from 'lucide-react';
 import { useEffect, useId, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { MODULES, PLAN_IDS, PLANS, type InviteResultDTO, type ModuleId, type PlanId, type PlatformSettings, type TenantDTO } from '@gc/shared';
@@ -31,6 +31,7 @@ import { BackupsTab } from './BackupsTab';
 import { BillingTab } from './BillingTab';
 import { SifenTab } from './SifenTab';
 import { LegalTab } from './LegalTab';
+import { CommsTab } from './CommsTab';
 import { PlatformSettingsTab } from './PlatformSettingsTab';
 import { TenantModulesModal } from './TenantModulesModal';
 import { TenantUsersModal } from './TenantUsersModal';
@@ -56,8 +57,8 @@ type PlatformTenant = TenantDTO & {
 
 type TenantPatch = { id: string; name?: string; plan?: PlanId; status?: TenantDTO['status']; isDemo?: boolean; extendDemoDays?: number };
 
-type PlatformTab = 'organizaciones' | 'facturacion' | 'sifen' | 'legal' | 'actividad' | 'administradores' | 'copias' | 'ajustes';
-const PLATFORM_TABS: PlatformTab[] = ['organizaciones', 'facturacion', 'sifen', 'legal', 'actividad', 'administradores', 'copias', 'ajustes'];
+type PlatformTab = 'organizaciones' | 'facturacion' | 'sifen' | 'comunicaciones' | 'legal' | 'actividad' | 'administradores' | 'copias' | 'ajustes';
+const PLATFORM_TABS: PlatformTab[] = ['organizaciones', 'facturacion', 'sifen', 'comunicaciones', 'legal', 'actividad', 'administradores', 'copias', 'ajustes'];
 
 const PLAN_COLORS: Record<PlanId, string> = {
   free: '#64748b',
@@ -84,6 +85,15 @@ export default function PlatformPage() {
     const hash = window.location.hash.slice(1) as PlatformTab;
     return PLATFORM_TABS.includes(hash) ? hash : 'organizaciones';
   });
+  // Los enlaces internos (#comunicaciones, #legal) cambian de pestaña.
+  useEffect(() => {
+    const onHash = () => {
+      const hash = window.location.hash.slice(1) as PlatformTab;
+      if (PLATFORM_TABS.includes(hash)) setTab(hash);
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
   const changeTab = (next: PlatformTab) => {
     setTab(next);
     window.history.replaceState(null, '', next === 'organizaciones' ? window.location.pathname : `#${next}`);
@@ -93,11 +103,12 @@ export default function PlatformPage() {
     organizaciones: { title: 'Organizaciones', description: 'Administre las organizaciones (clientes) de la plataforma: planes, estado, usuarios y soporte.' },
     facturacion: { title: 'Facturación', description: 'Facturas de los planes a las organizaciones, cobros, vencimientos y la pasarela con la que pagan.' },
     sifen: { title: 'Factura electrónica', description: 'Facturas electrónicas SIFEN de los planes a las organizaciones: emisor de la plataforma, timbrado, certificado y documentos enviados a la SET.' },
+    comunicaciones: { title: 'Comunicaciones', description: 'Correo y WhatsApp/SMS de la plataforma, los avisos que envía (facturas, vencimientos, suspensiones, demos, términos, alertas) y por qué canal, y los canales de cada organización.' },
     legal: { title: 'Legal', description: 'Titular del software, términos del servicio, política de privacidad, tratamiento de datos, aceptaciones y contrato de licencia.' },
     actividad: { title: 'Actividad', description: 'Registro de auditoría de toda la plataforma: cambios de cada organización, acciones del soporte y de los superadministradores.' },
     administradores: { title: 'Superadministradores', description: 'Personas con acceso total a la plataforma: todas las organizaciones, planes y ajustes.' },
     copias: { title: 'Copias de seguridad', description: 'Copia diaria automática de la base de datos y los archivos, en el servidor y en destinos externos: S3 y compatibles, SFTP o WebDAV.' },
-    ajustes: { title: 'Ajustes de la plataforma', description: 'Qué se ve en la dirección principal, quién puede registrarse, la marca del ingreso y el correo saliente.' },
+    ajustes: { title: 'Ajustes de la plataforma', description: 'Qué se ve en la dirección principal, quién puede registrarse, los planes y la marca del ingreso.' },
   };
 
   return (
@@ -167,6 +178,7 @@ export default function PlatformPage() {
               { value: 'organizaciones', label: 'Organizaciones', icon: <Building2 className="size-4" /> },
               { value: 'facturacion', label: 'Facturación', icon: <Receipt className="size-4" /> },
               { value: 'sifen', label: 'SIFEN', icon: <FileText className="size-4" /> },
+              { value: 'comunicaciones', label: 'Comunicaciones', icon: <Megaphone className="size-4" /> },
               { value: 'legal', label: 'Legal', icon: <Scale className="size-4" /> },
               { value: 'actividad', label: 'Actividad', icon: <History className="size-4" /> },
               { value: 'administradores', label: 'Superadministradores', icon: <UserCog className="size-4" /> },
@@ -183,6 +195,7 @@ export default function PlatformPage() {
         )}
         {tab === 'facturacion' && <BillingTab />}
         {tab === 'sifen' && <SifenTab />}
+        {tab === 'comunicaciones' && <CommsTab />}
         {tab === 'legal' && <LegalTab />}
         {tab === 'actividad' && <AuditLog scope="platform" />}
         {tab === 'administradores' && <AdminsTab />}

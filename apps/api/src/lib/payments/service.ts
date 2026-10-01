@@ -23,6 +23,7 @@ import { badRequest } from '../errors';
 import type { Mailer } from '../mailer';
 import type { Audit } from '../audit';
 import { createCheckout, fetchStatus, GatewayError, parseWebhook, type GatewayRuntime } from './gateways';
+import type { PlatformNotices } from '../platformNotices';
 
 export const PLATFORM_PAY_SCOPE = 'platform';
 
@@ -65,6 +66,8 @@ interface PaymentsDeps {
   onTicketPaid?(payment: Payment): void;
   /** Registro de auditoría (suspensiones y reactivaciones automáticas). */
   audit?: Audit;
+  /** Avisos de la plataforma (correo y WhatsApp/SMS según Plataforma → Comunicaciones). */
+  notices?: PlatformNotices;
 }
 
 export interface StartPaymentInput {
@@ -437,25 +440,33 @@ export class Payments {
 
   async notifyInvoice(invoice: Invoice, tenant: Tenant) {
     const settings = await this.deps.platformSettings();
+    const brand = await this.deps.emailBrand(null);
+    const dto = toInvoiceDTO(invoice, tenant.name);
+    const amount = formatMoney(dto.amount, dto.currency);
+    const dueDate = dto.dueDate.split('-').reverse().join('/');
+    const mail = (admin: { email: string; name: string }) =>
+      invoiceMail(admin.email, admin.name, { number: dto.number, description: dto.description, amount, dueDate, organization: tenant.name }, `${this.base}/app/facturacion`, settings.billing.instructions, brand);
+    if (this.deps.notices) {
+      await this.deps.notices.toTenant(
+        'invoice_issued',
+        tenant,
+        {
+          subject: `Factura ${dto.number} · ${amount}`,
+          title: `Factura ${dto.number}`,
+          lines: [],
+          whatsapp: `${tenant.name}: emitimos la factura ${dto.number} (${dto.description}) por ${amount}, vence el ${dueDate}. Pague en ${this.base}/app/facturacion`,
+        },
+        { mail },
+      );
+      return;
+    }
     const admins = await this.deps.db
       .select({ email: users.email, name: users.name })
       .from(users)
       .where(and(eq(users.tenantId, tenant.id), eq(users.role, 'admin'), eq(users.active, true)));
-    const brand = await this.deps.emailBrand(null);
-    const dto = toInvoiceDTO(invoice, tenant.name);
     for (const admin of admins) {
       try {
-        await this.deps.mailer.send(
-          invoiceMail(
-            admin.email,
-            admin.name,
-            { number: dto.number, description: dto.description, amount: formatMoney(dto.amount, dto.currency), dueDate: dto.dueDate.split('-').reverse().join('/'), organization: tenant.name },
-            `${this.base}/app/facturacion`,
-            settings.billing.instructions,
-            brand,
-          ),
-          { tenantId: null },
-        );
+        await this.deps.mailer.send(mail(admin), { tenantId: null });
       } catch (error) {
         this.deps.log.warn({ err: error, invoice: invoice.id }, 'facturación: no se pudo enviar la factura');
       }
@@ -478,6 +489,7 @@ export class Payments {
       .returning({ id: tenants.id });
     if (res.length) {
       this.deps.log.warn({ count: res.length }, 'facturación: organizaciones suspendidas por falta de pago');
+      void this.deps.notices?.tenantSuspended(res.map((r) => r.id)).catch((error) => this.deps.log.error({ err: error }, 'avisos: suspensión'));
       for (const { id } of res) {
         this.deps.audit?.record({ tenantId: id, actor: { kind: 'system', id: null, name: 'Sistema' }, action: 'tenant.suspended_billing', entity: 'invoice', summary: `Organización suspendida por falta de pago (facturas vencidas hace más de ${billing.graceDays} días)` });
       }

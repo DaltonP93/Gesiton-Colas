@@ -11,6 +11,7 @@ import {
   Hash,
   History,
   LayoutGrid,
+  Lock,
   Mail,
   MessageCircle,
   Palette,
@@ -23,7 +24,7 @@ import {
 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
 import { Link, Navigate, useParams } from 'react-router';
-import type { ModuleId } from '@gc/shared';
+import { MODULES, type ModuleId } from '@gc/shared';
 import { AuditLog } from '../../components/AuditLog';
 import { MailSettingsForm } from '../../components/MailSettingsForm';
 import { Button, Loading, PageHeader, cx } from '../../components/ui';
@@ -59,8 +60,9 @@ interface SectionDef {
   description: string;
   icon: ReactNode;
   group: string;
-  /** Solo se muestra si la organización tiene el módulo activo. */
+  /** Requiere este módulo: sin él la sección se ve como «no incluida en su plan». */
   module?: ModuleId;
+  locked?: boolean;
 }
 
 const TAB_COMPONENTS: Record<TabKey, ComponentType<TabProps>> = {
@@ -84,6 +86,34 @@ const PAGE_COMPONENTS: Record<PageKey, ComponentType> = {
   integraciones: IntegrationsPage,
   contrato: LegalStatusSection,
 };
+/** Sección de un módulo que el plan de la organización no incluye. */
+function LockedSection({ def }: { def: SectionDef }) {
+  const { me, can } = useAuth();
+  const module = MODULES[def.module!];
+  return (
+    <div>
+      <SectionTitle icon={def.icon} title={def.label} description={def.description} />
+      <div className="gc-card gc-pad flex flex-wrap items-start gap-4">
+        <span className="grid size-12 shrink-0 place-items-center rounded-ui bg-subtle text-muted">
+          <Lock className="size-6" />
+        </span>
+        <div className="min-w-0 flex-1 basis-72">
+          <p className="font-semibold">No está incluido en su plan</p>
+          <p className="mt-1 text-sm text-muted">
+            {module.name}: {module.description}
+          </p>
+          <p className="mt-2 text-sm text-muted">Se activa con un plan que lo incluya o como módulo adicional. Pídaselo al administrador de la plataforma.</p>
+        </div>
+        {me?.billing && can('admin') && (
+          <Link to="/app/facturacion">
+            <Button variant="secondary">Ver mi plan</Button>
+          </Link>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ActivitySection() {
   return (
     <div>
@@ -138,7 +168,7 @@ export default function ConfigurationPage() {
       { key: 'factura', label: 'Factura electrónica (SIFEN)', short: 'Factura electrónica', description: 'RUC, timbrado, certificado digital y CSC', icon: <FileText />, group: 'Equipo e integraciones', module: 'invoicing' },
       { key: 'integraciones', label: 'Integraciones y API', short: 'Integraciones', description: 'API keys, webhooks y documentación', icon: <Plug />, group: 'Equipo e integraciones', module: 'integrations' },
       ] as SectionDef[]
-    ).filter((s) => !s.module || hasModule(s.module)),
+    ).map((s) => ({ ...s, locked: Boolean(s.module && !hasModule(s.module)) })),
     [terms, hasModule],
   );
 
@@ -186,6 +216,7 @@ export default function ConfigurationPage() {
               >
                 {s.icon}
                 {s.short}
+                {s.locked && <Lock className="size-3 opacity-60" aria-label="no incluido en su plan" />}
                 {isTab(s.key) && dirty[s.key] && <span className="size-1.5 rounded-full bg-accent" aria-label="cambios sin guardar" />}
               </Link>
             );
@@ -215,7 +246,8 @@ export default function ConfigurationPage() {
                           )}
                         >
                           {s.icon}
-                          <span className="min-w-0 flex-1 truncate">{s.label}</span>
+                          <span className={cx('min-w-0 flex-1 truncate', s.locked && 'opacity-60')}>{s.label}</span>
+                          {s.locked && <Lock className="size-3.5 opacity-50" aria-label="no incluido en su plan" />}
                           {isTab(s.key) && dirty[s.key] && (
                             <span className="size-1.5 shrink-0 rounded-full bg-accent" title="Cambios sin guardar">
                               <span className="sr-only">(cambios sin guardar)</span>
@@ -252,7 +284,9 @@ export default function ConfigurationPage() {
           );
         })}
 
-        {isPage(current.key) && (
+        {current.locked && current.module && <LockedSection def={current} />}
+
+        {isPage(current.key) && !current.locked && (
           <Suspense fallback={<Loading />}>
             {(() => {
               const Component = PAGE_COMPONENTS[current.key];
@@ -356,7 +390,7 @@ function Overview({ sections }: { sections: SectionDef[] }) {
                 <ChevronRight className="size-4 shrink-0 text-muted transition group-hover:translate-x-0.5" />
               </span>
               <span className="block text-xs text-muted">{s.description}</span>
-              <span className="mt-2 block truncate text-xs font-medium text-fg/80">{summary[s.key]}</span>
+              <span className="mt-2 block truncate text-xs font-medium text-fg/80">{s.locked ? 'No incluido en su plan' : summary[s.key]}</span>
             </span>
           </Link>
         ))}

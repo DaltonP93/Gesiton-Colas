@@ -13,6 +13,7 @@ import { Audit } from './lib/audit';
 import { Backups } from './lib/backups';
 import { Sifen } from './lib/sifen/service';
 import { Legal } from './lib/legal';
+import { PlatformNotices } from './lib/platformNotices';
 import { DeviceMonitor } from './lib/deviceMonitor';
 import { Notifier } from './lib/notifier';
 import { Payments } from './lib/payments/service';
@@ -53,6 +54,8 @@ export interface AppContext {
   sifen: Sifen;
   /** Términos, privacidad y tratamiento de datos: versiones y aceptaciones. */
   legal: Legal;
+  /** Avisos de la plataforma a las organizaciones y a los superadministradores. */
+  notices: PlatformNotices;
   /** Notifica un cambio de turno a pantallas, operadores, seguimiento público y webhooks. */
   publishTicket(
     tenantId: string,
@@ -105,6 +108,7 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
     return brandFrom({ appName: brand.appName, logoUrl: brand.logoUrl, primaryColor: brand.primaryColor }, publicUrl);
   };
   const sifen = new Sifen({ config, db, log, mailer, emailBrand, modulesOf });
+  const notices = new PlatformNotices({ db, log, mailer, notifier, platformSettings: () => platform.get(), emailBrand, publicUrl });
   const payments = new Payments({
     config,
     db,
@@ -113,6 +117,7 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
     platformSettings: () => platform.get(),
     emailBrand,
     audit,
+    notices,
     onTicketPaid(payment) {
       // Factura electrónica automática (si la organización la activó).
       void sifen.autoIssueForPayment(payment).catch((error) => log.error({ err: error, paymentId: payment.id }, 'sifen: no se pudo facturar el cobro'));
@@ -149,11 +154,12 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
     payments,
     audit,
     devices: new DeviceMonitor({ config, db, log, mailer, notifier, modulesOf, emailBrand, onChange: (tenantId) => rt.emit(rooms.tenant(tenantId), RT.devicesStatus, {}) }),
-    backups: new Backups({ config, db, log, mailer, platformSettings: () => platform.get() }),
+    backups: new Backups({ config, db, log, mailer, platformSettings: () => platform.get(), notices }),
     // Se crea al final: usa publishTicket de este mismo contexto.
     appointments: null as unknown as Appointments,
     sifen,
     legal: new Legal(db, platform, publicUrl),
+    notices,
     log,
     emailBrand,
     publishTicket(tenantId, event, ticket, extra = {}, options = {}) {

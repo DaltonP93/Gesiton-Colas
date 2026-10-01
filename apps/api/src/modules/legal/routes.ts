@@ -1,6 +1,6 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { LEGAL_KINDS, legalHolderPatchSchema, type LegalAdminDTO, type LegalDocumentDTO, type LegalStatusDTO } from '@gc/shared';
+import { LEGAL_DOCS, LEGAL_KINDS, legalHolderPatchSchema, type LegalAdminDTO, type LegalDocumentDTO, type LegalStatusDTO } from '@gc/shared';
 import type { AppContext } from '../../context';
 import { badRequest, forbidden } from '../../lib/errors';
 
@@ -99,7 +99,12 @@ export const legalRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (ap
     async (request) => {
       const auth = request.auth;
       if (auth?.kind !== 'user') throw badRequest('Disponible solo para usuarios');
-      return ctx.legal.publish({ kind: request.params.kind, ...request.body, user: { id: auth.user.id, name: auth.user.name } });
+      const version = await ctx.legal.publish({ kind: request.params.kind, ...request.body, user: { id: auth.user.id, name: auth.user.name } });
+      // Aviso a las organizaciones si tienen que aceptar la nueva versión.
+      if (version.requiresAcceptance && (await ctx.platform.get()).legal.requireAcceptance) {
+        void ctx.notices.legalUpdated(LEGAL_DOCS[version.kind].title, version.version, version.note).catch((error) => request.log.error({ err: error }, 'avisos: términos'));
+      }
+      return version;
     },
   );
 

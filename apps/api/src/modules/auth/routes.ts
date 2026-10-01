@@ -199,6 +199,7 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
         return { ...created, accepted: await acceptForNewTenant(tx, request, created.admin, created.tenant) };
       });
       auditAcceptance(request, admin, accepted, 'al crear la organización');
+      void ctx.notices.tenantCreated(tenant, admin, 'registro').catch((error) => request.log.error({ err: error }, 'avisos: nueva organización'));
       if (verification !== 'off') {
         // La cuenta ya existe: si el correo falla se puede reenviar la verificación después.
         await sendVerification(admin, tenant).catch((error) => request.log.warn({ err: error }, 'No se pudo enviar la verificación'));
@@ -248,6 +249,7 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
         return { ...created, accepted: await acceptForNewTenant(tx, request, created.admin, created.tenant) };
       });
       auditAcceptance(request, admin, accepted, 'al pedir la demo');
+      void ctx.notices.tenantCreated(tenant, admin, 'demo').catch((error) => request.log.error({ err: error }, 'avisos: nueva demo'));
       const { token: link, code } = await issueToken(ctx.db, admin.id, 'email_login', { withCode: true, ttlMs: 7 * 24 * 3600 * 1000 });
       await mail(demoMail(admin.email, admin.name, `${base}/acceso?token=${link}`, code!, days, await brandOf(tenant)), tenant.id);
       return { ok: true, message: 'Le enviamos un correo con el acceso a su demo.' };

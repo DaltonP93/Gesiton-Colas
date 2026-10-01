@@ -5,6 +5,7 @@ import { CURRENCIES } from './currency';
 import { billingSettingsSchema } from './payments';
 import { legalSettingsSchema, type LegalIndexDTO } from './legal';
 import type { BackupRemoteDTO, BackupTargetDTO } from './backupTargets';
+import { platformNoticesSchema } from './platformNotices';
 
 const color = z.string().regex(/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i, 'Color hexadecimal inválido');
 
@@ -122,6 +123,8 @@ export const platformSettingsSchema = z.object({
   backups: backupSettingsSchema,
   /** Titular del software y aceptación de los términos (Plataforma → Legal). */
   legal: legalSettingsSchema,
+  /** Avisos de la plataforma a las organizaciones y a los superadministradores, y por qué canal. */
+  notices: platformNoticesSchema,
 });
 export type PlatformSettings = z.infer<typeof platformSettingsSchema>;
 

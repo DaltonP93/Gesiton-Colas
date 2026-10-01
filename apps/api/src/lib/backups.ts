@@ -22,6 +22,7 @@ import { friendlyTargetError, uploaderFor, type TargetSecrets } from './backupTa
 import { decryptSecret, encryptSecret } from './crypto';
 import { badRequest, notFound } from './errors';
 import type { Mailer } from './mailer';
+import type { PlatformNotices } from './platformNotices';
 
 /*
  * Copias de seguridad: un archivo .tar.gz con la base (pg_dump, formato custom), los archivos
@@ -160,6 +161,8 @@ interface BackupDeps {
   log: FastifyBaseLogger;
   mailer: Mailer;
   platformSettings(): Promise<PlatformSettings>;
+  /** Avisos de la plataforma: correo y/o WhatsApp a los superadministradores. */
+  notices?: PlatformNotices;
 }
 
 export function toBackupDTO(row: Backup, dir: string): BackupDTO {
@@ -526,6 +529,12 @@ export class Backups {
 
   /** Avisa a los superadministradores cuando una copia falla o no se puede subir. */
   private async alert(subject: string, message: string) {
+    if (this.deps.notices) {
+      await this.deps.notices
+        .toPlatform('backup_failed', { subject, title: subject, lines: message.split('\n').filter(Boolean), outro: ['Revise Plataforma → Copias.'], whatsapp: `${subject}: ${message.split('\n').filter(Boolean).join(' ').slice(0, 300)}` })
+        .catch((error) => this.deps.log.error({ err: error }, 'copias: no se pudo avisar'));
+      return;
+    }
     const admins = await this.deps.db.select({ email: users.email }).from(users).where(and(eq(users.role, 'superadmin'), eq(users.active, true)));
     for (const a of admins) {
       try {

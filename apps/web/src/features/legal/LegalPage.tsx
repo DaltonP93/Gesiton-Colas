@@ -76,7 +76,7 @@ export default function LegalPage({ kind }: { kind: LegalKind }) {
                     <History className="size-4" />
                     <Select
                       aria-label="Versiones"
-                      className="w-auto"
+                      className="max-w-60"
                       value={doc.data.version}
                       onChange={(e) => {
                         const v = Number(e.target.value);

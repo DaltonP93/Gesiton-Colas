@@ -302,6 +302,27 @@ export class Notifier {
     }
   }
 
+  /**
+   * Mensaje de la plataforma (vencimientos, alertas) con el canal compartido de la plataforma.
+   * Con `tenantId` queda también en el historial de avisos de esa organización.
+   */
+  async sendPlatformText(phone: string, text: string, options: { countryCode: string; tenantId?: string | null; event?: string }): Promise<{ ok: boolean; error?: string }> {
+    const to = normalizePhone(phone, options.countryCode);
+    const row = await this.row(PLATFORM_NOTIFY_SCOPE);
+    if (!to) return { ok: false, error: 'Número inválido' };
+    if (!row?.enabled) return { ok: false, error: 'La plataforma no tiene un canal de WhatsApp/SMS configurado' };
+    const runtime = this.runtime(row, PLATFORM_NOTIFY_SCOPE);
+    try {
+      const ref = await deliver(runtime, { to, body: text, params: [] });
+      if (options.tenantId) {
+        await this.deps.db.insert(notifyMessages).values({ tenantId: options.tenantId, event: options.event ?? 'platform', to, body: text, provider: runtime.provider, status: 'sent', attempts: 1, providerRef: ref, sentAt: new Date(), nextAttemptAt: null });
+      }
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: (error instanceof Error ? error.message : 'Error').slice(0, 300) };
+    }
+  }
+
   /* ------------------------------ Eventos ----------------------------- */
 
   /** Llamado en cada cambio de turno: arma los avisos que correspondan. */

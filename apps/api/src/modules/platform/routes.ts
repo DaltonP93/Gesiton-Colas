@@ -6,6 +6,7 @@ import { z } from 'zod';
 import {
   CURRENCIES,
   HOME_PAGES,
+  PLATFORM_NOTICE_EVENTS,
   MODULE_IDS,
   PLAN_IDS,
   UPLOAD_MIME_TYPES,
@@ -85,6 +86,16 @@ const settingsBody = z.object({
       keepDays: z.number().int().min(1).max(365),
       includeUploads: z.boolean(),
       s3: z.boolean(),
+    })
+    .partial()
+    .optional(),
+  notices: z
+    .object({
+      events: z.partialRecord(z.enum(PLATFORM_NOTICE_EVENTS), z.object({ email: z.boolean(), whatsapp: z.boolean() }).partial()),
+      dueDaysBefore: z.number().int().min(1).max(30),
+      demoDaysBefore: z.number().int().min(1).max(14),
+      adminPhones: z.array(z.string().trim().min(6).max(30)).max(5),
+      countryCode: z.string().regex(/^\d{1,4}$/),
     })
     .partial()
     .optional(),

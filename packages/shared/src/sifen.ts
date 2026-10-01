@@ -206,6 +206,8 @@ export const fiscalProfileSchema = z
     name: z.string().trim().max(255).default(''),
     email: z.union([z.literal(''), z.email().max(80)]).default(''),
     address: z.string().trim().max(255).default(''),
+    /** Celular para los avisos de la plataforma por WhatsApp/SMS (facturas, vencimientos). */
+    phone: z.string().trim().max(30).default(''),
   })
   .prefault({});
 export type FiscalProfile = z.infer<typeof fiscalProfileSchema>;

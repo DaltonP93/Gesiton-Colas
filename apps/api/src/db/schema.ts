@@ -1034,3 +1034,15 @@ export const legalAcceptances = pgTable(
   },
   (t) => [uniqueIndex('legal_acceptances_tenant_document_idx').on(t.tenantId, t.documentId), index('legal_acceptances_kind_idx').on(t.kind, t.tenantId, t.version)],
 );
+
+/** Avisos de la plataforma ya enviados (para no repetir recordatorios). */
+export const platformNoticeLog = pgTable(
+  'platform_notice_log',
+  {
+    id: id(),
+    event: text('event').notNull(),
+    entityId: text('entity_id').notNull(),
+    sentAt: timestamp('sent_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex('platform_notice_log_event_entity_idx').on(t.event, t.entityId)],
+);

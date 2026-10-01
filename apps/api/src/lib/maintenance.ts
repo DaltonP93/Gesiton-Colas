@@ -12,7 +12,7 @@ const NOTIFY_RETENTION_DAYS = 90;
 const AUDIT_RETENTION_DAYS = 365;
 
 /** Limpieza periódica: enlaces vencidos, vinculaciones viejas y demos abandonadas. */
-export async function runMaintenance(ctx: Pick<AppContext, 'db' | 'log'> & Partial<Pick<AppContext, 'payments'>>) {
+export async function runMaintenance(ctx: Pick<AppContext, 'db' | 'log'> & Partial<Pick<AppContext, 'payments' | 'notices'>>) {
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 24 * 3600 * 1000);
   await ctx.db.delete(authTokens).where(or(lt(authTokens.expiresAt, weekAgo), and(isNotNull(authTokens.usedAt), lt(authTokens.usedAt, weekAgo))));
@@ -52,9 +52,11 @@ export async function runMaintenance(ctx: Pick<AppContext, 'db' | 'log'> & Parti
   await ctx.db.delete(auditLogs).where(lt(auditLogs.createdAt, new Date(now.getTime() - AUDIT_RETENTION_DAYS * 24 * 3600 * 1000)));
   // Facturación: factura del mes y suspensión por falta de pago (si el superadministrador lo activó).
   await ctx.payments?.runCycle();
+  // Recordatorios de la plataforma: facturas por vencer o vencidas, demos por vencer.
+  await ctx.notices?.runDaily();
 }
 
-export function startMaintenance(ctx: Pick<AppContext, 'db' | 'log' | 'payments'>, intervalMs = 6 * 3600 * 1000) {
+export function startMaintenance(ctx: Pick<AppContext, 'db' | 'log' | 'payments' | 'notices'>, intervalMs = 6 * 3600 * 1000) {
   const run = () => runMaintenance(ctx).catch((error) => ctx.log.error({ err: error }, 'mantenimiento: error'));
   const first = setTimeout(run, 60_000);
   const timer = setInterval(run, intervalMs);

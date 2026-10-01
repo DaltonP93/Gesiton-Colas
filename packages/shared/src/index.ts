@@ -20,3 +20,4 @@ export * from './legal';
 export * from './legalTemplates';
 export * from './backupTargets';
 export * from './mediaGuides';
+export * from './platformNotices';
