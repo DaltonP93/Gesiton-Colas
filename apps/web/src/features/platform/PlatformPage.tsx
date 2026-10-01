@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Blocks, Building2, HardDrive, History, LogIn, LogOut, MonitorPlay, Plus, Receipt, Search, Settings2, Shield, ShieldCheck, Ticket, UserCog, Users } from 'lucide-react';
+import { Blocks, Building2, DatabaseBackup, HardDrive, History, LogIn, LogOut, MonitorPlay, Plus, Receipt, Search, Settings2, Shield, ShieldCheck, Ticket, UserCog, Users } from 'lucide-react';
 import { useEffect, useId, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { MODULES, PLAN_IDS, PLANS, type InviteResultDTO, type ModuleId, type PlanId, type PlatformSettings, type TenantDTO } from '@gc/shared';
@@ -26,6 +26,7 @@ import {
 } from '../../components/ui';
 import { assetUrl } from '../../lib/api';
 import { AdminsTab } from './AdminsTab';
+import { BackupsTab } from './BackupsTab';
 import { BillingTab } from './BillingTab';
 import { PlatformSettingsTab } from './PlatformSettingsTab';
 import { TenantModulesModal } from './TenantModulesModal';
@@ -52,7 +53,7 @@ type PlatformTenant = TenantDTO & {
 
 type TenantPatch = { id: string; name?: string; plan?: PlanId; status?: TenantDTO['status']; isDemo?: boolean; extendDemoDays?: number };
 
-type PlatformTab = 'organizaciones' | 'facturacion' | 'actividad' | 'administradores' | 'ajustes';
+type PlatformTab = 'organizaciones' | 'facturacion' | 'actividad' | 'administradores' | 'copias' | 'ajustes';
 
 const PLAN_COLORS: Record<PlanId, string> = {
   free: '#64748b',
@@ -77,7 +78,7 @@ export default function PlatformPage() {
   const [creating, setCreating] = useState(false);
   const [tab, setTab] = useState<PlatformTab>(() => {
     const hash = window.location.hash.slice(1);
-    return hash === 'administradores' || hash === 'ajustes' || hash === 'facturacion' || hash === 'actividad' ? hash : 'organizaciones';
+    return hash === 'administradores' || hash === 'ajustes' || hash === 'facturacion' || hash === 'actividad' || hash === 'copias' ? hash : 'organizaciones';
   });
   const changeTab = (next: PlatformTab) => {
     setTab(next);
@@ -89,6 +90,7 @@ export default function PlatformPage() {
     facturacion: { title: 'Facturación', description: 'Facturas de los planes a las organizaciones, cobros, vencimientos y la pasarela con la que pagan.' },
     actividad: { title: 'Actividad', description: 'Registro de auditoría de toda la plataforma: cambios de cada organización, acciones del soporte y de los superadministradores.' },
     administradores: { title: 'Superadministradores', description: 'Personas con acceso total a la plataforma: todas las organizaciones, planes y ajustes.' },
+    copias: { title: 'Copias de seguridad', description: 'Copia diaria automática de la base de datos y los archivos, en el servidor y opcionalmente en S3.' },
     ajustes: { title: 'Ajustes de la plataforma', description: 'Qué se ve en la dirección principal, quién puede registrarse, la marca del ingreso y el correo saliente.' },
   };
 
@@ -160,6 +162,7 @@ export default function PlatformPage() {
               { value: 'facturacion', label: 'Facturación', icon: <Receipt className="size-4" /> },
               { value: 'actividad', label: 'Actividad', icon: <History className="size-4" /> },
               { value: 'administradores', label: 'Superadministradores', icon: <UserCog className="size-4" /> },
+              { value: 'copias', label: 'Copias', icon: <DatabaseBackup className="size-4" /> },
               { value: 'ajustes', label: 'Ajustes', icon: <Settings2 className="size-4" /> },
             ]}
           />
@@ -173,6 +176,7 @@ export default function PlatformPage() {
         {tab === 'facturacion' && <BillingTab />}
         {tab === 'actividad' && <AuditLog scope="platform" />}
         {tab === 'administradores' && <AdminsTab />}
+        {tab === 'copias' && <BackupsTab />}
         {tab === 'ajustes' && <PlatformSettingsTab />}
       </main>
 

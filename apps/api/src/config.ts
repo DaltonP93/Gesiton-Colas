@@ -63,6 +63,10 @@ const envSchema = z.object({
   SUPERADMIN_PASSWORD: z.string().optional(),
   STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
   UPLOAD_DIR: z.string().default('./uploads'),
+  /** Carpeta de las copias de seguridad (por defecto, «backups» junto a UPLOAD_DIR: /data/backups en Docker). */
+  BACKUP_DIR: z.string().optional().transform((v) => v?.trim() || undefined),
+  /** Carpeta de pg_dump / pg_restore si no están en el PATH. */
+  PG_BIN_DIR: z.string().optional().transform((v) => v?.trim() || undefined),
   MAX_UPLOAD_MB: z.coerce.number().int().default(1024),
   S3_ENDPOINT: z.string().optional(),
   S3_REGION: z.string().default('us-east-1'),

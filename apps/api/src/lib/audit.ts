@@ -122,6 +122,8 @@ const ROUTES: Record<string, RouteMeta> = {
   'PUT /platform/mail': M('platform.mail', 'platform', 'Cambió el correo de la plataforma'),
   'PUT /platform/notifications': M('platform.notifications', 'platform', 'Cambió el canal de avisos de la plataforma'),
   'PUT /platform/payments/gateway': M('platform.gateway', 'platform', 'Cambió la pasarela de la plataforma'),
+  'POST /platform/backups': M('platform.backup', 'platform', 'Creó una copia de seguridad'),
+  'DELETE /platform/backups/:id': M('platform.backup_delete', 'platform', 'Borró una copia de seguridad'),
   'POST /platform/billing/invoices': M('invoice.create', 'invoice', 'Emitió una factura'),
   'POST /platform/billing/generate': M('invoice.generate', 'invoice', 'Generó las facturas del mes'),
   'POST /platform/billing/invoices/:id/pay': M('invoice.pay', 'invoice', 'Registró el pago de una factura'),

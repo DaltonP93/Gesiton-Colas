@@ -71,6 +71,13 @@
       "when": 1790857024552,
       "tag": "0009_device_alerts",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790857439097,
+      "tag": "0010_backups",
+      "breakpoints": true
     }
   ]
 }

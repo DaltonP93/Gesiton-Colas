@@ -747,6 +747,25 @@ export const auditLogs = pgTable(
   (t) => [index('audit_logs_tenant_idx').on(t.tenantId, t.createdAt), index('audit_logs_entity_idx').on(t.entity, t.entityId), index('audit_logs_created_idx').on(t.createdAt)],
 );
 
+/** Copias de seguridad de la instalación. */
+export const backups = pgTable(
+  'backups',
+  {
+    id: id(),
+    file: text('file').notNull(),
+    sizeBytes: bigint('size_bytes', { mode: 'number' }).notNull().default(0),
+    status: text('status').$type<'running' | 'ok' | 'failed'>().notNull(),
+    error: text('error'),
+    trigger: text('trigger').$type<'auto' | 'manual'>().notNull(),
+    includesUploads: boolean('includes_uploads').notNull().default(true),
+    s3Key: text('s3_key'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    startedAt: timestamp('started_at', { withTimezone: true }).defaultNow().notNull(),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+  },
+  (t) => [index('backups_started_idx').on(t.startedAt)],
+);
+
 export type Tenant = typeof tenants.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Branch = typeof branches.$inferSelect;
@@ -770,5 +789,6 @@ export type Survey = typeof surveys.$inferSelect;
 export type SurveyResponse = typeof surveyResponses.$inferSelect;
 export type Invoice = typeof invoices.$inferSelect;
 export type AuditLog = typeof auditLogs.$inferSelect;
+export type Backup = typeof backups.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
 export type PaymentGatewayRow = typeof paymentGateways.$inferSelect;

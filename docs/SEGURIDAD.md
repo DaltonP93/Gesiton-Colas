@@ -35,13 +35,14 @@ Se encontraron y **corrigieron** los siguientes problemas:
 - Sesiones JWT con algoritmo fijo que se invalidan al cambiar o restablecer la contraseña.
 - Rol y estado del usuario leídos de la base en cada pedido; módulos y suspensión aplicados en la API.
 - **Registro de auditoría** (Configuración → Registro de actividad; Plataforma → Actividad): cada cambio guarda quién lo hizo, cuándo, desde qué IP y los datos enviados (sin contraseñas ni claves), además de los ingresos y los intentos fallidos. Lo que hace un superadministrador dentro de una organización queda marcado como «Soporte» y la organización lo ve. Se conserva un año.
+- **Copias de seguridad** diarias (base y archivos) con permisos `600`, descarga solo para superadministradores y registrada en la actividad; restauración en una sola transacción con copia previa automática.
 - Consultas parametrizadas, protección contra inyección de fórmulas en CSV, archivos subidos con nombres generados y servidos con `CSP sandbox`.
 - Política de contenido (CSP) en el panel, las pantallas y los kioscos: solo se ejecuta código propio y la API de YouTube.
 
 ## Recomendaciones pendientes para la instalación
 
 1. **HTTPS con dominio** (Caddy o Nginx con Let's Encrypt) y luego `TRUST_PROXY=1`. Hoy el acceso por IP viaja sin cifrar.
-2. **Copias de seguridad** diarias de la base y del volumen `/data` (ver `docs/DESPLIEGUE.md`).
+2. **Copias de seguridad fuera del servidor**: la copia diaria automática ya viene activada (Plataforma → Copias); active la subida a S3 o descárguelas periódicamente, y guarde `JWT_SECRET` aparte (ver `docs/DESPLIEGUE.md` → Copias de seguridad).
 3. `JWT_SECRET` de al menos 32 caracteres (`openssl rand -hex 32`); no reutilizarlo en otros sistemas.
 4. No usar `DEV_OUTBOX=true` en una instalación real.
 5. Rotar la contraseña de MySQL del sistema anterior (hallazgo 5).

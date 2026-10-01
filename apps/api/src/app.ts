@@ -37,6 +37,7 @@ import { billingRoutes } from './modules/billing/routes';
 import { paymentRoutes } from './modules/payments/routes';
 import { auditRoutes } from './modules/audit/routes';
 import { alertRoutes } from './modules/alerts/routes';
+import { backupRoutes } from './modules/backups/routes';
 import { pairingRoutes } from './modules/pairing/routes';
 import { platformRoutes } from './modules/platform/routes';
 import { publicRoutes } from './modules/public/routes';
@@ -202,6 +203,7 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
       await api.register(integrationRoutes(ctx));
       await api.register(reportRoutes(ctx));
       await api.register(platformRoutes(ctx));
+      await api.register(backupRoutes(ctx));
       await api.register(publicRoutes(ctx));
       await api.register(pairingRoutes(ctx));
     },
@@ -244,6 +246,7 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
     ctx.webhooks.start();
     ctx.notifier.start();
     ctx.devices.start();
+    ctx.backups.start();
   }
   await ensureSuperadmin(ctx);
 
@@ -252,6 +255,7 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
     ctx.webhooks.stop();
     ctx.notifier.stop();
     ctx.devices.stop();
+    ctx.backups.stop();
     ctx.rt.close();
     await pool?.pool.end();
   });

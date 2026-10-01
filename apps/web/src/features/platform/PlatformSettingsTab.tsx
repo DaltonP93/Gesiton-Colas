@@ -27,7 +27,8 @@ export function PlatformSettingsTab() {
   }, [settings.data, draft]);
 
   const save = useMutation({
-    mutationFn: (body: PlatformSettings) => api.put<PlatformSettings>('/platform/settings', body),
+    // Las copias de seguridad se guardan en su propia pestaña.
+    mutationFn: ({ backups: _backups, ...body }: PlatformSettings) => api.put<PlatformSettings>('/platform/settings', body),
     onSuccess: (data) => {
       qc.setQueryData(['platform', 'settings'], data);
       void qc.invalidateQueries({ queryKey: ['public-config'] });
@@ -43,7 +44,7 @@ export function PlatformSettingsTab() {
   const set = <K extends keyof PlatformSettings>(key: K, value: PlatformSettings[K]) => setDraft((d) => (d ? { ...d, [key]: value } : d));
   const setBrand = <K extends keyof PlatformSettings['brand']>(key: K, value: PlatformSettings['brand'][K]) =>
     setDraft((d) => (d ? { ...d, brand: { ...d.brand, [key]: value } } : d));
-  const dirty = !sameJson(draft, settings.data);
+  const dirty = !sameJson({ ...draft, backups: null }, { ...settings.data, backups: null });
   const origin = window.location.origin;
 
   return (
