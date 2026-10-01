@@ -1,10 +1,10 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { AlertTriangle, CreditCard, Info, Receipt } from 'lucide-react';
-import { MODULES, PAYMENT_GATEWAY_INFO, formatMoney, toMinor, type BillingOverviewDTO } from '@gc/shared';
+import { MODULES, PAYMENT_GATEWAY_INFO, formatMoney, type BillingOverviewDTO } from '@gc/shared';
 import { Badge, Button, EmptyState, Loading, PageHeader, Table, useFeedback } from '../../components/ui';
 import { api, errorMessage } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
-import { dateOnly, statusBadge } from '../platform/BillingTab';
+import { InvoiceLines, dateOnly, statusBadge } from '../platform/BillingTab';
 
 export default function BillingPage() {
   const { me } = useAuth();
@@ -42,14 +42,24 @@ export default function BillingPage() {
           <p className="text-sm text-muted">Su plan</p>
           <p className="mt-1 text-2xl font-bold">{b.plan.name}</p>
           <p className="mt-1 text-lg font-semibold tabular-nums">
-            {b.plan.monthlyPrice > 0 ? (
+            {b.monthly.total > 0 ? (
               <>
-                {formatMoney(toMinor(b.plan.monthlyPrice, b.plan.currency), b.plan.currency)} <span className="text-sm font-normal text-muted">por mes</span>
+                {formatMoney(b.monthly.total, b.monthly.currency)} <span className="text-sm font-normal text-muted">por mes</span>
               </>
             ) : (
               <span className="text-muted">Sin costo mensual</span>
             )}
           </p>
+          {b.monthly.lines.length > 1 && (
+            <ul className="mt-2 space-y-1 border-t border-border pt-2 text-sm">
+              {b.monthly.lines.map((l, i) => (
+                <li key={i} className="flex justify-between gap-4">
+                  <span className="text-muted">{l.description}</span>
+                  <span className="tabular-nums">{formatMoney(l.amount, b.monthly.currency)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
           <div className="mt-4 flex flex-wrap gap-1.5">
             {modules.map((m) => (
               <Badge key={m}>{MODULES[m].name}</Badge>
@@ -114,6 +124,7 @@ export default function BillingPage() {
                     <td className="font-mono text-xs whitespace-nowrap">{inv.number}</td>
                     <td className="min-w-56">
                       {inv.description}
+                      <InvoiceLines invoice={inv} />
                       {inv.notes && <span className="block text-xs text-muted">{inv.notes}</span>}
                     </td>
                     <td className="text-right font-semibold whitespace-nowrap tabular-nums">{formatMoney(inv.amount, inv.currency)}</td>

@@ -30,6 +30,7 @@ import type {
   Role,
   Schedule,
   Currency,
+  InvoiceLine,
   InvoiceStatus,
   PaymentGateway,
   PaymentProvider,
@@ -635,6 +636,8 @@ export const invoices = pgTable(
     description: text('description').notNull(),
     amount: bigint('amount', { mode: 'number' }).notNull(),
     currency: text('currency').$type<Currency>().notNull(),
+    /** Detalle: plan y módulos adicionales. */
+    lines: jsonb('lines').$type<InvoiceLine[]>().notNull().default([]),
     status: text('status').$type<InvoiceStatus>().notNull().default('pending'),
     dueDate: date('due_date').notNull(),
     issuedAt: timestamp('issued_at', { withTimezone: true }).defaultNow().notNull(),

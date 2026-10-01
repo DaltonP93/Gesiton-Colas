@@ -12,3 +12,4 @@ export * from './types';
 export * from './surveys';
 export * from './currency';
 export * from './payments';
+export * from './billing';

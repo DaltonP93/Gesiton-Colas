@@ -1,0 +1,1 @@
+ALTER TABLE "invoices" ADD COLUMN "lines" jsonb DEFAULT '[]'::jsonb NOT NULL;

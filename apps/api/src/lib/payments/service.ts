@@ -4,7 +4,7 @@ import {
   PAYMENT_GATEWAY_INFO,
   PLANS,
   formatMoney,
-  toMinor,
+  monthlyCharges,
   type BillingSettings,
   type Currency,
   type GatewayBody,
@@ -41,6 +41,7 @@ export function toInvoiceDTO(row: Invoice, tenantName: string, now = new Date())
     description: row.description,
     amount: row.amount,
     currency: row.currency,
+    lines: row.lines ?? [],
     status: row.status,
     overdue: row.status === 'pending' && row.dueDate < todayISO(now),
     dueDate: row.dueDate,
@@ -401,17 +402,20 @@ export class Payments {
     const today = todayISO();
     let created = 0;
     for (const tenant of rows) {
-      const plan = settings.plans[tenant.plan];
-      if (!plan || plan.monthlyPrice <= 0) continue;
-      const amount = toMinor(plan.monthlyPrice, plan.currency);
+      // Plan + módulos adicionales activados que el plan no incluye.
+      const charges = monthlyCharges(settings, tenant);
+      if (charges.total <= 0) continue;
+      const month = new Date(`${period}-15T12:00:00Z`).toLocaleDateString('es', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+      const extras = charges.lines.filter((l) => l.module).length;
       const [invoice] = await this.deps.db
         .insert(invoices)
         .values({
           tenantId: tenant.id,
           period,
-          description: `Plan ${PLANS[tenant.plan].name} · ${new Date(`${period}-15T12:00:00Z`).toLocaleDateString('es', { month: 'long', year: 'numeric', timeZone: 'UTC' })}`,
-          amount,
-          currency: plan.currency,
+          description: `Plan ${PLANS[tenant.plan].name}${extras ? ` + ${extras} ${extras === 1 ? 'módulo adicional' : 'módulos adicionales'}` : ''} · ${month}`,
+          amount: charges.total,
+          currency: charges.currency,
+          lines: charges.lines,
           dueDate: addDays(today, settings.billing.dueDays),
           createdBy: options.userId ?? null,
         })

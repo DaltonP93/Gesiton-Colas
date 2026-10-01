@@ -64,6 +64,11 @@ export const platformSettingsSchema = z.object({
   brand: platformBrandSchema.prefault({}),
   /** Módulos y precio de cada plan. */
   plans: platformPlansSchema.prefault({}),
+  /**
+   * Precio mensual de cada módulo cuando se activa a una organización cuyo plan no lo incluye
+   * (en la moneda del plan de esa organización). Sin precio = sin cargo adicional.
+   */
+  addons: z.partialRecord(z.enum(MODULE_IDS), z.number().min(0).max(1_000_000_000)).default({}),
   /** Facturación de los planes a las organizaciones. */
   billing: billingSettingsSchema.prefault({}),
 });

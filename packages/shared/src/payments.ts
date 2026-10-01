@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { InvoiceLine, MonthlyCharges } from './billing';
 import { CURRENCIES, type Currency } from './currency';
 
 /* ------------------------------------------------------------------ */
@@ -128,6 +129,8 @@ export interface InvoiceDTO {
   /** En la unidad mínima de la moneda. */
   amount: number;
   currency: Currency;
+  /** Detalle (plan y módulos adicionales); vacío en las facturas de un solo concepto. */
+  lines: InvoiceLine[];
   status: InvoiceStatus;
   overdue: boolean;
   dueDate: string;
@@ -141,6 +144,8 @@ export interface InvoiceDTO {
 export interface BillingOverviewDTO {
   enabled: boolean;
   plan: { id: string; name: string; monthlyPrice: number; currency: Currency };
+  /** Cargo mensual: plan más módulos adicionales. */
+  monthly: MonthlyCharges;
   suspended: boolean;
   /** Se puede pagar en línea (la plataforma tiene una pasarela activa). */
   onlinePayment: PaymentGateway | null;

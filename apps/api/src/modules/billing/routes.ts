@@ -6,6 +6,7 @@ import {
   gatewayBodySchema,
   invoiceBodySchema,
   manualPaymentSchema,
+  monthlyCharges,
   toMinor,
   type BillingOverviewDTO,
   type BillingStatsDTO,
@@ -180,6 +181,7 @@ export const billingRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (
     return {
       enabled: settings.billing.enabled,
       plan: { id: tenant.plan, name: PLANS[tenant.plan].name, monthlyPrice: plan.monthlyPrice, currency: plan.currency },
+      monthly: monthlyCharges(settings, tenant),
       suspended: tenant.status === 'suspended',
       onlinePayment: gateway?.rt.provider ?? null,
       instructions: settings.billing.instructions,

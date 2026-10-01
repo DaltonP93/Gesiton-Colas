@@ -37,6 +37,21 @@ export function statusBadge(inv: Pick<InvoiceDTO, 'status' | 'overdue'>) {
 
 export const dateOnly = (iso: string) => iso.split('-').reverse().join('/');
 
+/** Detalle de la factura (plan y módulos adicionales). */
+export function InvoiceLines({ invoice }: { invoice: Pick<InvoiceDTO, 'lines' | 'currency'> }) {
+  if (invoice.lines.length < 2) return null;
+  return (
+    <ul className="mt-1 space-y-0.5 text-xs text-muted">
+      {invoice.lines.map((l, i) => (
+        <li key={i} className="flex justify-between gap-4">
+          <span>{l.description}</span>
+          <span className="tabular-nums">{formatMoney(l.amount, invoice.currency)}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function BillingTab() {
   const qc = useQueryClient();
   const { toast } = useFeedback();
@@ -151,6 +166,7 @@ export function BillingTab() {
                     <td className="font-medium whitespace-nowrap">{inv.tenantName}</td>
                     <td className="min-w-56">
                       {inv.description}
+                      <InvoiceLines invoice={inv} />
                       {inv.status === 'paid' && (
                         <span className="block text-xs text-muted">
                           Pagada {inv.paidAt ? formatDateTime(inv.paidAt) : ''} · {inv.method && (MANUAL_METHOD_LABELS[inv.method as ManualMethod] ?? inv.method)}

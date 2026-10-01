@@ -437,7 +437,7 @@ function TenantsCard({ onCreate }: { onCreate: () => void }) {
       )}
       {viewingUsers && <TenantUsersModal tenant={viewingUsers} onClose={() => setViewingUsers(null)} onEnter={() => enter(viewingUsers)} />}
       {editingModules && platformSettings.data && (
-        <TenantModulesModal tenant={editingModules} planModules={platformSettings.data.plans[editingModules.plan].modules} onClose={() => setEditingModules(null)} />
+        <TenantModulesModal tenant={editingModules} settings={platformSettings.data} onClose={() => setEditingModules(null)} />
       )}
     </Card>
   );

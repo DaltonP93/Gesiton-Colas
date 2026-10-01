@@ -61,6 +61,8 @@ const settingsBody = z.object({
       }),
     )
     .optional(),
+  /** Precio mensual de cada módulo adicional (0 = sin cargo). */
+  addons: z.partialRecord(z.enum(MODULE_IDS), z.number().min(0).max(1_000_000_000)).optional(),
   // Sin valores por defecto: lo que no se envía queda como está.
   billing: z
     .object({

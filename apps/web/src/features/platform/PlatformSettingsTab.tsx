@@ -118,6 +118,7 @@ export function PlatformSettingsTab() {
             <PlanCard key={id} id={id} value={draft.plans[id]} onChange={(plan) => set('plans', { ...draft.plans, [id]: plan })} />
           ))}
         </div>
+        <AddonPrices value={draft.addons} onChange={(addons) => set('addons', addons)} />
       </section>
 
       <section className="space-y-4">
@@ -230,6 +231,33 @@ function PlanCard({ id, value, onChange }: { id: PlanId; value: PlatformSettings
           <Checkbox key={m} checked={value.modules.includes(m)} onChange={(on) => toggle(m, on)} label={MODULES[m].name} />
         ))}
       </fieldset>
+    </div>
+  );
+}
+
+/** Precio mensual de cada módulo cuando se activa fuera del plan. */
+function AddonPrices({ value, onChange }: { value: PlatformSettings['addons']; onChange: (value: PlatformSettings['addons']) => void }) {
+  return (
+    <div className="gc-card gc-pad">
+      <h3 className="text-base font-semibold">Módulos adicionales</h3>
+      <p className="mt-0.5 mb-4 text-sm text-muted">
+        Precio mensual que se suma a la factura cuando le activa a una organización un módulo que su plan no incluye (Organizaciones → Módulos). En la moneda del plan de cada
+        organización; 0 = sin cargo.
+      </p>
+      <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2 xl:grid-cols-4">
+        {MODULE_IDS.map((m) => (
+          <Field key={m} label={MODULES[m].name}>
+            <Input
+              type="number"
+              min={0}
+              step="any"
+              value={value[m] ?? 0}
+              onChange={(e) => onChange({ ...value, [m]: Math.max(0, Number(e.target.value) || 0) })}
+              aria-label={`Precio mensual de ${MODULES[m].name}`}
+            />
+          </Field>
+        ))}
+      </div>
     </div>
   );
 }
