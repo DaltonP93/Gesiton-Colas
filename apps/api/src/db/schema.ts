@@ -32,6 +32,9 @@ import type {
   CustomerData,
   DisplayConfig,
   KioskConfig,
+  BackupRemoteDTO,
+  BackupTargetConfig,
+  BackupTargetKind,
   LegalKind,
   MediaKind,
   MediaProvider,
@@ -763,6 +766,26 @@ export const auditLogs = pgTable(
   (t) => [index('audit_logs_tenant_idx').on(t.tenantId, t.createdAt), index('audit_logs_entity_idx').on(t.entity, t.entityId), index('audit_logs_created_idx').on(t.createdAt)],
 );
 
+/** Destinos externos de las copias (configurados en Plataforma → Copias). */
+export const backupTargets = pgTable('backup_targets', {
+  id: id(),
+  kind: text('kind').$type<BackupTargetKind>().notNull(),
+  name: text('name').notNull(),
+  enabled: boolean('enabled').notNull().default(true),
+  config: jsonb('config').$type<BackupTargetConfig>().notNull(),
+  /** Claves (JSON) cifradas con la clave del servidor. */
+  secret: text('secret'),
+  lastTestAt: timestamp('last_test_at', { withTimezone: true }),
+  lastTestOk: boolean('last_test_ok'),
+  lastTestMessage: text('last_test_message'),
+  lastUploadAt: timestamp('last_upload_at', { withTimezone: true }),
+  lastUploadOk: boolean('last_upload_ok'),
+  lastUploadMessage: text('last_upload_message'),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+export type BackupTarget = typeof backupTargets.$inferSelect;
+
 /** Copias de seguridad de la instalación. */
 export const backups = pgTable(
   'backups',
@@ -775,6 +798,8 @@ export const backups = pgTable(
     trigger: text('trigger').$type<'auto' | 'manual'>().notNull(),
     includesUploads: boolean('includes_uploads').notNull().default(true),
     s3Key: text('s3_key'),
+    /** Subidas a los destinos externos (S3, SFTP, WebDAV). */
+    remotes: jsonb('remotes').$type<BackupRemoteDTO[]>().notNull().default([]),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
     startedAt: timestamp('started_at', { withTimezone: true }).defaultNow().notNull(),
     finishedAt: timestamp('finished_at', { withTimezone: true }),

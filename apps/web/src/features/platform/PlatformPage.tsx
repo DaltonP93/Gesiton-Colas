@@ -96,7 +96,7 @@ export default function PlatformPage() {
     legal: { title: 'Legal', description: 'Titular del software, términos del servicio, política de privacidad, tratamiento de datos, aceptaciones y contrato de licencia.' },
     actividad: { title: 'Actividad', description: 'Registro de auditoría de toda la plataforma: cambios de cada organización, acciones del soporte y de los superadministradores.' },
     administradores: { title: 'Superadministradores', description: 'Personas con acceso total a la plataforma: todas las organizaciones, planes y ajustes.' },
-    copias: { title: 'Copias de seguridad', description: 'Copia diaria automática de la base de datos y los archivos, en el servidor y opcionalmente en S3.' },
+    copias: { title: 'Copias de seguridad', description: 'Copia diaria automática de la base de datos y los archivos, en el servidor y en destinos externos: S3 y compatibles, SFTP o WebDAV.' },
     ajustes: { title: 'Ajustes de la plataforma', description: 'Qué se ve en la dirección principal, quién puede registrarse, la marca del ingreso y el correo saliente.' },
   };
 

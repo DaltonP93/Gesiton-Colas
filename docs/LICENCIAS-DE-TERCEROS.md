@@ -11,19 +11,20 @@ Incluye el conjunto transitivo completo de dependencias de **producción** de lo
 Los textos completos de cada licencia están en los ficheros `LICENSE` de cada paquete y en los enlaces SPDX indicados. 
 Para cumplir MIT/ISC/BSD/Apache-2.0, este documento (o uno equivalente con los textos de licencia) debe acompañar a cada copia distribuida del producto.
 
-## Resumen (286 paquetes únicos nombre@versión)
+## Resumen (294 paquetes únicos nombre@versión)
 
 | Licencia | Paquetes | Texto |
 | --- | ---: | --- |
-| MIT | 204 | https://spdx.org/licenses/MIT.html |
+| MIT | 210 | https://spdx.org/licenses/MIT.html |
 | ISC | 37 | https://spdx.org/licenses/ISC.html |
 | Apache-2.0 | 27 | https://www.apache.org/licenses/LICENSE-2.0 |
-| BSD-3-Clause | 7 | https://spdx.org/licenses/BSD-3-Clause.html |
+| BSD-3-Clause | 8 | https://spdx.org/licenses/BSD-3-Clause.html |
 | BlueOak-1.0.0 | 6 | https://blueoakcouncil.org/license/1.0.0 |
 | (MPL-2.0 OR Apache-2.0) | 1 | https://github.com/cure53/DOMPurify/blob/main/LICENSE |
 | (BSD-3-Clause OR GPL-2.0) | 1 |  |
 | MIT-0 | 1 | https://spdx.org/licenses/MIT-0.html |
 | 0BSD | 1 | https://spdx.org/licenses/0BSD.html |
+| Unlicense | 1 | https://unlicense.org |
 | MIT AND ISC | 1 | https://spdx.org/licenses/MIT.html + https://spdx.org/licenses/ISC.html |
 
 Notas sobre licencias no estándar:
@@ -33,7 +34,7 @@ Notas sobre licencias no estándar:
 - **BlueOak-1.0.0** (glob, minimatch, lru-cache, minipass, path-scurry, de Isaac Z. Schlueter): permisiva, equivalente a MIT.
 - **es-toolkit** (MIT) incluye un fichero NOTICE: partes derivadas de Lodash — "Copyright OpenJS Foundation and other contributors <https://openjsf.org/>", licencia MIT.
 
-## MIT (204)
+## MIT (210)
 
 | Paquete | Versión | Se distribuye en | Repositorio / web | Copyright |
 | --- | --- | --- | --- | --- |
@@ -88,6 +89,7 @@ Notas sobre licencias no estándar:
 | ajv-formats | 3.0.1 | API/servidor | https://github.com/ajv-validator/ajv-formats | Copyright (c) 2020 Evgeny Poberezkin |
 | ansi-regex | 5.0.1 | API/servidor, bundle web | https://github.com/chalk/ansi-regex | Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com) |
 | ansi-styles | 4.3.0 | API/servidor, bundle web | https://github.com/chalk/ansi-styles | Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com) |
+| asn1 | 0.2.6 | API/servidor | https://github.com/joyent/node-asn1 | Copyright (c) 2011 Mark Cavage, All rights reserved. |
 | atomic-sleep | 1.0.0 | API/servidor | https://github.com/davidmarkclements/atomic-sleep | Copyright (c) 2020 David Mark Clements |
 | avvio | 9.3.0 | API/servidor | https://github.com/fastify/avvio | Copyright (c) 2016-2020 Matteo Collina / Copyright (c) 2020-present The Fastify team <https://github.com/fastify/fastify#team> |
 | balanced-match | 1.0.2 | API/servidor | https://github.com/juliangruber/balanced-match | Copyright (c) 2013 Julian Gruber &lt;julian@juliangruber.com&gt; |
@@ -97,6 +99,7 @@ Notas sobre licencias no estándar:
 | brace-expansion | 1.1.21 | API/servidor | https://github.com/juliangruber/brace-expansion | Copyright (c) 2013 Julian Gruber <julian@juliangruber.com> |
 | brace-expansion | 5.0.12 | API/servidor | https://github.com/juliangruber/brace-expansion | Copyright Julian Gruber <julian@juliangruber.com> / TypeScript port Copyright Isaac Z. Schlueter <i@izs.me> |
 | buffer | 5.6.0 | API/servidor | https://github.com/feross/buffer | Copyright (c) Feross Aboukhadijeh, and other contributors. |
+| buildcheck | 0.0.7 | API/servidor (opcional, no usado en Node) | https://github.com/mscdex/buildcheck | Copyright Brian White. All rights reserved. |
 | camelcase | 5.3.1 | bundle web | https://github.com/sindresorhus/camelcase | Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com) |
 | clsx | 2.1.1 | bundle web | https://github.com/lukeed/clsx | Copyright (c) Luke Edwards <luke.edwards05@gmail.com> (lukeed.com) |
 | color-convert | 2.0.1 | API/servidor, bundle web | https://github.com/Qix-/color-convert | Copyright (c) 2011-2016 Heather Arthur <fayearthur@gmail.com> |
@@ -109,6 +112,7 @@ Notas sobre licencias no estándar:
 | copyfiles | 2.4.1 | API/servidor | https://github.com/calvinmetcalf/copyfiles | Copyright (c) 2014-2018 Calvin Metcalf |
 | core-util-is | 1.0.3 | API/servidor | https://github.com/isaacs/core-util-is | Copyright Node.js contributors. All rights reserved. |
 | cors | 2.8.6 | API/servidor | https://github.com/expressjs/cors | Copyright (c) 2013 Troy Goode <troygoode@gmail.com> |
+| cpu-features | 0.0.10 | API/servidor (opcional, no usado en Node) | https://github.com/mscdex/cpu-features | Copyright Brian White. All rights reserved. |
 | csstype | 3.2.3 | solo tipos (no se ejecuta) | https://github.com/frenic/csstype | Copyright (c) 2017-2018 Fredrik Nicol |
 | debug | 4.4.3 | API/servidor, bundle web | https://github.com/debug-js/debug | Copyright (c) 2014-2017 TJ Holowaychuk <tj@vision-media.ca> / Copyright (c) 2018-2021 Josh Junon |
 | decamelize | 1.2.0 | bundle web | https://github.com/sindresorhus/decamelize | Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com) |
@@ -153,6 +157,7 @@ Notas sobre licencias no estándar:
 | mime-types | 2.1.35 | API/servidor | https://github.com/jshttp/mime-types | Copyright (c) 2014 Jonathan Ong <me@jongleberry.com> / Copyright (c) 2015 Douglas Christopher Wilson <doug@somethingdoug.com> |
 | mkdirp | 1.0.4 | API/servidor | https://github.com/isaacs/node-mkdirp | Copyright James Halliday (mail@substack.net) and Isaac Z. Schlueter (i@izs.me) |
 | ms | 2.1.3 | API/servidor, bundle web | https://github.com/vercel/ms | Copyright (c) 2020 Vercel, Inc. |
+| nan | 2.29.0 | API/servidor (opcional, no usado en Node) | https://github.com/nodejs/nan | Copyright (c) 2018 [NAN contributors](<https://github.com/nodejs/nan#wg-members--collaborators>) |
 | negotiator | 0.6.3 | API/servidor | https://github.com/jshttp/negotiator | Copyright (c) 2012-2014 Federico Romero / Copyright (c) 2012-2014 Isaac Z. Schlueter |
 | object-assign | 4.1.1 | API/servidor | https://github.com/sindresorhus/object-assign | Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com) |
 | on-exit-leak-free | 2.1.2 | API/servidor | https://github.com/mcollina/on-exit-or-gc | Copyright (c) 2021 Matteo Collina |
@@ -205,6 +210,7 @@ Notas sobre licencias no estándar:
 | safe-buffer | 5.2.1 | API/servidor | https://github.com/feross/safe-buffer | Copyright (c) Feross Aboukhadijeh |
 | safe-regex2 | 5.1.1 | API/servidor | https://github.com/fastify/safe-regex2 | Copyright (c) 2019-present The Fastify team <https://github.com/fastify/fastify#team> |
 | safe-stable-stringify | 2.5.0 | API/servidor | https://github.com/BridgeAR/safe-stable-stringify | Copyright (c) Ruben Bridgewater |
+| safer-buffer | 2.1.2 | API/servidor | https://github.com/ChALkeR/safer-buffer | Copyright (c) 2018 Nikita Skovoroda <chalkerx@gmail.com> |
 | scheduler | 0.28.0 | bundle web | https://github.com/react/react | Copyright (c) Meta Platforms, Inc. and affiliates. |
 | set-cookie-parser | 2.7.2 | API/servidor | https://github.com/nfriedly/set-cookie-parser | Copyright (c) 2015 Nathan Friedly <nathan@nfriedly.com> (http://nfriedly.com/) |
 | socket.io | 4.8.4 | API/servidor | https://github.com/socketio/socket.io | Copyright (c) 2014-present Guillermo Rauch and Socket.IO contributors |
@@ -212,6 +218,7 @@ Notas sobre licencias no estándar:
 | socket.io-client | 4.8.4 | bundle web | https://github.com/socketio/socket.io | Copyright (c) 2014-present Guillermo Rauch and Socket.IO contributors |
 | socket.io-parser | 4.2.7 | API/servidor, bundle web | https://github.com/socketio/socket.io | Copyright (c) 2014-present Guillermo Rauch and Socket.IO contributors |
 | sonic-boom | 4.2.1 | API/servidor | https://github.com/pinojs/sonic-boom | Copyright (c) 2017 Matteo Collina |
+| ssh2 | 1.17.0 | API/servidor | https://github.com/mscdex/ssh2 | Copyright Brian White. All rights reserved. |
 | statuses | 2.0.2 | API/servidor | https://github.com/jshttp/statuses | Copyright (c) 2014 Jonathan Ong <me@jongleberry.com> / Copyright (c) 2016 Douglas Christopher Wilson <doug@somethingdoug.com> |
 | stream-browserify | 3.0.0 | API/servidor | https://github.com/browserify/stream-browserify | Copyright (c) James Halliday |
 | string_decoder | 0.10.31 | API/servidor | https://github.com/rvagg/string_decoder | Copyright Joyent, Inc. and other Node contributors. |
@@ -316,10 +323,11 @@ Notas sobre licencias no estándar:
 | drizzle-orm | 0.45.3 | API/servidor | https://github.com/drizzle-team/drizzle-orm | (autor según package.json: Drizzle Team) |
 | hls.js | 1.7.3 | bundle web | https://github.com/video-dev/hls.js | Copyright (c) 2017 Dailymotion (http://www.dailymotion.com) / Copyright (c) 2013-2015 Brightcove |
 
-## BSD-3-Clause (7)
+## BSD-3-Clause (8)
 
 | Paquete | Versión | Se distribuye en | Repositorio / web | Copyright |
 | --- | --- | --- | --- | --- |
+| bcrypt-pbkdf | 1.0.2 | API/servidor | https://github.com/joyent/node-bcrypt-pbkdf | Copyright 1997 Niels Provos <provos@physnet.uni-hamburg.de> / Copyright (c) 2013 Ted Unangst <tedu@openbsd.org> |
 | bcryptjs | 3.0.3 | API/servidor | https://github.com/dcodeIO/bcrypt.js | Copyright (c) 2012 Nevins Bartolomeo <nevins.bartolomeo@gmail.com> / Copyright (c) 2012 Shane Girish <shaneGirish@gmail.com> |
 | d3-ease | 3.0.1 | bundle web | https://github.com/d3/d3-ease | Copyright 2010-2021 Mike Bostock / Copyright 2001 Robert Penner |
 | fast-uri | 3.1.8 | API/servidor | https://github.com/fastify/fast-uri | Copyright (c) 2011-2021, Gary Court until https://github.com/garycourt/uri-js/commit/a1acf730b4bba3f1097c9f52e7d9d3aba8cdcaae / Copyright (c) 2021-present The Fastify team <https://github.com/fastify/fastify#team> |
@@ -347,8 +355,6 @@ Notas sobre licencias no estándar:
 
 ## (BSD-3-Clause OR GPL-2.0) (1)
 
-`node-forge` tiene licencia doble: se usa bajo **BSD-3-Clause** (sin obligaciones de copyleft).
-
 | Paquete | Versión | Se distribuye en | Repositorio / web | Copyright |
 | --- | --- | --- | --- | --- |
 | node-forge | 1.4.0 | API/servidor | https://github.com/digitalbazaar/forge | Copyright (c) 2010, Digital Bazaar, Inc. / Copyright (C) 1989, 1991 Free Software Foundation, Inc. |
@@ -364,6 +370,12 @@ Notas sobre licencias no estándar:
 | Paquete | Versión | Se distribuye en | Repositorio / web | Copyright |
 | --- | --- | --- | --- | --- |
 | tslib | 2.8.1 | API/servidor | https://github.com/Microsoft/tslib | Copyright (c) Microsoft Corporation. |
+
+## Unlicense (1)
+
+| Paquete | Versión | Se distribuye en | Repositorio / web | Copyright |
+| --- | --- | --- | --- | --- |
+| tweetnacl | 0.14.5 | API/servidor | https://github.com/dchest/tweetnacl-js | (autor según package.json: TweetNaCl-js contributors) |
 
 ## MIT AND ISC (1)
 

@@ -65,7 +65,12 @@ Detalles:
 
 - La imagen de Docker trae `pg_dump`, `pg_restore` y `psql` de PostgreSQL 16, la misma versión de la base de `docker-compose.yml`; si actualiza la base a otra versión, cambie también el paquete `postgresql16-client` del `Dockerfile`. Sin Docker instale el cliente de PostgreSQL de la **misma versión** que el servidor, o indique su carpeta en `PG_BIN_DIR`; la carpeta de las copias se cambia con `BACKUP_DIR`.
 - Las copias más viejas que el plazo se borran solas después de cada copia correcta. Si una falla, se avisa por correo a los superadministradores.
-- **Guarde una copia fuera del servidor**: active «Subir también una copia a S3» (usa el bucket de `S3_BUCKET`, carpeta `backups/`) o descargue las copias periódicamente. Una copia en el mismo disco no sirve si se pierde el servidor.
+- **Guarde una copia fuera del servidor**: en **Plataforma → Copias → Copias fuera del servidor** agregue uno o más destinos y cada copia se sube también allí (una copia en el mismo disco no sirve si se pierde el servidor):
+  - **S3 y compatibles**: Amazon S3, Cloudflare R2, Backblaze B2, Wasabi, DigitalOcean Spaces, Google Cloud Storage (clave HMAC) o MinIO. Cada proveedor indica el endpoint y de dónde sacar las claves.
+  - **SFTP**: otro servidor Linux, un NAS (Synology, QNAP) o un hosting con SSH, con contraseña o clave privada. La huella del servidor se guarda en la primera conexión y se verifica en las siguientes.
+  - **WebDAV**: Nextcloud, ownCloud, Synology, pCloud, Koofr, Yandex Disk u otro.
+
+  «Probar conexión» escribe y borra un archivo de prueba. Las claves se guardan cifradas con `JWT_SECRET`. Si una subida falla, la copia queda en el servidor, se avisa por correo a los superadministradores y se puede reintentar desde el listado. Al vencer el plazo, las copias se borran también de los destinos. El S3 configurado con variables (`S3_BUCKET`, carpeta `backups/`) sigue disponible como «S3 del servidor».
 - Las copias contienen **todos los datos**, también las claves de las pasarelas de pago y del correo (cifradas con `JWT_SECRET`, que no viaja en la copia: guárdelo aparte; sin él esas claves no se pueden leer). Se guardan con permisos `600`, solo el superadministrador las descarga y cada descarga queda en el registro de actividad. Si usa S3, el bucket debe ser privado.
 
 **Restaurar una copia** reemplaza todos los datos actuales. Antes se guarda automáticamente una copia de lo actual (`…-previa.tar.gz`) y la restauración se hace en una sola transacción: si falla, la base queda como estaba.

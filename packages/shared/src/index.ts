@@ -18,3 +18,4 @@ export * from './appointments';
 export * from './sifen';
 export * from './legal';
 export * from './legalTemplates';
+export * from './backupTargets';

@@ -5,10 +5,22 @@ import os from 'node:os';
 import path from 'node:path';
 import { and, desc, eq, gte, inArray, lt, or, sql } from 'drizzle-orm';
 import type { FastifyBaseLogger } from 'fastify';
-import type { BackupDTO, BackupSettings, PlatformSettings } from '@gc/shared';
+import {
+  backupTargetSummary,
+  type BackupDTO,
+  type BackupRemoteDTO,
+  type BackupSettings,
+  type BackupTargetDTO,
+  type BackupTargetInput,
+  type BackupTargetTestDTO,
+  type PlatformSettings,
+} from '@gc/shared';
 import type { AppConfig } from '../config';
 import type { Database } from '../db/client';
-import { backups, users, type Backup } from '../db/schema';
+import { backupTargets, backups, users, type Backup, type BackupTarget } from '../db/schema';
+import { friendlyTargetError, uploaderFor, type TargetSecrets } from './backupTargets';
+import { decryptSecret, encryptSecret } from './crypto';
+import { badRequest, notFound } from './errors';
 import type { Mailer } from './mailer';
 
 /*
@@ -160,9 +172,27 @@ export function toBackupDTO(row: Backup, dir: string): BackupDTO {
     trigger: row.trigger,
     includesUploads: row.includesUploads,
     s3Key: row.s3Key,
+    remotes: row.remotes ?? [],
     available: row.status === 'ok' && existsSync(path.join(dir, row.file)),
     startedAt: row.startedAt.toISOString(),
     finishedAt: row.finishedAt?.toISOString() ?? null,
+  };
+}
+
+const SECRET_PURPOSE = 'backup-targets';
+
+export function toBackupTargetDTO(row: BackupTarget, secrets: TargetSecrets): BackupTargetDTO {
+  return {
+    id: row.id,
+    kind: row.kind,
+    name: row.name,
+    enabled: row.enabled,
+    config: row.config,
+    secrets: Object.fromEntries(Object.entries(secrets).map(([k, v]) => [k, Boolean(v)])),
+    summary: backupTargetSummary(row.kind, row.config),
+    lastTest: row.lastTestAt ? { at: row.lastTestAt.toISOString(), ok: Boolean(row.lastTestOk), message: row.lastTestMessage ?? '' } : null,
+    lastUpload: row.lastUploadAt ? { at: row.lastUploadAt.toISOString(), ok: Boolean(row.lastUploadOk), message: row.lastUploadMessage ?? '' } : null,
+    createdAt: row.createdAt.toISOString(),
   };
 }
 
@@ -295,17 +325,30 @@ export class Backups {
   private async execute(id: string, s: BackupSettings): Promise<Backup> {
     try {
       const { file, size } = await createBackupArchive(this.deps.config, { includeUploads: s.includeUploads, dir: this.dir });
+      const remotes: BackupRemoteDTO[] = [];
       let s3Key: string | null = null;
-      if (s.s3 && this.s3Available) s3Key = await this.uploadToS3(file);
-      const [done] = await this.deps.db.update(backups).set({ file, sizeBytes: size, status: 'ok', s3Key, finishedAt: new Date() }).where(eq(backups.id, id)).returning();
-      this.deps.log.info({ file, size, s3Key }, 'copias: copia de seguridad creada');
+      if (s.s3 && this.s3Available) {
+        try {
+          s3Key = await this.uploadToS3(file);
+          remotes.push({ targetId: null, name: 'S3 del servidor', kind: 's3', ok: true, location: s3Key, error: null, at: new Date().toISOString() });
+        } catch (error) {
+          remotes.push({ targetId: null, name: 'S3 del servidor', kind: 's3', ok: false, location: null, error: friendlyTargetError(error), at: new Date().toISOString() });
+        }
+      }
+      remotes.push(...(await this.uploadToTargets(file)));
+      const [done] = await this.deps.db.update(backups).set({ file, sizeBytes: size, status: 'ok', s3Key, remotes, finishedAt: new Date() }).where(eq(backups.id, id)).returning();
+      this.deps.log.info({ file, size, remotes: remotes.map((r) => `${r.name}:${r.ok ? 'ok' : 'error'}`) }, 'copias: copia de seguridad creada');
+      const failed = remotes.filter((r) => !r.ok);
+      if (failed.length) {
+        await this.alert('No se pudo subir la copia de seguridad', `La copia ${file} se creó en el servidor, pero no se pudo subir a:\n\n${failed.map((r) => `- ${r.name}: ${r.error}`).join('\n')}`);
+      }
       await this.rotate(s.keepDays).catch((error) => this.deps.log.warn({ err: error }, 'copias: no se pudieron borrar las copias viejas'));
       return done!;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Error';
       const [failed] = await this.deps.db.update(backups).set({ status: 'failed', error: message.slice(0, 1000), finishedAt: new Date() }).where(eq(backups.id, id)).returning();
       this.deps.log.error({ err: error }, 'copias: falló la copia de seguridad');
-      await this.alertFailure(message);
+      await this.alert('Falló la copia de seguridad', `La copia de seguridad automática no se pudo crear:\n\n${message}`);
       return failed!;
     }
   }
@@ -355,20 +398,143 @@ export class Backups {
         this.deps.log.warn({ err: error, key: b.s3Key }, 'copias: no se pudo borrar la copia en S3');
       }
     }
+    for (const remote of b.remotes ?? []) {
+      if (!remote.ok || !remote.location || !remote.targetId) continue;
+      const target = await this.findTarget(remote.targetId).catch(() => null);
+      if (!target) continue;
+      await uploaderFor(target.kind, target.config, this.secretsOf(target))
+        .remove(remote.location)
+        .catch((error) => this.deps.log.warn({ err: error, target: target.name, location: remote.location }, 'copias: no se pudo borrar la copia en el destino'));
+    }
     await this.deps.db.delete(backups).where(eq(backups.id, b.id));
   }
 
-  /** Avisa a los superadministradores cuando una copia falla. */
-  private async alertFailure(message: string) {
+  /* --------------------------- Destinos externos --------------------------- */
+
+  private secretsOf(row: Pick<BackupTarget, 'secret'>): TargetSecrets {
+    if (!row.secret) return {};
+    const json = decryptSecret(this.deps.config.JWT_SECRET, row.secret, SECRET_PURPOSE);
+    if (!json) return {};
+    try {
+      return JSON.parse(json) as TargetSecrets;
+    } catch {
+      return {};
+    }
+  }
+
+  async findTarget(id: string): Promise<BackupTarget> {
+    const [row] = await this.deps.db.select().from(backupTargets).where(eq(backupTargets.id, id));
+    if (!row) throw notFound('Destino');
+    return row;
+  }
+
+  async listTargets(): Promise<BackupTargetDTO[]> {
+    const rows = await this.deps.db.select().from(backupTargets).orderBy(backupTargets.createdAt);
+    return rows.map((r) => toBackupTargetDTO(r, this.secretsOf(r)));
+  }
+
+  /** Une las claves nuevas con las guardadas (vacío = conservar). */
+  private mergeSecrets(input: BackupTargetInput, existing?: BackupTarget): TargetSecrets {
+    const previous = existing && existing.kind === input.kind ? this.secretsOf(existing) : {};
+    const next: TargetSecrets = { ...previous };
+    for (const [k, v] of Object.entries(input.secrets ?? {})) if (typeof v === 'string' && v.trim()) next[k as keyof TargetSecrets] = k === 'privateKey' ? v.trim() + '\n' : v.trim();
+    return next;
+  }
+
+  private assertComplete(input: BackupTargetInput, secrets: TargetSecrets) {
+    if (input.kind === 's3' && (!secrets.accessKeyId || !secrets.secretAccessKey)) throw badRequest('Indique la clave de acceso y la clave secreta');
+    if (input.kind === 'sftp' && !secrets.password && !secrets.privateKey) throw badRequest('Indique la contraseña o la clave privada');
+  }
+
+  async saveTarget(input: BackupTargetInput, id?: string): Promise<BackupTargetDTO> {
+    const existing = id ? await this.findTarget(id) : undefined;
+    const secrets = this.mergeSecrets(input, existing);
+    this.assertComplete(input, secrets);
+    const values = {
+      kind: input.kind,
+      name: input.name,
+      enabled: input.enabled,
+      config: input.config,
+      secret: encryptSecret(this.deps.config.JWT_SECRET, JSON.stringify(secrets), SECRET_PURPOSE),
+    };
+    const [row] = existing
+      ? await this.deps.db.update(backupTargets).set(values).where(eq(backupTargets.id, existing.id)).returning()
+      : await this.deps.db.insert(backupTargets).values(values).returning();
+    return toBackupTargetDTO(row!, secrets);
+  }
+
+  async deleteTarget(id: string) {
+    await this.findTarget(id);
+    await this.deps.db.delete(backupTargets).where(eq(backupTargets.id, id));
+  }
+
+  /**
+   * Prueba un destino escribiendo y borrando un archivo. Con `id` usa las claves guardadas que no se
+   * enviaron, y guarda el resultado (y la huella del servidor SFTP la primera vez).
+   */
+  async testTarget(input: BackupTargetInput, id?: string): Promise<BackupTargetTestDTO> {
+    const existing = id ? await this.findTarget(id) : undefined;
+    const secrets = this.mergeSecrets(input, existing);
+    this.assertComplete(input, secrets);
+    let result: BackupTargetTestDTO;
+    try {
+      const { message, fingerprint } = await uploaderFor(input.kind, input.config, secrets).test();
+      result = { ok: true, message, fingerprint };
+    } catch (error) {
+      result = { ok: false, message: friendlyTargetError(error) };
+    }
+    if (existing) {
+      const config = input.kind === 'sftp' && result.ok && result.fingerprint && !input.config.hostFingerprint ? { ...input.config, hostFingerprint: result.fingerprint } : existing.config;
+      await this.deps.db
+        .update(backupTargets)
+        .set({ lastTestAt: new Date(), lastTestOk: result.ok, lastTestMessage: result.message, config })
+        .where(eq(backupTargets.id, existing.id));
+    }
+    return result;
+  }
+
+  /** Sube la copia a cada destino activo y anota el resultado. */
+  private async uploadToTargets(file: string, only?: (t: BackupTarget) => boolean): Promise<BackupRemoteDTO[]> {
+    const targets = (await this.deps.db.select().from(backupTargets).where(eq(backupTargets.enabled, true)).orderBy(backupTargets.createdAt)).filter((t) => !only || only(t));
+    const results: BackupRemoteDTO[] = [];
+    for (const target of targets) {
+      const at = new Date();
+      try {
+        const location = await uploaderFor(target.kind, target.config, this.secretsOf(target)).upload(path.join(this.dir, file), file);
+        results.push({ targetId: target.id, name: target.name, kind: target.kind, ok: true, location, error: null, at: at.toISOString() });
+        await this.deps.db.update(backupTargets).set({ lastUploadAt: at, lastUploadOk: true, lastUploadMessage: `Se subió ${file}` }).where(eq(backupTargets.id, target.id));
+      } catch (error) {
+        const message = friendlyTargetError(error);
+        this.deps.log.warn({ err: error, target: target.name }, 'copias: no se pudo subir la copia');
+        results.push({ targetId: target.id, name: target.name, kind: target.kind, ok: false, location: null, error: message, at: at.toISOString() });
+        await this.deps.db.update(backupTargets).set({ lastUploadAt: at, lastUploadOk: false, lastUploadMessage: message }).where(eq(backupTargets.id, target.id));
+      }
+    }
+    return results;
+  }
+
+  /** Vuelve a subir una copia a los destinos activos donde todavía no está. */
+  async retryUploads(b: Backup): Promise<Backup> {
+    if (b.status !== 'ok' || !existsSync(path.join(this.dir, b.file))) throw badRequest('El archivo de la copia ya no está en el servidor');
+    const done = new Set((b.remotes ?? []).filter((r) => r.ok && r.targetId).map((r) => r.targetId));
+    const fresh = await this.uploadToTargets(b.file, (t) => !done.has(t.id));
+    const retried = new Set(fresh.map((f) => f.targetId));
+    const remotes = [...(b.remotes ?? []).filter((r) => !r.targetId || !retried.has(r.targetId)), ...fresh];
+    const [row] = await this.deps.db.update(backups).set({ remotes }).where(eq(backups.id, b.id)).returning();
+    return row!;
+  }
+
+  /** Avisa a los superadministradores cuando una copia falla o no se puede subir. */
+  private async alert(subject: string, message: string) {
     const admins = await this.deps.db.select({ email: users.email }).from(users).where(and(eq(users.role, 'superadmin'), eq(users.active, true)));
     for (const a of admins) {
       try {
         await this.deps.mailer.send(
           {
             to: a.email,
-            subject: 'Falló la copia de seguridad',
-            text: `La copia de seguridad automática no se pudo crear:\n\n${message}\n\nRevise Plataforma → Ajustes → Copias de seguridad.`,
-            html: `<p>La copia de seguridad automática no se pudo crear:</p><pre>${message.replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[c]!)}</pre><p>Revise Plataforma → Ajustes → Copias de seguridad.</p>`,
+            subject,
+            text: `${message}\n\nRevise Plataforma → Copias.`,
+            html: `<pre style="white-space:pre-wrap;font-family:inherit">${message.replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[c]!)}</pre><p>Revise Plataforma → Copias.</p>`,
             tag: 'backup_failed',
           },
           { tenantId: null },
