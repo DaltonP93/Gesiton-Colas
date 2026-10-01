@@ -24,7 +24,7 @@ interface AuthState {
   platformBrand: PlatformBrand;
   login(email: string, password: string): Promise<MeDTO>;
   /** Devuelve `null` si hay que confirmar el correo antes de ingresar. */
-  register(data: { organizationName: string; name: string; email: string; password: string }): Promise<MeDTO | null>;
+  register(data: { organizationName: string; name: string; email: string; password: string; acceptTerms?: boolean }): Promise<MeDTO | null>;
   logout(): void;
   refresh(): Promise<void>;
   /** Guarda la sesión devuelta por los flujos de acceso por correo (verificación, enlace, invitación...). */

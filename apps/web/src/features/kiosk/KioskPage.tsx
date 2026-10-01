@@ -23,6 +23,7 @@ import { translator } from '../../lib/i18n';
 import { connectSocket } from '../../lib/socket';
 import { fontStack, loadFont, readableOn, setCustomCss } from '../../lib/theme';
 import { printTicket } from './printTicket';
+import { PrivacyNotice } from '../../components/legal/PrivacyNotice';
 
 type Service = KioskBootstrapDTO['services'][number];
 type KioskTheme = KioskBootstrapDTO['kiosk']['config']['theme'];
@@ -375,7 +376,7 @@ function Kiosk({ boot, token, refetch }: { boot: KioskBootstrapDTO; token: strin
         )}
         {step.name === 'form' && (
           <StepFrame title={t('kiosk.yourData')} subtitle={step.service.name} onBack={reset} t={t}>
-            <CustomerForm fields={askFields} t={t} shape={shapeClass(theme)} onSubmit={(data) => void issue(step.service, step.priority, data)} />
+            <CustomerForm fields={askFields} t={t} tenant={tenant} shape={shapeClass(theme)} onSubmit={(data) => void issue(step.service, step.priority, data)} />
           </StepFrame>
         )}
         {step.name === 'issuing' && (
@@ -589,7 +590,7 @@ function ServicesStep({
                         shapeClass(theme),
                         tile
                           ? cx('flex-col items-center justify-center gap-4 px-6 py-8 text-center', size.tile)
-                          : cx('items-center gap-5 px-7 py-6', theme.iconPosition === 'right' ? 'flex-row-reverse text-right' : 'text-left', size.row),
+                          : cx('items-center gap-4 px-5 py-5 sm:gap-5 sm:px-7 sm:py-6', theme.iconPosition === 'right' ? 'flex-row-reverse text-right' : 'text-left', size.row),
                       )}
                       style={colors}
                     >
@@ -607,9 +608,15 @@ function ServicesStep({
                         </span>
                         {service.description && <span className="mt-1 block text-[0.95em] opacity-80">{service.description}</span>}
                         {prices && service.price ? <span className="mt-1 block text-[1.05em] font-bold tabular-nums">{formatMoney(service.price, prices.currency)}</span> : null}
+                        {/* En pantallas angostas (fila virtual en el celular) la espera va debajo del nombre. */}
+                        {config.showWaitingCount && !tile && (
+                          <span className="mt-2 inline-block rounded-full bg-black/15 px-2.5 py-0.5 text-[0.8em] font-semibold tabular-nums sm:hidden">
+                            {service.waiting} {t('kiosk.waiting')}
+                          </span>
+                        )}
                       </span>
                       {config.showWaitingCount && (
-                        <span className="shrink-0 rounded-full bg-black/15 px-3 py-1 text-[0.9em] font-semibold tabular-nums">
+                        <span className={cx('shrink-0 rounded-full bg-black/15 px-3 py-1 text-[0.9em] font-semibold tabular-nums', !tile && 'hidden sm:inline-block')}>
                           {service.waiting} {t('kiosk.waiting')}
                         </span>
                       )}
@@ -645,7 +652,19 @@ const TOP_ICON: Record<KioskTheme['iconSize'], [string, string]> = {
   xl: ['size-40', 'size-20'],
 };
 
-function CustomerForm({ fields, t, onSubmit, shape }: { fields: CustomerField[]; t: ReturnType<typeof translator>; onSubmit: (data: Record<string, string>) => void; shape: string }) {
+function CustomerForm({
+  fields,
+  t,
+  onSubmit,
+  shape,
+  tenant,
+}: {
+  fields: CustomerField[];
+  t: ReturnType<typeof translator>;
+  onSubmit: (data: Record<string, string>) => void;
+  shape: string;
+  tenant: KioskBootstrapDTO['tenant'];
+}) {
   const [data, setData] = useState<Record<string, string>>({});
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -693,6 +712,7 @@ function CustomerForm({ fields, t, onSubmit, shape }: { fields: CustomerField[];
       >
         <Check className="size-7" /> {t('kiosk.continue')}
       </button>
+      <PrivacyNotice notice={tenant.privacyNotice} organization={tenant.name} label={t('privacy.notice')} className="text-[0.95em]" />
     </form>
   );
 }

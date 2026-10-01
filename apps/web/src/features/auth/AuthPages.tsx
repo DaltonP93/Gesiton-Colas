@@ -2,10 +2,12 @@ import { ArrowLeft, CheckCircle2, KeyRound, Mail, MailCheck, Sparkles } from 'lu
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router';
 import type { MeDTO } from '@gc/shared';
-import { Button, Field, Input, Loading, cx } from '../../components/ui';
+import { Button, Checkbox, Field, Input, Loading, cx } from '../../components/ui';
 import { ApiError, api, assetUrl, errorMessage } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { usePublicConfig } from '../../lib/queries';
+import { LegalFooter } from '../../components/legal/LegalFooter';
+import { LEGAL_DOCS, type LegalIndexDTO } from '@gc/shared';
 
 type Session = MeDTO & { token: string };
 
@@ -86,11 +88,7 @@ function AuthShell({ title, subtitle, children, footer }: { title: string; subti
           {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
           <div className="mt-8">{children}</div>
           {footer && <div className="mt-6 space-y-2 text-center text-sm text-muted">{footer}</div>}
-          <p className="mt-10 text-center text-[11px] text-muted/80">
-            <a href="/licencias-de-terceros.txt" className="hover:text-fg">
-              Licencias de software de terceros
-            </a>
-          </p>
+          <LegalFooter className="mt-10" copyright={false} />
           {brand.supportEmail && (
             <p className="mt-8 text-center text-xs text-muted lg:hidden">
               ¿Problemas para ingresar?{' '}
@@ -102,6 +100,33 @@ function AuthShell({ title, subtitle, children, footer }: { title: string; subti
         </div>
       </div>
     </div>
+  );
+}
+
+/** Casilla «Acepto los términos» del registro y la demo (solo si hay documentos publicados para aceptar). */
+function TermsCheckbox({ legal, checked, onChange }: { legal: LegalIndexDTO | undefined; checked: boolean; onChange: (v: boolean) => void }) {
+  if (!legal?.acceptance) return null;
+  const doc = (kind: keyof typeof LEGAL_DOCS, label: string) =>
+    legal.documents.some((d) => d.kind === kind) ? (
+      <a href={LEGAL_DOCS[kind].path} target="_blank" rel="noreferrer" className="font-medium text-primary hover:underline">
+        {label}
+      </a>
+    ) : null;
+  const terms = doc('terms', 'Términos y condiciones');
+  const dpa = doc('dpa', 'Acuerdo de tratamiento de datos');
+  const privacy = doc('privacy', 'Política de privacidad');
+  return (
+    <Checkbox
+      checked={checked}
+      onChange={onChange}
+      label={
+        <span className="text-muted">
+          Acepto {terms ? <>los {terms}</> : 'los términos del servicio'}
+          {dpa && <> y el {dpa}</>} en nombre de la organización
+          {privacy && <>, y leí la {privacy}</>}.
+        </span>
+      }
+    />
   );
 }
 
@@ -691,8 +716,11 @@ export function AcceptInvitePage() {
 
 export function RegisterPage() {
   const { me, register } = useAuth();
+  const { data: config } = usePublicConfig();
   const navigate = useNavigate();
   const [form, setForm] = useState({ organizationName: '', name: '', email: '', password: '' });
+  const [accepted, setAccepted] = useState(false);
+  const needsTerms = Boolean(config?.legal.acceptance);
   const [error, setError] = useState<string | null>(null);
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -708,7 +736,7 @@ export function RegisterPage() {
     setLoading(true);
     justCreated.current = true;
     try {
-      const res = await register(form);
+      const res = await register({ ...form, acceptTerms: needsTerms ? accepted : undefined });
       if (res) navigate('/app/bienvenida', { replace: true });
       else setPendingEmail(form.email);
     } catch (err) {
@@ -758,8 +786,9 @@ export function RegisterPage() {
           <Field label="Contraseña" hint="Mínimo 8 caracteres">
             <Input type="password" required minLength={8} value={form.password} onChange={set('password')} autoComplete="new-password" />
           </Field>
+          <TermsCheckbox legal={config?.legal} checked={accepted} onChange={setAccepted} />
           {error && <Alert>{error}</Alert>}
-          <Button type="submit" size="lg" className="w-full" loading={loading}>
+          <Button type="submit" size="lg" className="w-full" loading={loading} disabled={needsTerms && !accepted}>
             Crear cuenta
           </Button>
         </form>
@@ -773,6 +802,8 @@ export function DemoPage() {
   const { data: config } = usePublicConfig();
   const [params] = useSearchParams();
   const [form, setForm] = useState({ name: '', email: params.get('email') ?? '', organizationName: '' });
+  const [accepted, setAccepted] = useState(false);
+  const needsTerms = Boolean(config?.legal.acceptance);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -790,6 +821,7 @@ export function DemoPage() {
         email: form.email,
         organizationName: form.organizationName || undefined,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        acceptTerms: needsTerms ? accepted : undefined,
       });
       setSent(true);
     } catch (err) {
@@ -837,8 +869,9 @@ export function DemoPage() {
           <Field label="Organización (opcional)">
             <Input value={form.organizationName} onChange={set('organizationName')} placeholder="Ej.: Farmacia Central" />
           </Field>
+          <TermsCheckbox legal={config?.legal} checked={accepted} onChange={setAccepted} />
           {error && <Alert>{error}</Alert>}
-          <Button type="submit" size="lg" className="w-full" loading={loading} icon={<Sparkles className="size-4" />}>
+          <Button type="submit" size="lg" className="w-full" loading={loading} disabled={needsTerms && !accepted} icon={<Sparkles className="size-4" />}>
             Enviarme la demo
           </Button>
           <p className="text-center text-xs text-muted">Sin tarjeta de crédito. La demo dura {config?.demoDays ?? 14} días.</p>

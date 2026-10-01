@@ -20,6 +20,7 @@ import {
   type UserDTO,
   type WebhookDTO,
   type WebhookDeliveryDTO,
+  privacyNoticeOf,
 } from '@gc/shared';
 import type {
   ApiKey,
@@ -70,6 +71,7 @@ export function toPublicTenantDTO(t: Tenant): PublicTenantDTO {
     terminology: settings.terminology,
     locale: settings.locale,
     timezone: settings.timezone,
+    privacyNotice: privacyNoticeOf(t.name, settings.privacy),
   };
 }
 

@@ -1,7 +1,7 @@
 import { and, desc, eq } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { normalizePhone, type NotifyMessageDTO } from '@gc/shared';
+import { PLATFORM_NOTICE_EVENTS, normalizePhone, type NotifyMessageDTO, type PlatformNoticeTestDTO, type TenantChannelsDTO } from '@gc/shared';
 import type { AppContext } from '../../context';
 import { notifyMessages, tenants, tickets } from '../../db/schema';
 import { assertModuleActive, assertTenantAvailable, tenantIdOf } from '../../lib/auth';
@@ -134,6 +134,27 @@ export const notificationRoutes = (ctx: AppContext): FastifyPluginAsyncZod => as
       const [ticket] = await findTickets(ctx.db, eq(tickets.id, row.id), [], 1);
       if (ticket) await ctx.notifier.onTicketEvent(tenant.id, 'ticket.created', ticket);
       return { ok: true, phone: `+${phone}` };
+    },
+  );
+
+  /* ------------------------- Avisos de la plataforma ------------------------- */
+
+  app.get(
+    '/platform/notices/channels',
+    { preHandler: superadmin, schema: { tags, summary: 'Por dónde sale el correo y el WhatsApp/SMS de cada organización' } },
+    async (): Promise<TenantChannelsDTO[]> => ctx.notices.channels((t) => ctx.modulesOf(t)),
+  );
+
+  app.post(
+    '/platform/notices/test',
+    {
+      preHandler: superadmin,
+      config: testLimit,
+      schema: { tags, summary: 'Enviar un aviso de prueba al superadministrador (correo) y a los celulares de la plataforma', body: z.object({ event: z.enum(PLATFORM_NOTICE_EVENTS) }) },
+    },
+    async (request): Promise<PlatformNoticeTestDTO> => {
+      if (request.auth?.kind !== 'user') throw badRequest('Disponible solo para usuarios');
+      return ctx.notices.test(request.body.event, request.auth.user.email);
     },
   );
 };

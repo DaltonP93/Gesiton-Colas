@@ -32,6 +32,10 @@ import type {
   CustomerData,
   DisplayConfig,
   KioskConfig,
+  BackupRemoteDTO,
+  BackupTargetConfig,
+  BackupTargetKind,
+  LegalKind,
   MediaKind,
   MediaProvider,
   MailSecurity,
@@ -762,6 +766,26 @@ export const auditLogs = pgTable(
   (t) => [index('audit_logs_tenant_idx').on(t.tenantId, t.createdAt), index('audit_logs_entity_idx').on(t.entity, t.entityId), index('audit_logs_created_idx').on(t.createdAt)],
 );
 
+/** Destinos externos de las copias (configurados en Plataforma → Copias). */
+export const backupTargets = pgTable('backup_targets', {
+  id: id(),
+  kind: text('kind').$type<BackupTargetKind>().notNull(),
+  name: text('name').notNull(),
+  enabled: boolean('enabled').notNull().default(true),
+  config: jsonb('config').$type<BackupTargetConfig>().notNull(),
+  /** Claves (JSON) cifradas con la clave del servidor. */
+  secret: text('secret'),
+  lastTestAt: timestamp('last_test_at', { withTimezone: true }),
+  lastTestOk: boolean('last_test_ok'),
+  lastTestMessage: text('last_test_message'),
+  lastUploadAt: timestamp('last_upload_at', { withTimezone: true }),
+  lastUploadOk: boolean('last_upload_ok'),
+  lastUploadMessage: text('last_upload_message'),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+export type BackupTarget = typeof backupTargets.$inferSelect;
+
 /** Copias de seguridad de la instalación. */
 export const backups = pgTable(
   'backups',
@@ -774,6 +798,8 @@ export const backups = pgTable(
     trigger: text('trigger').$type<'auto' | 'manual'>().notNull(),
     includesUploads: boolean('includes_uploads').notNull().default(true),
     s3Key: text('s3_key'),
+    /** Subidas a los destinos externos (S3, SFTP, WebDAV). */
+    remotes: jsonb('remotes').$type<BackupRemoteDTO[]>().notNull().default([]),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
     startedAt: timestamp('started_at', { withTimezone: true }).defaultNow().notNull(),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
@@ -957,3 +983,66 @@ export const sifenDocuments = pgTable(
   ],
 );
 export type SifenDocument = typeof sifenDocuments.$inferSelect;
+
+/**
+ * Versiones publicadas de los documentos legales (términos, privacidad, tratamiento de datos).
+ * Nunca se modifican: `content` es exactamente el texto que se publicó y que aceptaron las organizaciones.
+ */
+export const legalDocuments = pgTable(
+  'legal_documents',
+  {
+    id: id(),
+    kind: text('kind').$type<LegalKind>().notNull(),
+    version: integer('version').notNull(),
+    /** Texto con variables ({{titular}}…) tal como lo dejó el superadministrador. */
+    source: text('source').notNull(),
+    /** Texto publicado, con los datos del titular reemplazados. */
+    content: text('content').notNull(),
+    /** Cambio importante: las organizaciones tienen que volver a aceptar. */
+    requiresAcceptance: boolean('requires_acceptance').notNull().default(true),
+    /** Qué cambió respecto de la versión anterior. */
+    note: text('note'),
+    publishedBy: uuid('published_by').references(() => users.id, { onDelete: 'set null' }),
+    publishedByName: text('published_by_name'),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('legal_documents_kind_version_idx').on(t.kind, t.version)],
+);
+export type LegalDocument = typeof legalDocuments.$inferSelect;
+
+/**
+ * Constancia de aceptación de un documento por una organización (quién, cuándo y desde dónde).
+ * Se conserva aunque se borren la organización o el usuario: es la prueba del contrato.
+ */
+export const legalAcceptances = pgTable(
+  'legal_acceptances',
+  {
+    id: id(),
+    tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'set null' }),
+    tenantName: text('tenant_name').notNull(),
+    documentId: uuid('document_id')
+      .notNull()
+      .references(() => legalDocuments.id, { onDelete: 'restrict' }),
+    kind: text('kind').$type<LegalKind>().notNull(),
+    version: integer('version').notNull(),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    userName: text('user_name').notNull(),
+    userEmail: text('user_email').notNull(),
+    ip: text('ip'),
+    userAgent: text('user_agent'),
+    acceptedAt: timestamp('accepted_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex('legal_acceptances_tenant_document_idx').on(t.tenantId, t.documentId), index('legal_acceptances_kind_idx').on(t.kind, t.tenantId, t.version)],
+);
+
+/** Avisos de la plataforma ya enviados (para no repetir recordatorios). */
+export const platformNoticeLog = pgTable(
+  'platform_notice_log',
+  {
+    id: id(),
+    event: text('event').notNull(),
+    entityId: text('entity_id').notNull(),
+    sentAt: timestamp('sent_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex('platform_notice_log_event_entity_idx').on(t.event, t.entityId)],
+);

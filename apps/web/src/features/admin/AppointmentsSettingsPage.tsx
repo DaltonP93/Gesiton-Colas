@@ -221,7 +221,7 @@ export default function AppointmentsSettingsPage() {
           <Callout icon={<Plug />}>
             <p>
               <strong>API:</strong> cree una API key con los permisos <code>appointments:read</code> y <code>appointments:write</code> (Configuración → Integraciones) y use{' '}
-              <code>PUT /api/v1/appointments/external/&#123;suId&#125;</code> para crear o actualizar cada cita con el identificador de su sistema. La sucursal va por{' '}
+              <code className="break-all">PUT /api/v1/appointments/external/&#123;suId&#125;</code> para crear o actualizar cada cita con el identificador de su sistema. La sucursal va por{' '}
               <code>branchCode</code> y el servicio por nombre o prefijo (<code>serviceName</code>).
             </p>
             <p>

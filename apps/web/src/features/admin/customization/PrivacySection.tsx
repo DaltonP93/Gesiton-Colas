@@ -1,7 +1,8 @@
 import { useMutation } from '@tanstack/react-query';
-import { ShieldCheck, Trash2 } from 'lucide-react';
+import { Eye, ShieldCheck, Trash2 } from 'lucide-react';
+import { defaultPrivacyNotice, type PrivacySettings } from '@gc/shared';
 import { useState, type FormEvent } from 'react';
-import { Button, Field, Input, Select, useFeedback } from '../../../components/ui';
+import { Button, Field, Input, Select, Textarea, Toggle, useFeedback } from '../../../components/ui';
 import { api, errorMessage } from '../../../lib/api';
 import { useAuth } from '../../../lib/auth';
 import { Section, useSaveTenant } from './common';
@@ -17,7 +18,11 @@ const RETENTION_OPTIONS = [
 
 /** Plazo de conservación de datos personales y borrado a pedido del titular. */
 export function PrivacySection() {
-  const { settings, terms } = useAuth();
+  const { me, settings, terms } = useAuth();
+  const [notice, setNotice] = useState<PrivacySettings['notice']>(settings.privacy.notice);
+  const noticeDirty = JSON.stringify(notice) !== JSON.stringify(settings.privacy.notice);
+  const organization = me?.tenant?.name ?? '';
+  const standard = defaultPrivacyNotice(organization, { retentionDays: settings.privacy.retentionDays, notice });
   const { save, saving } = useSaveTenant();
   const { toast, confirm } = useFeedback();
   const [retention, setRetention] = useState(settings.privacy.retentionDays);
@@ -83,6 +88,46 @@ export function PrivacySection() {
             Borrar datos
           </Button>
         </form>
+      </div>
+
+      <div className="mt-6 space-y-4 border-t border-border pt-6">
+        <Toggle
+          checked={notice.enabled}
+          onChange={(enabled) => setNotice((n) => ({ ...n, enabled }))}
+          label="Mostrar un aviso de privacidad a quien saca un turno o reserva"
+          hint="Aparece en la reserva en línea, el kiosco, la fila virtual y las encuestas: qué datos pide, para qué y cómo pedir su borrado."
+        />
+        {notice.enabled && (
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="space-y-3">
+              <Field label="Dónde pedir el acceso o el borrado de los datos" hint="Correo, teléfono o lugar de atención.">
+                <Input value={notice.contact} maxLength={200} onChange={(e) => setNotice((n) => ({ ...n, contact: e.target.value }))} placeholder="privacidad@suempresa.com.py" />
+              </Field>
+              <Field label="Enlace a su política completa (opcional)">
+                <Input type="url" value={notice.url} maxLength={2048} onChange={(e) => setNotice((n) => ({ ...n, url: e.target.value.trim() }))} placeholder="https://suempresa.com.py/privacidad" />
+              </Field>
+              <Field label="Texto propio (opcional)" hint="Vacío = el texto estándar, que se arma con el nombre de la organización y el plazo de conservación.">
+                <Textarea rows={5} maxLength={4000} value={notice.text} onChange={(e) => setNotice((n) => ({ ...n, text: e.target.value }))} placeholder={standard} />
+              </Field>
+            </div>
+            <div className="rounded-ui border border-border bg-subtle/50 p-4">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-muted uppercase">
+                <Eye className="size-3.5" /> Así lo ve el {customer}
+              </p>
+              <p className="text-sm leading-relaxed whitespace-pre-line">{notice.text.trim() || standard}</p>
+              {notice.url && <p className="mt-3 text-sm font-medium text-primary">Ver la política completa</p>}
+            </div>
+          </div>
+        )}
+        <Button
+          variant="secondary"
+          icon={<ShieldCheck className="size-4" />}
+          loading={saving}
+          disabled={!noticeDirty}
+          onClick={() => void save({ settings: { privacy: { notice } } }, 'Aviso de privacidad guardado')}
+        >
+          Guardar aviso
+        </Button>
       </div>
     </Section>
   );

@@ -159,7 +159,7 @@ function FiscalCard() {
   const dirty = JSON.stringify(form) !== JSON.stringify(settings.fiscal);
   const set = <K extends keyof FiscalProfile>(k: K, v: FiscalProfile[K]) => setForm((f) => ({ ...f, [k]: v }));
   return (
-    <Card title="Datos para su factura" description="RUC y razón social con los que se emiten las facturas de su plan.">
+    <Card title="Datos para su factura y avisos" description="RUC y razón social con los que se emiten las facturas de su plan, y dónde le avisamos de facturas y vencimientos.">
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="RUC" hint="Con dígito verificador: 80012345-6">
           <Input value={form.ruc} onChange={(e) => set('ruc', e.target.value.trim())} maxLength={20} />
@@ -172,6 +172,9 @@ function FiscalCard() {
         </Field>
         <Field label="Dirección">
           <Input value={form.address} onChange={(e) => set('address', e.target.value)} maxLength={255} />
+        </Field>
+        <Field label="Celular para avisos (WhatsApp/SMS)" hint="Para recordatorios de facturas y vencimientos, si la plataforma los envía por WhatsApp o SMS.">
+          <Input type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} maxLength={30} placeholder="0981 123 456" />
         </Field>
       </div>
       <div className="mt-4 flex justify-end">

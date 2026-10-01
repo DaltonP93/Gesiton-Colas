@@ -16,6 +16,7 @@ import { Button } from '../../components/ui';
 import { assetUrl } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { usePublicConfig } from '../../lib/queries';
+import { LegalFooter } from '../../components/legal/LegalFooter';
 
 const features = [
   { icon: <MonitorPlay />, title: 'Pantallas inteligentes', text: 'Llamados con voz y sonido, historial, reloj y diseños intercambiables para cualquier TV, Smart TV o Android TV.' },
@@ -37,18 +38,18 @@ export function LandingPage() {
   const demo = config?.allowDemo !== false;
   return (
     <div className="min-h-screen bg-bg">
-      <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-        <div className="flex items-center gap-2 text-lg font-bold">
+      <header className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-5 sm:px-6">
+        <div className="flex min-w-0 items-center gap-2 text-lg font-bold">
           {platformBrand.logoUrl ? (
-            <img src={assetUrl(platformBrand.logoUrl)} alt={name} className="h-9 max-w-44 object-contain" />
+            <img src={assetUrl(platformBrand.logoUrl)} alt={name} className="h-9 max-w-44 min-w-0 object-contain" />
           ) : (
             <>
-              <span className="grid size-9 place-items-center rounded-ui bg-primary text-primary-fg">{name.charAt(0)}</span>
-              {name}
+              <span className="grid size-9 shrink-0 place-items-center rounded-ui bg-primary text-primary-fg">{name.charAt(0)}</span>
+              <span className="truncate">{name}</span>
             </>
           )}
         </div>
-        <nav className="flex items-center gap-2">
+        <nav className="flex shrink-0 items-center gap-1 sm:gap-2">
           <a href="/api/docs" className="hidden text-sm text-muted hover:text-fg sm:inline">
             API
           </a>
@@ -58,7 +59,9 @@ export function LandingPage() {
             </Link>
           )}
           <Link to="/login">
-            <Button variant={signup ? 'ghost' : 'primary'}>Ingresar</Button>
+            <Button variant={signup ? 'ghost' : 'primary'} className="px-3 sm:px-4">
+              Ingresar
+            </Button>
           </Link>
           {signup && (
             <Link to="/registro">
@@ -68,8 +71,8 @@ export function LandingPage() {
         </nav>
       </header>
 
-      <section className="mx-auto grid max-w-6xl items-center gap-12 px-6 pt-10 pb-20 lg:grid-cols-2">
-        <div>
+      <section className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-12 px-4 pt-10 pb-20 sm:px-6 lg:grid-cols-2">
+        <div className="min-w-0">
           <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
             <Code2 className="size-4" /> Plataforma SaaS de gestión de colas
           </span>
@@ -104,7 +107,7 @@ export function LandingPage() {
             </Link>
           </p>
         </div>
-        <div className="relative">
+        <div className="relative min-w-0">
           <div className="overflow-hidden rounded-2xl border border-border bg-slate-900 shadow-2xl">
             <div className="grid grid-cols-[1fr_38%]">
               <div className="relative aspect-video bg-gradient-to-br from-indigo-600 via-sky-500 to-emerald-400">
@@ -150,11 +153,13 @@ export function LandingPage() {
         </div>
       </section>
 
-      <footer className="py-10 text-center text-sm text-muted">
-        © {new Date().getFullYear()} {name} · <a href="/api/docs" className="hover:text-fg">Documentación de la API</a> ·{' '}
-        <a href="/licencias-de-terceros.txt" className="hover:text-fg">
-          Licencias de terceros
-        </a>
+      <footer className="space-y-2 py-10 text-center text-sm text-muted">
+        <p>
+          <a href="/api/docs" className="hover:text-fg">
+            Documentación de la API
+          </a>
+        </p>
+        <LegalFooter className="text-xs" />
       </footer>
     </div>
   );

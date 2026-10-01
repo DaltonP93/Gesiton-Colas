@@ -3,6 +3,9 @@ import { DEFAULT_PLAN_MODULES, MODULE_IDS } from './modules';
 import { PLAN_IDS, type PlanId } from './plans';
 import { CURRENCIES } from './currency';
 import { billingSettingsSchema } from './payments';
+import { legalSettingsSchema, type LegalIndexDTO } from './legal';
+import type { BackupRemoteDTO, BackupTargetDTO } from './backupTargets';
+import { platformNoticesSchema } from './platformNotices';
 
 const color = z.string().regex(/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i, 'Color hexadecimal inválido');
 
@@ -63,7 +66,7 @@ export const backupSettingsSchema = z
     keepDays: z.number().int().min(1).max(365).default(14),
     /** Incluir las imágenes, videos y audios subidos (si se guardan en el disco del servidor). */
     includeUploads: z.boolean().default(true),
-    /** Copiar también a S3 (requiere S3_BUCKET y credenciales en el servidor). */
+    /** Copiar también al S3 configurado con variables del servidor (S3_BUCKET y credenciales). */
     s3: z.boolean().default(false),
   })
   .prefault({});
@@ -78,6 +81,8 @@ export interface BackupDTO {
   trigger: 'auto' | 'manual';
   includesUploads: boolean;
   s3Key: string | null;
+  /** Subidas a los destinos externos. */
+  remotes: BackupRemoteDTO[];
   /** El archivo sigue en el servidor y se puede descargar. */
   available: boolean;
   startedAt: string;
@@ -90,7 +95,10 @@ export interface BackupStatusDTO {
   /** pg_dump instalado en el servidor. */
   ready: boolean;
   dir: string;
+  /** S3 configurado con variables del servidor (S3_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY). */
   s3Available: boolean;
+  /** Destinos externos configurados desde el panel. */
+  targets: BackupTargetDTO[];
 }
 
 export const platformSettingsSchema = z.object({
@@ -113,6 +121,10 @@ export const platformSettingsSchema = z.object({
   /** Facturación de los planes a las organizaciones. */
   billing: billingSettingsSchema.prefault({}),
   backups: backupSettingsSchema,
+  /** Titular del software y aceptación de los términos (Plataforma → Legal). */
+  legal: legalSettingsSchema,
+  /** Avisos de la plataforma a las organizaciones y a los superadministradores, y por qué canal. */
+  notices: platformNoticesSchema,
 });
 export type PlatformSettings = z.infer<typeof platformSettingsSchema>;
 
@@ -131,6 +143,8 @@ export interface PublicConfigDTO {
   /** Hay un servidor de correo configurado (se pueden enviar invitaciones, códigos y recuperaciones). */
   emailEnabled: boolean;
   brand: PlatformBrand;
+  /** Términos, privacidad y tratamiento de datos publicados. */
+  legal: LegalIndexDTO;
 }
 
 /* ------------------------------------------------------------------ */

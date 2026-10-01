@@ -301,7 +301,7 @@ function PlaylistEditor({ playlist, onDeleted }: { playlist: PlaylistDTO; onDele
                     if (from >= 0 && from !== index) move(from, index);
                     setDragKey(null);
                   }}
-                  className={cx('flex flex-wrap items-center gap-3 px-4 py-3 lg:flex-nowrap', !item.active && 'opacity-50', dragKey === item.key && 'bg-primary/5')}
+                  className={cx('flex flex-wrap items-center gap-3 px-4 py-3 xl:flex-nowrap', !item.active && 'opacity-50', dragKey === item.key && 'bg-primary/5')}
                 >
                   <GripVertical className="size-4 shrink-0 cursor-grab text-muted" />
                   <MediaThumb media={item.media} className="aspect-video w-24 shrink-0 overflow-hidden rounded-md" />
@@ -316,7 +316,7 @@ function PlaylistEditor({ playlist, onDeleted }: { playlist: PlaylistDTO; onDele
                       )}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Input
                       type="number"
                       min={1}

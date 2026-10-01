@@ -3,7 +3,7 @@ import path from 'node:path';
 import { eq } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import type { BackupDTO, BackupStatusDTO } from '@gc/shared';
+import { backupTargetInputSchema, type BackupDTO, type BackupStatusDTO, type BackupTargetDTO, type BackupTargetTestDTO } from '@gc/shared';
 import type { AppContext } from '../../context';
 import { backups } from '../../db/schema';
 import { userIdOf } from '../../lib/auth';
@@ -24,13 +24,14 @@ export const backupRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
   };
 
   app.get('/platform/backups', { preHandler: superadmin, schema: { tags, summary: 'Copias de seguridad y su configuración' } }, async (): Promise<BackupStatusDTO> => {
-    const [settings, rows, ready] = await Promise.all([ctx.platform.get(), ctx.backups.list(), hasPgDump(ctx.config)]);
+    const [settings, rows, ready, targets] = await Promise.all([ctx.platform.get(), ctx.backups.list(), hasPgDump(ctx.config), ctx.backups.listTargets()]);
     return {
       settings: settings.backups,
       items: rows.map((r) => toBackupDTO(r, ctx.backups.dir)),
       ready,
       dir: ctx.backups.dir,
       s3Available: ctx.backups.s3Available,
+      targets,
     };
   });
 
@@ -80,5 +81,55 @@ export const backupRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
       await ctx.backups.remove(row);
       return reply.code(204).send();
     },
+  );
+
+  /* --------------------------- Destinos externos --------------------------- */
+
+  app.post(
+    '/platform/backups/targets',
+    { preHandler: superadmin, schema: { tags, summary: 'Agregar un destino externo para las copias (S3, SFTP o WebDAV)', body: backupTargetInputSchema } },
+    async (request): Promise<BackupTargetDTO> => ctx.backups.saveTarget(request.body),
+  );
+
+  app.put(
+    '/platform/backups/targets/:id',
+    {
+      preHandler: superadmin,
+      schema: { tags, summary: 'Modificar un destino (las claves vacías conservan las guardadas)', params: idParam, body: backupTargetInputSchema },
+    },
+    async (request): Promise<BackupTargetDTO> => ctx.backups.saveTarget(request.body, request.params.id),
+  );
+
+  app.delete(
+    '/platform/backups/targets/:id',
+    { preHandler: superadmin, schema: { tags, summary: 'Quitar un destino (las copias ya subidas quedan allí)', params: idParam } },
+    async (request, reply) => {
+      await ctx.backups.deleteTarget(request.params.id);
+      return reply.code(204).send();
+    },
+  );
+
+  app.post(
+    '/platform/backups/targets/test',
+    {
+      preHandler: superadmin,
+      config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+      schema: {
+        tags,
+        summary: 'Probar un destino: escribe y borra un archivo de prueba',
+        description: 'Con `id`, usa las claves guardadas que no se envíen y guarda el resultado.',
+        body: z.intersection(backupTargetInputSchema, z.object({ id: z.uuid().optional() })),
+      },
+    },
+    async (request): Promise<BackupTargetTestDTO> => {
+      const { id, ...input } = request.body;
+      return ctx.backups.testTarget(input as typeof request.body, id);
+    },
+  );
+
+  app.post(
+    '/platform/backups/:id/upload',
+    { preHandler: superadmin, schema: { tags, summary: 'Volver a subir una copia a los destinos donde falló', params: idParam } },
+    async (request): Promise<BackupDTO> => toBackupDTO(await ctx.backups.retryUploads(await find(request.params.id)), ctx.backups.dir),
   );
 };

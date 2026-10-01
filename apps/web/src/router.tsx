@@ -49,6 +49,8 @@ const BookingPage = lazy(() => import('./features/booking/BookingPage'));
 const AppointmentPage = lazy(() => import('./features/booking/AppointmentPage'));
 const InvoicesPage = lazy(() => import('./features/admin/InvoicesPage'));
 const KudePage = lazy(() => import('./features/invoice/KudePage'));
+const LegalPage = lazy(() => import('./features/legal/LegalPage'));
+const LicenseContractPage = lazy(() => import('./features/platform/LicenseContractPage'));
 
 function Lazy({ children }: { children: ReactNode }) {
   return <Suspense fallback={<Loading />}>{children}</Suspense>;
@@ -158,6 +160,10 @@ export const router = createBrowserRouter([
     ],
   },
   { path: '/plataforma', element: page(<PlatformPage />, 'superadmin') },
+  { path: '/plataforma/contrato-de-licencia', element: page(<LicenseContractPage />, 'superadmin') },
+  { path: '/terminos', element: <Lazy><LegalPage kind="terms" /></Lazy> },
+  { path: '/privacidad', element: <Lazy><LegalPage kind="privacy" /></Lazy> },
+  { path: '/tratamiento-de-datos', element: <Lazy><LegalPage kind="dpa" /></Lazy> },
   {
     path: '/pantalla/:token',
     element: (

@@ -31,6 +31,7 @@ import type { ModuleId, OfflineDeviceDTO, Role } from '@gc/shared';
 import { cx } from '../../components/ui';
 import { api, assetUrl } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
+import { LegalAcceptGate } from '../../components/legal/LegalAcceptGate';
 
 interface NavItem {
   to: string;
@@ -261,6 +262,7 @@ export function AdminLayout() {
 
   return (
     <div className="gc-app flex min-h-screen">
+      <LegalAcceptGate />
       <div className="sticky top-0 hidden h-screen shrink-0 lg:block">{sidebar(collapsed)}</div>
       {open && (
         <div className="fixed inset-0 z-40 lg:hidden">

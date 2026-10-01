@@ -16,3 +16,8 @@ export * from './billing';
 export * from './audit';
 export * from './appointments';
 export * from './sifen';
+export * from './legal';
+export * from './legalTemplates';
+export * from './backupTargets';
+export * from './mediaGuides';
+export * from './platformNotices';

@@ -225,3 +225,14 @@ export function sifenMail(to: string, name: string, doc: { issuer: string; numbe
   });
   return { to, subject: `Factura electrónica ${doc.number} · ${doc.issuer}`, html, text, fromName: brand.appName, tag: 'sifen_invoice' };
 }
+
+/** Aviso de la plataforma (vencimientos, suspensión, términos, alertas para los superadministradores). */
+export function noticeMail(
+  to: string,
+  name: string,
+  notice: { subject: string; title: string; lines: string[]; cta?: { label: string; url: string }; outro?: string[]; tag: string },
+  brand: EmailBrand,
+): MailMessage {
+  const { html, text } = layout({ brand, title: notice.title, intro: [greet(name), ...notice.lines], cta: notice.cta, outro: notice.outro ?? [] });
+  return { to, subject: notice.subject, html, text, fromName: brand.appName, tag: notice.tag };
+}

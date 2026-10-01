@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  AlertTriangle,
   Eye,
   FileVideo,
   Globe,
@@ -15,14 +16,17 @@ import {
   UploadCloud,
   Video,
 } from 'lucide-react';
-import { useMemo, useRef, useState, type DragEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import {
   PROVIDER_LABELS,
   UPLOAD_MIME_TYPES,
   audioFromUrl,
   defaultDisplayConfig,
   detectMedia,
+  guideForProvider,
+  mediaUrlHint,
   type MediaDTO,
+  type MediaGuide,
   type PlaylistItemDTO,
 } from '@gc/shared';
 import {
@@ -48,28 +52,11 @@ import { formatBytes, formatDuration } from '../../lib/format';
 import { useMedia } from '../../lib/queries';
 import { MediaPlayer } from '../display/MediaPlayer';
 import { ContentTabs } from './ContentTabs';
+import { GuideChips, GuideContent, GuideModal } from './media/MediaGuide';
 
 type Filter = 'all' | 'video' | 'image' | 'audio' | 'platform' | 'text';
 
 const PLATFORM_KINDS = new Set(['youtube', 'vimeo', 'embed', 'hls']);
-
-export const PLATFORMS = [
-  'YouTube',
-  'Vimeo',
-  'TikTok',
-  'Instagram',
-  'Facebook',
-  'Twitch',
-  'Dailymotion',
-  'Google Drive',
-  'Google Slides',
-  'Canva',
-  'Loom',
-  'HLS / m3u8',
-  'MP4 / WebM',
-  'MP3 / radios',
-  'Páginas web',
-];
 
 export function MediaThumb({ media, className }: { media: MediaDTO; className?: string }) {
   // Miniaturas externas (YouTube, Vimeo...) pueden no cargar: se muestra el ícono de la plataforma.
@@ -127,6 +114,8 @@ export default function MediaPage() {
   const [modal, setModal] = useState<null | 'upload' | 'url' | 'text'>(null);
   const [editing, setEditing] = useState<MediaDTO | null>(null);
   const [preview, setPreview] = useState<MediaDTO | null>(null);
+  const [guide, setGuide] = useState<MediaGuide | null>(null);
+  const [urlGuide, setUrlGuide] = useState<MediaGuide | null>(null);
   const usage = useQuery({
     queryKey: ['tenant-usage'],
     queryFn: () => api.get<{ limits: { storageMb: number | null; maxUploadMb: number }; usage: { storageBytes: number } }>('/tenant/usage'),
@@ -168,7 +157,14 @@ export default function MediaPage() {
             <Button icon={<UploadCloud className="size-4" />} onClick={() => setModal('upload')}>
               Subir archivos
             </Button>
-            <Button variant="secondary" icon={<Link2 className="size-4" />} onClick={() => setModal('url')}>
+            <Button
+              variant="secondary"
+              icon={<Link2 className="size-4" />}
+              onClick={() => {
+                setUrlGuide(null);
+                setModal('url');
+              }}
+            >
               Desde URL
             </Button>
             <Button variant="secondary" icon={<Type className="size-4" />} onClick={() => setModal('text')}>
@@ -178,10 +174,9 @@ export default function MediaPage() {
         }
       />
 
-      <div className="mb-5 flex flex-wrap gap-1.5">
-        {PLATFORMS.map((p) => (
-          <Badge key={p}>{p}</Badge>
-        ))}
+      <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-ui border border-border bg-surface/60 px-3 py-2.5">
+        <p className="text-xs font-semibold text-muted">Puede mostrar · toque uno para ver cómo agregarlo:</p>
+        <GuideChips onOpen={setGuide} />
       </div>
 
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
@@ -271,7 +266,20 @@ export default function MediaPage() {
       )}
 
       <UploadModal open={modal === 'upload'} onClose={() => setModal(null)} />
-      <UrlModal open={modal === 'url'} onClose={() => setModal(null)} />
+      <UrlModal open={modal === 'url'} guide={urlGuide} onClose={() => setModal(null)} />
+      <GuideModal
+        guide={guide}
+        onClose={() => setGuide(null)}
+        onUpload={() => {
+          setGuide(null);
+          setModal('upload');
+        }}
+        onUrl={(g) => {
+          setGuide(null);
+          setUrlGuide(g);
+          setModal('url');
+        }}
+      />
       <TextModal open={modal === 'text'} onClose={() => setModal(null)} />
       <EditModal media={editing} onClose={() => setEditing(null)} />
       <MediaPreview media={preview} onClose={() => setPreview(null)} />
@@ -418,15 +426,21 @@ function UploadModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   );
 }
 
-function UrlModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+function UrlModal({ open, onClose, guide }: { open: boolean; onClose: () => void; guide: MediaGuide | null }) {
   const qc = useQueryClient();
   const { toast } = useFeedback();
   const [url, setUrl] = useState('');
+  const [help, setHelp] = useState<MediaGuide | null>(null);
+  useEffect(() => {
+    if (open) setHelp(guide);
+  }, [open, guide]);
   const [name, setName] = useState('');
   const [duration, setDuration] = useState('');
   const [asAudio, setAsAudio] = useState(false);
   const detected = useMemo(() => (url.trim().length > 4 ? (asAudio ? audioFromUrl(url) : detectMedia(url)) : null), [url, asAudio]);
   const needsDuration = detected && ['embed', 'image', 'hls'].includes(detected.kind);
+  const hint = useMemo(() => (url.trim().length > 8 ? mediaUrlHint(url, window.location.protocol) : null), [url]);
+  const detectedGuide = detected ? guideForProvider(detected.provider, detected.kind) : undefined;
 
   const save = useMutation({
     mutationFn: () =>
@@ -453,29 +467,47 @@ function UrlModal({ open, onClose }: { open: boolean; onClose: () => void }) {
     <Modal
       open={open}
       onClose={onClose}
-      title="Agregar desde una URL"
-      description="Pegue el enlace de YouTube, Vimeo, TikTok, Instagram, Facebook, Twitch, Dailymotion, Google Drive, Google Slides, Canva, Loom, una transmisión HLS, un video/imagen o cualquier página web."
+      title={guide ? `Agregar desde ${guide.label}` : 'Agregar desde una URL'}
+      description="Pegue el enlace: el sistema reconoce la plataforma y le muestra una vista previa antes de agregarlo."
       size="lg"
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
-          <Button onClick={() => save.mutate()} loading={save.isPending} disabled={!detected}>
+          <Button onClick={() => save.mutate()} loading={save.isPending} disabled={!detected || Boolean(hint?.guide)}>
             Agregar a la biblioteca
           </Button>
         </>
       }
     >
       <div className="space-y-4">
-        <Field label="URL">
-          <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=…" autoFocus />
+        <Field label="Enlace">
+          <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={guide?.examples[0] ?? 'https://www.youtube.com/watch?v=…'} autoFocus />
         </Field>
+        {!detected && (
+          <div className="space-y-3 rounded-ui border border-border p-3">
+            <p className="text-xs font-semibold text-muted">¿De dónde es el contenido? Toque para ver cómo copiar el enlace:</p>
+            <GuideChips onOpen={(g) => setHelp(help?.id === g.id ? null : g)} active={help?.id} />
+            {help && <GuideContent guide={help} compact />}
+          </div>
+        )}
+        {hint && (
+          <p className="flex gap-2 rounded-ui bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200" role="alert">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+            {hint.warning}
+          </p>
+        )}
         <Toggle checked={asAudio} onChange={setAsAudio} label="Es una radio o audio por streaming" hint="Actívelo para enlaces de radios online (Icecast/Shoutcast) que no terminan en .mp3." />
-        {detected && (
+        {detected && !hint?.guide && (
           <>
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <Badge color="#2563eb">{PROVIDER_LABELS[detected.provider]}</Badge>
+              {detectedGuide && (
+                <button type="button" className="text-xs font-medium text-primary hover:underline" onClick={() => setHelp(help?.id === detectedGuide.id ? null : detectedGuide)}>
+                  {help?.id === detectedGuide.id ? 'Ocultar la guía' : 'Ver qué tener en cuenta'}
+                </button>
+              )}
               <span className="text-muted">
                 {detected.kind === 'audio'
                   ? 'Audio: úselo como música ambiental, sonido de llamado o dentro de una lista.'
@@ -488,6 +520,12 @@ function UrlModal({ open, onClose }: { open: boolean; onClose: () => void }) {
                       : 'Se mostrará durante el tiempo indicado.'}
               </span>
             </div>
+            {help && detectedGuide && help.id === detectedGuide.id && (
+              <div className="rounded-ui border border-border p-3">
+                <GuideContent guide={help} compact />
+              </div>
+            )}
+            {detected.provider === 'web' && <p className="text-xs text-muted">Si la vista previa queda en blanco, esa página no permite mostrarse dentro de otra y tampoco se verá en la pantalla.</p>}
             <div className="aspect-video overflow-hidden rounded-ui border border-border bg-black">
               {detected.kind === 'audio' ? (
                 <div className="grid size-full place-items-center">

@@ -7,6 +7,7 @@ import { Button, Field, Input, cx } from '../../components/ui';
 import { ApiError, api, assetUrl, errorMessage } from '../../lib/api';
 import { longDate } from '../../lib/format';
 import { AppointmentCard } from './AppointmentPage';
+import { PrivacyNotice } from '../../components/legal/PrivacyNotice';
 
 type Step = 'service' | 'branch' | 'slot' | 'data' | 'done';
 
@@ -113,6 +114,7 @@ export default function BookingPage() {
         <CustomerStep
           slug={slug}
           booking={data.booking}
+          tenant={data.tenant}
           body={{ branchId: branch.id, serviceId: service.id, scheduledAt: slot.at }}
           onTaken={() => setStep('slot')}
           onDone={(r) => {
@@ -154,7 +156,7 @@ function SlotPicker({ slug, branchId, serviceId, days, onPick }: { slug: string;
 
   return (
     <Panel title="Elija el día y la hora">
-      <div className="gc-scroll -mx-1 flex gap-2 overflow-x-auto px-1 pb-2" role="group" aria-label="Días">
+      <div className="gc-scroll relative -mx-1 flex gap-2 overflow-x-auto px-1 pb-2" role="group" aria-label="Días">
         {open.map((d) => {
           const on = d.date === selected?.date;
           const noon = new Date(`${d.date}T12:00:00Z`);
@@ -197,12 +199,14 @@ function SlotPicker({ slug, branchId, serviceId, days, onPick }: { slug: string;
 function CustomerStep({
   slug,
   booking,
+  tenant,
   body,
   onDone,
   onTaken,
 }: {
   slug: string;
   booking: BookingPageDTO['booking'];
+  tenant: BookingPageDTO['tenant'];
   body: { branchId: string; serviceId: string; scheduledAt: string };
   onDone: (r: BookingResultDTO) => void;
   onTaken: () => void;
@@ -245,6 +249,7 @@ function CustomerStep({
           Confirmar la cita
         </Button>
         {booking.cancelUntilHours > 0 && <p className="text-center text-xs text-muted">Puede cancelarla desde su enlace hasta {booking.cancelUntilHours} h antes.</p>}
+        <PrivacyNotice notice={tenant.privacyNotice} organization={tenant.name} intro="Al confirmar, sus datos se usan según el" label="aviso de privacidad" />
       </form>
     </Panel>
   );

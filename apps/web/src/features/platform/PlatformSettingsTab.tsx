@@ -3,8 +3,6 @@ import { ExternalLink, Globe, LogIn, Presentation } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { CURRENCIES, MODULE_IDS, MODULES, PLAN_IDS, PLANS, type Currency, type HomePage, type ModuleId, type PlanId, type PlatformSettings } from '@gc/shared';
 import { ImageField } from '../../components/ImageField';
-import { MailSettingsForm } from '../../components/MailSettingsForm';
-import { NotifyProviderForm } from '../../components/NotifyProviderForm';
 import { Button, Checkbox, ColorInput, Field, Input, Loading, Select, Textarea, Toggle, cx, useFeedback } from '../../components/ui';
 import { api, assetUrl, errorMessage } from '../../lib/api';
 
@@ -27,8 +25,8 @@ export function PlatformSettingsTab() {
   }, [settings.data, draft]);
 
   const save = useMutation({
-    // Las copias de seguridad se guardan en su propia pestaña.
-    mutationFn: ({ backups: _backups, ...body }: PlatformSettings) => api.put<PlatformSettings>('/platform/settings', body),
+    // Las copias, los avisos y lo legal se guardan en sus propias pestañas.
+    mutationFn: ({ backups: _backups, notices: _notices, legal: _legal, ...body }: PlatformSettings) => api.put<PlatformSettings>('/platform/settings', body),
     onSuccess: (data) => {
       qc.setQueryData(['platform', 'settings'], data);
       void qc.invalidateQueries({ queryKey: ['public-config'] });
@@ -182,18 +180,13 @@ export function PlatformSettingsTab() {
         </Button>
       </div>
 
-      <section className="space-y-4">
-        <SectionHead title="Correo saliente (SMTP)" description="Servidor por el que salen las invitaciones, los códigos de acceso y la recuperación de contraseñas." />
-        <MailSettingsForm scope="platform" />
-      </section>
-
-      <section className="space-y-4">
-        <SectionHead
-          title="Avisos por WhatsApp y SMS"
-          description="Canal compartido para las organizaciones con el módulo «Avisos» que no configuren uno propio. Cada organización define sus mensajes."
-        />
-        <NotifyProviderForm scope="platform" />
-      </section>
+      <p className="rounded-ui border border-border bg-surface px-4 py-3 text-sm text-muted">
+        El correo saliente, WhatsApp/SMS y los avisos de la plataforma están en{' '}
+        <a href="#comunicaciones" className="font-medium text-primary hover:underline">
+          Comunicaciones
+        </a>
+        .
+      </p>
     </div>
   );
 }
