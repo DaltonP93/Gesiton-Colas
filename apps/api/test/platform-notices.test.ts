@@ -117,6 +117,14 @@ describe('avisos de la plataforma', () => {
     const test = await api(app, root, 'POST', '/platform/notices/test', { event: 'invoice_overdue' });
     expect(test.body).toEqual({ email: { sent: 1, error: null }, whatsapp: { sent: 1, error: null } });
     expect(sms.at(-1)).toMatchObject({ to: '595981500500' });
+    // También al celular de «Mi perfil» (sin repetir si es el mismo número).
+    await api(app, root, 'PUT', '/auth/me', { phone: '0981 600 600' });
+    const both = await api(app, root, 'POST', '/platform/notices/test', { event: 'invoice_overdue' });
+    expect(both.body.whatsapp).toEqual({ sent: 2, error: null });
+    expect(sms.slice(-2).map((m) => m.to).sort()).toEqual(['595981500500', '595981600600']);
+    await api(app, root, 'PUT', '/auth/me', { phone: '+595 981 500 500' });
+    expect((await api(app, root, 'POST', '/platform/notices/test', { event: 'invoice_overdue' })).body.whatsapp.sent).toBe(1);
+    await api(app, root, 'PUT', '/auth/me', { phone: null });
     expect(outbox().some((m) => m.to === ROOT.email && m.subject === 'Prueba: Factura vencida')).toBe(true);
 
     const channels = await api(app, root, 'GET', '/platform/notices/channels');

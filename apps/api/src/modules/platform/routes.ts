@@ -10,6 +10,8 @@ import {
   MODULE_IDS,
   PLAN_IDS,
   UPLOAD_MIME_TYPES,
+  deepMerge,
+  landingSettingsSchema,
   type AccessLinkDTO,
   type ModuleOverrides,
   type PlatformSettings,
@@ -19,6 +21,7 @@ import { createTenantWithDefaults } from '../../db/seed';
 import { tenants, users } from '../../db/schema';
 import { hashPassword, sessionsResetNow, verifyPassword } from '../../lib/auth';
 import { randomToken } from '../../lib/crypto';
+import { removeAvatar } from '../../lib/avatars';
 import { toTenantDTO, toUserDTO } from '../../lib/dto';
 import { AppError, badRequest, conflict, notFound } from '../../lib/errors';
 import { sendInvite } from '../../lib/invites';
@@ -99,6 +102,11 @@ const settingsBody = z.object({
     })
     .partial()
     .optional(),
+  /**
+   * Página de presentación: se mezcla con lo guardado (las listas se reemplazan enteras) y se valida el resultado.
+   * Ver `landingSettingsSchema` en @gc/shared.
+   */
+  landing: z.record(z.string(), z.unknown()).optional(),
 });
 
 /** Límite de tiempo de un enlace de acceso generado por el superadministrador. */
@@ -430,6 +438,7 @@ export const platformRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async 
       if (!target) throw notFound('Superadministrador');
       await assertAnotherActive(target.id);
       await ctx.db.delete(users).where(eq(users.id, target.id));
+      await removeAvatar(ctx.storage, target.avatarUrl);
       return reply.code(204).send();
     },
   );
@@ -451,11 +460,25 @@ export const platformRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async 
           throw badRequest('Zona horaria inválida');
         }
       }
+      const current = await ctx.platform.get();
       if (request.body.homePage === 'redirect') {
-        const url = request.body.homeRedirectUrl ?? (await ctx.platform.get()).homeRedirectUrl;
+        const url = request.body.homeRedirectUrl ?? current.homeRedirectUrl;
         if (!url) throw badRequest('Indique la dirección a la que se redirige la página principal');
       }
-      return ctx.platform.update(request.body);
+      const { landing: landingPatch, ...rest } = request.body;
+      let landing = current.landing;
+      if (landingPatch) {
+        const parsed = landingSettingsSchema.safeParse(deepMerge(current.landing, landingPatch));
+        if (!parsed.success) {
+          const issue = parsed.error.issues[0]!;
+          throw badRequest(`Página de presentación (${issue.path.join('.') || 'datos'}): ${issue.message}`);
+        }
+        landing = parsed.data;
+      }
+      if ((rest.homePage ?? current.homePage) === 'landing' && !landing.enabled) {
+        throw badRequest('La página de presentación no está publicada: publíquela o elija otra página principal');
+      }
+      return ctx.platform.update({ ...rest, ...(landingPatch ? { landing } : {}) });
     },
   );
 

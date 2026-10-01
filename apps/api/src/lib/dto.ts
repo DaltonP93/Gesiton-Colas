@@ -84,6 +84,8 @@ export function toUserDTO(u: User, branchIds: string[] = [], serviceIds: string[
     role: u.role,
     active: u.active,
     locale: (u.locale as UserDTO['locale']) ?? null,
+    avatarUrl: u.avatarUrl,
+    phone: u.phone,
     branchIds,
     serviceIds,
     emailVerified: Boolean(u.emailVerifiedAt),

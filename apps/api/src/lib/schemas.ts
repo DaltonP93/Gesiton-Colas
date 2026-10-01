@@ -3,6 +3,12 @@ import { z } from 'zod';
 export const idParam = z.object({ id: z.uuid() });
 export const hexColor = z.string().regex(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i, 'Color hexadecimal inválido');
 export const optionalText = (max: number) => z.string().trim().max(max);
+/** Celular o teléfono: dígitos, espacios, +, guiones y paréntesis. */
+export const phoneNumber = z
+  .string()
+  .trim()
+  .max(30)
+  .regex(/^\+?[\d\s()-]{6,}$/, 'Teléfono inválido: use solo números, espacios, + y guiones');
 export const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato YYYY-MM-DD');
 export const pagination = z.object({
   page: z.coerce.number().int().min(1).default(1),

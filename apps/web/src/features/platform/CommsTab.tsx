@@ -103,7 +103,7 @@ function NoticesCard() {
   };
   const groups: { audience: 'tenant' | 'platform'; title: string; text: string }[] = [
     { audience: 'tenant', title: 'A los administradores de cada organización', text: 'Por correo a sus administradores; por WhatsApp/SMS al celular que cargan en «Plan y facturación».' },
-    { audience: 'platform', title: 'A los superadministradores', text: 'Por correo a todos los superadministradores; por WhatsApp/SMS a los celulares de abajo.' },
+    { audience: 'platform', title: 'A los superadministradores', text: 'Por correo a todos los superadministradores; por WhatsApp/SMS a los celulares de abajo y al que cada uno cargó en «Mi perfil».' },
   ];
 
   return (
@@ -167,7 +167,7 @@ function NoticesCard() {
         ))}
 
         <div className="grid gap-4 border-t border-border pt-4 md:grid-cols-[minmax(0,1fr)_10rem]">
-          <Field label="Celulares de los superadministradores (WhatsApp/SMS)" hint="Hasta 5. Reciben los avisos para superadministradores y las pruebas.">
+          <Field label="Otros celulares para los avisos (WhatsApp/SMS)" hint="Hasta 5, además del celular de «Mi perfil» de cada superadministrador. Reciben los avisos para superadministradores y las pruebas.">
             <div className="space-y-2">
               <div className="flex flex-wrap gap-1.5">
                 {draft.adminPhones.map((p) => (

@@ -49,6 +49,7 @@ import {
 } from '../../lib/dto';
 import { assertModuleActive, assertTenantAvailable } from '../../lib/auth';
 import { badRequest, conflict, notFound } from '../../lib/errors';
+import { effectiveHomePage, landingPlans } from '../../lib/landing';
 import { dayInTimezone } from '../../lib/tz';
 import { ticketCharge } from '../payments/routes';
 import { ticketSurveyInfo } from '../surveys/routes';
@@ -89,7 +90,7 @@ export const publicRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
     async (): Promise<PublicConfigDTO> => {
       const [settings, mail, legal] = await Promise.all([ctx.platform.get(), ctx.mailer.resolve(null), ctx.legal.index()]);
       return {
-        homePage: settings.homePage,
+        homePage: effectiveHomePage(settings),
         homeRedirectUrl: settings.homeRedirectUrl,
         allowSignup: ctx.config.ALLOW_SIGNUP && settings.allowSignup,
         allowDemo: ctx.config.ALLOW_DEMO && settings.allowDemo,
@@ -100,6 +101,9 @@ export const publicRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
         emailEnabled: mail.source !== 'none' || ctx.config.DEV_OUTBOX,
         brand: settings.brand,
         legal,
+        landing: settings.landing,
+        landingPlans: landingPlans(settings),
+        appUrl: ctx.config.PUBLIC_URL.replace(/\/$/, ''),
       };
     },
   );

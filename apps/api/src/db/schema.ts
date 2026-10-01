@@ -102,6 +102,10 @@ export const users = pgTable(
     role: text('role').$type<Role>().notNull().default('agent'),
     active: boolean('active').notNull().default(true),
     locale: text('locale'),
+    /** Foto de perfil (archivo subido en avatars/). */
+    avatarUrl: text('avatar_url'),
+    /** Celular propio. El de los superadministradores recibe los avisos de la plataforma por WhatsApp/SMS. */
+    phone: text('phone'),
     emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
     /** Invitado por correo que todavía no definió su contraseña. */
     invitePending: boolean('invite_pending').notNull().default(false),

@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
@@ -8,7 +8,7 @@ import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
-import Fastify, { LogController, type FastifyInstance } from 'fastify';
+import Fastify, { LogController, type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import {
   hasZodFastifySchemaValidationErrors,
   jsonSchemaTransform,
@@ -22,6 +22,7 @@ import { createDatabase, type Database } from './db/client';
 import { runMigrations } from './db/migrate';
 import { ensureSuperadmin } from './db/seed';
 import { AppError } from './lib/errors';
+import { effectiveHomePage, landingHead } from './lib/landing';
 import { startMaintenance } from './lib/maintenance';
 import { agentRoutes } from './modules/agent/routes';
 import { authRoutes } from './modules/auth/routes';
@@ -140,7 +141,9 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
   await app.register(rateLimit, {
     max: 1200,
     timeWindow: '1 minute',
-    allowList: () => config.NODE_ENV === 'test',
+    // Solo la API: el frontend (decenas de archivos por página) y los archivos subidos no cuentan,
+    // para que una oficina detrás de una misma IP o las TVs no se queden sin poder cargar la página.
+    allowList: (request) => config.NODE_ENV === 'test' || ((request.method === 'GET' || request.method === 'HEAD') && !request.url.startsWith('/api/')),
   });
   await app.register(multipart, {
     limits: { fileSize: config.MAX_UPLOAD_MB * 1024 * 1024, files: 1, fields: 20 },
@@ -229,6 +232,24 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
         if (filePath.endsWith('.html')) res.header('content-security-policy', WEB_CSP);
       },
     });
+    const indexFile = path.join(webDist, 'index.html');
+    // El HTML se relee si cambió (nueva versión del frontend sin reiniciar).
+    let indexHtml: { mtime: number; html: string } | null = null;
+    // Dirección principal y /presentacion: con el título, la descripción y la imagen de la presentación
+    // (para buscadores y para la vista previa al compartir el enlace, que no ejecutan JavaScript).
+    const landingPage = async (request: FastifyRequest, reply: FastifyReply) => {
+      reply.header('cache-control', 'no-cache').header('content-security-policy', WEB_CSP);
+      const settings = await ctx.platform.get();
+      const host = request.hostname.split(':')[0]!.toLowerCase();
+      const { landing } = settings;
+      const isLanding = request.url.startsWith('/presentacion') || effectiveHomePage(settings) === 'landing' || (landing.domain !== '' && host === landing.domain);
+      if (!landing.enabled || !isLanding) return reply.sendFile('index.html', webDist);
+      const { mtimeMs } = await stat(indexFile);
+      if (indexHtml?.mtime !== mtimeMs) indexHtml = { mtime: mtimeMs, html: await readFile(indexFile, 'utf8') };
+      return reply.type('text/html; charset=utf-8').send(landingHead(indexHtml.html, settings, config.PUBLIC_URL));
+    };
+    app.get('/', { schema: { hide: true } }, landingPage);
+    app.get('/presentacion', { schema: { hide: true } }, landingPage);
     app.setNotFoundHandler((request, reply) => {
       const path = (request.raw.url ?? '').split('?')[0]!;
       // Las rutas de la API, archivos subidos y recursos con extensión inexistentes devuelven 404.

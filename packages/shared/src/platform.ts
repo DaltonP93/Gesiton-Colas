@@ -6,6 +6,7 @@ import { billingSettingsSchema } from './payments';
 import { legalSettingsSchema, type LegalIndexDTO } from './legal';
 import type { BackupRemoteDTO, BackupTargetDTO } from './backupTargets';
 import { platformNoticesSchema } from './platformNotices';
+import { landingSettingsSchema, type LandingPlanDTO, type LandingSettings } from './landing';
 
 const color = z.string().regex(/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i, 'Color hexadecimal inválido');
 
@@ -125,6 +126,8 @@ export const platformSettingsSchema = z.object({
   legal: legalSettingsSchema,
   /** Avisos de la plataforma a las organizaciones y a los superadministradores, y por qué canal. */
   notices: platformNoticesSchema,
+  /** Página de presentación del producto: plantilla, portada, secciones, pie y dominio propio. */
+  landing: landingSettingsSchema,
 });
 export type PlatformSettings = z.infer<typeof platformSettingsSchema>;
 
@@ -145,6 +148,12 @@ export interface PublicConfigDTO {
   brand: PlatformBrand;
   /** Términos, privacidad y tratamiento de datos publicados. */
   legal: LegalIndexDTO;
+  /** Página de presentación (contenido y diseño). */
+  landing: LandingSettings;
+  /** Planes para la sección de precios (vacío si la sección no está activa). */
+  landingPlans: LandingPlanDTO[];
+  /** Dirección del panel (PUBLIC_URL): adonde llevan los botones cuando la presentación tiene dominio propio. */
+  appUrl: string;
 }
 
 /* ------------------------------------------------------------------ */

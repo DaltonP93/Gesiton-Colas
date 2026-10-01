@@ -44,6 +44,10 @@ export interface UserDTO {
   role: Role;
   active: boolean;
   locale: Locale | null;
+  /** Foto de perfil, si subió una. */
+  avatarUrl: string | null;
+  /** Celular propio (los superadministradores reciben ahí los avisos de la plataforma). */
+  phone: string | null;
   branchIds: string[];
   serviceIds: string[];
   emailVerified: boolean;

@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { KeyRound, Link2, LogIn } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import type { AccessLinkDTO, Role, TenantDTO, UserDTO } from '@gc/shared';
+import { Avatar } from '../../components/Avatar';
 import { CopyField } from '../../components/CopyField';
 import { Badge, Button, EmptyState, Input, Loading, Modal, Table, useFeedback } from '../../components/ui';
 import { api, errorMessage } from '../../lib/api';
@@ -57,8 +58,13 @@ export function TenantUsersModal({ tenant, onClose, onEnter }: { tenant: TenantD
               {users.data.map((u) => (
                 <tr key={u.id}>
                   <td>
-                    <p className="font-medium">{u.name}</p>
-                    <p className="text-xs text-muted">{u.email}</p>
+                    <div className="flex items-center gap-3">
+                      <Avatar name={u.name} url={u.avatarUrl} size="sm" />
+                      <div className="min-w-0">
+                        <p className="font-medium">{u.name}</p>
+                        <p className="text-xs text-muted">{u.email}</p>
+                      </div>
+                    </div>
                   </td>
                   <td>{ROLE_LABELS[u.role]}</td>
                   <td>

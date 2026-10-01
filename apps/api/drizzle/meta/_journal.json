@@ -113,6 +113,13 @@
       "when": 1790877674737,
       "tag": "0015_platform_notices",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1790891663305,
+      "tag": "0016_user_profile",
+      "breakpoints": true
     }
   ]
 }

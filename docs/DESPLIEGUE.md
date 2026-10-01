@@ -20,6 +20,25 @@ colas.ejemplo.com {
 }
 ```
 
+### Página de presentación con dominio propio
+
+La presentación del producto se arma en **Plataforma → Ajustes → Página de presentación → Personalizar**: 6 plantillas (moderna, clásica, minimalista, oscura, corporativa y vibrante), portada, secciones, colores, tipografía, pie, redes y la imagen al compartir el enlace. Siempre está en `/presentacion`; la dirección principal (`/`) muestra lo que se elija en «Página principal».
+
+Para tenerla en otro dominio (por ejemplo `www.suempresa.com`) y el panel en `PUBLIC_URL` (por ejemplo `app.suempresa.com`):
+
+1. Apunte el dominio nuevo al mismo servidor (registro A o CNAME).
+2. Agréguelo al mismo sitio del proxy, que debe pasar el encabezado `Host` original:
+
+   ```
+   app.suempresa.com, www.suempresa.com {
+     reverse_proxy app:3000
+   }
+   ```
+
+3. Escriba `www.suempresa.com` en **Publicación → Dominio propio**. Con ese dominio, `/` muestra siempre la presentación y los botones («Ingresar», «Probar gratis», «Ver demo») llevan al panel.
+
+El servidor agrega el título, la descripción y la imagen de la presentación al HTML de `/` y `/presentacion`, para que se vean al compartir el enlace por WhatsApp, Facebook o LinkedIn.
+
 ### Correo electrónico (SMTP)
 
 Necesario para la demo por correo, la verificación de email, «olvidé mi contraseña», el ingreso con código y las invitaciones. Funciona con cualquier proveedor SMTP:

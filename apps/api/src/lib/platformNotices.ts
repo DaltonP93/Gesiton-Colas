@@ -3,6 +3,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import {
   PLATFORM_NOTICE_INFO,
   formatMoney,
+  normalizePhone,
   type PlatformNoticeEvent,
   type PlatformNoticeTestDTO,
   type PlatformSettings,
@@ -41,6 +42,17 @@ const todayISO = (now = new Date()) => now.toISOString().slice(0, 10);
 const addDays = (iso: string, days: number) => new Date(Date.parse(`${iso}T12:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
 const dmy = (iso: string) => iso.slice(0, 10).split('-').reverse().join('/');
 const errorOf = (error: unknown) => (error instanceof Error ? error.message : 'Error').slice(0, 300);
+
+/** Celulares sin repetir (compara el número completo con el código de país) y sin vacíos. */
+function uniquePhones(list: string[], countryCode: string): string[] {
+  const seen = new Set<string>();
+  return list.filter((p) => {
+    const digits = normalizePhone(p, countryCode);
+    if (!digits || digits.length < 6 || seen.has(digits)) return false;
+    seen.add(digits);
+    return true;
+  });
+}
 
 /**
  * Avisos de la plataforma a los administradores de cada organización y a los superadministradores,
@@ -92,15 +104,23 @@ export class PlatformNotices {
     return result;
   }
 
-  /** A los superadministradores (correo) y a los celulares cargados en Comunicaciones. */
+  /**
+   * A los superadministradores: por correo y, por WhatsApp/SMS, a los celulares cargados en Comunicaciones
+   * más el celular que cada uno tenga en su perfil.
+   */
   async toPlatform(event: PlatformNoticeEvent, notice: Notice, options: { force?: boolean; onlyEmail?: string } = {}): Promise<Result> {
     const settings = (await this.deps.platformSettings()).notices;
     const channels = options.force ? { email: true, whatsapp: true } : settings.events[event];
     const result: Result = { email: { sent: 0, error: null }, whatsapp: { sent: 0, error: null } };
+    if (!channels.email && !channels.whatsapp) return result;
+    const superadmins = await this.deps.db
+      .select({ email: users.email, name: users.name, phone: users.phone })
+      .from(users)
+      .where(and(eq(users.role, 'superadmin'), eq(users.active, true)));
+    // La prueba va solo a quien la pide (y a su celular).
+    const recipients = options.onlyEmail ? superadmins.filter((a) => a.email === options.onlyEmail) : superadmins;
     if (channels.email) {
-      const admins = options.onlyEmail
-        ? [{ email: options.onlyEmail, name: 'Administrador' }]
-        : await this.deps.db.select({ email: users.email, name: users.name }).from(users).where(and(eq(users.role, 'superadmin'), eq(users.active, true)));
+      const admins = options.onlyEmail && !recipients.length ? [{ email: options.onlyEmail, name: 'Administrador' }] : recipients;
       const brand = await this.deps.emailBrand(null);
       for (const admin of admins) {
         try {
@@ -112,8 +132,9 @@ export class PlatformNotices {
       }
     }
     if (channels.whatsapp) {
-      if (!settings.adminPhones.length) result.whatsapp.error = 'No hay celulares de superadministradores cargados';
-      for (const phone of settings.adminPhones) {
+      const phones = uniquePhones([...settings.adminPhones, ...recipients.map((a) => a.phone ?? '')], settings.countryCode);
+      if (!phones.length) result.whatsapp.error = 'No hay celulares de superadministradores cargados';
+      for (const phone of phones) {
         const sent = await this.deps.notifier.sendPlatformText(phone, notice.whatsapp, { countryCode: settings.countryCode });
         if (sent.ok) result.whatsapp.sent += 1;
         else result.whatsapp.error = sent.error ?? 'No se pudo enviar';

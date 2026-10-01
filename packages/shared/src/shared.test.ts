@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  LANDING_SECTION_TYPES,
+  LANDING_TEMPLATES,
+  LANDING_TEMPLATE_INFO,
+  defaultLandingSection,
+  isSafeLink,
+  landingPlansOf,
+  landingSettingsSchema,
+  socialHref,
   MEDIA_GUIDES,
   guideForProvider,
   mediaUrlHint,
@@ -330,3 +338,40 @@ describe('guía de plataformas de medios', () => {
     expect(mediaUrlHint('no es una url')).toBeNull();
   });
 });
+
+describe('página de presentación', () => {
+  it('trae contenido de ejemplo válido para cada plantilla y sección, sin testimonios ni cifras inventadas', () => {
+    const landing = landingSettingsSchema.parse({});
+    expect(landing.template).toBe('moderna');
+    expect(landing.sections.map((s) => s.type)).toEqual(['features', 'steps', 'faq', 'cta']);
+    for (const t of LANDING_TEMPLATES) expect(LANDING_TEMPLATE_INFO[t].name).toBeTruthy();
+    for (const type of LANDING_SECTION_TYPES) {
+      const section = defaultLandingSection(type);
+      expect(section.type).toBe(type);
+      if (section.type === 'testimonials' || section.type === 'stats' || section.type === 'logos') expect(section.items).toEqual([]);
+    }
+  });
+
+  it('acepta solo enlaces seguros y arma los de las redes', () => {
+    expect(isSafeLink('https://suempresa.com')).toBe(true);
+    expect(isSafeLink('mailto:ventas@suempresa.com')).toBe(true);
+    expect(isSafeLink('#precios')).toBe(true);
+    expect(isSafeLink('/registro')).toBe(true);
+    expect(isSafeLink('javascript:alert(1)')).toBe(false);
+    expect(isSafeLink('//otro.com')).toBe(false);
+    expect(isSafeLink('/\\otro.com')).toBe(false);
+    expect(socialHref('whatsapp', '+595 981 123 456')).toBe('https://wa.me/595981123456');
+    expect(socialHref('instagram', 'instagram.com/x')).toBeNull();
+    expect(socialHref('instagram', 'https://instagram.com/x')).toBe('https://instagram.com/x');
+  });
+
+  it('lista los planes solo con una sección de precios visible', () => {
+    const settings = defaultPlatformSettings();
+    expect(landingPlansOf(settings)).toEqual([]);
+    const pricing = { ...defaultLandingSection('pricing'), plans: ['enterprise', 'free'] } as ReturnType<typeof defaultLandingSection>;
+    const plans = landingPlansOf({ ...settings, landing: { sections: [pricing] } });
+    expect(plans.map((p) => p.id)).toEqual(['free', 'enterprise']);
+    expect(plans[0]).toMatchObject({ name: 'Inicial', limits: { branches: 1 } });
+  });
+});
+
