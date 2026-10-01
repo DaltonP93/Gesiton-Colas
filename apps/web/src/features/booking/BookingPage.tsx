@@ -156,7 +156,7 @@ function SlotPicker({ slug, branchId, serviceId, days, onPick }: { slug: string;
 
   return (
     <Panel title="Elija el día y la hora">
-      <div className="gc-scroll -mx-1 flex gap-2 overflow-x-auto px-1 pb-2" role="group" aria-label="Días">
+      <div className="gc-scroll relative -mx-1 flex gap-2 overflow-x-auto px-1 pb-2" role="group" aria-label="Días">
         {open.map((d) => {
           const on = d.date === selected?.date;
           const noon = new Date(`${d.date}T12:00:00Z`);

@@ -46,7 +46,7 @@ test('el superadministrador publica los términos y cada organización los acept
     // El registro pide la casilla.
     const visitor = await (await browser.newContext()).newPage();
     await visitor.goto('/registro');
-    await visitor.getByLabel('Nombre de la organización').fill('Clínica Términos');
+    await visitor.getByLabel('Nombre de la organización', { exact: true }).fill('Clínica Términos');
     await visitor.getByLabel('Su nombre').fill('Tere Admin');
     await visitor.getByLabel('Email').fill(`terminos-${Date.now()}@e2e.test`);
     await visitor.getByLabel('Contraseña').fill('clave-segura-123');

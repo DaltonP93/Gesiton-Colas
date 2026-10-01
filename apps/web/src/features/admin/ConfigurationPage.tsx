@@ -201,7 +201,7 @@ export default function ConfigurationPage() {
     <div className="grid items-start gap-[var(--gc-gap)] 2xl:grid-cols-[15.5rem_minmax(0,1fr)]">
       {/* Menú de secciones: pestañas en pantallas medianas, lista lateral en pantallas grandes */}
       <aside className="min-w-0 2xl:sticky 2xl:top-8">
-        <nav className="gc-scroll -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 2xl:hidden" aria-label="Secciones de la configuración">
+        <nav className="gc-scroll relative -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 2xl:hidden" aria-label="Secciones de la configuración">
           {sections.map((s) => {
             const active = s.key === current.key;
             return (

@@ -83,23 +83,25 @@ export function IconButton({ label, className, ...rest }: ButtonProps & { label:
 /* Formularios                                                         */
 /* ------------------------------------------------------------------ */
 
-const fieldBase =
-  'w-full rounded-ui border border-border bg-surface px-3 text-sm text-fg placeholder:text-muted outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60';
+const fieldClasses =
+  'rounded-ui border border-border bg-surface px-3 text-sm text-fg placeholder:text-muted outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60';
+/** Ancho completo salvo que se indique otro (w-24, w-auto…): si no, `w-full` le ganaría según el orden del CSS. */
+const fieldBase = (className?: string) => cx(fieldClasses, !/(^|\s)w-\S+/.test(className ?? '') && 'w-full');
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, ...rest }, ref) {
-  return <input ref={ref} className={cx(fieldBase, 'h-[var(--gc-control-h)]', className)} {...rest} />;
+  return <input ref={ref} className={cx(fieldBase(className), 'h-[var(--gc-control-h)]', className)} {...rest} />;
 });
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(function Textarea(
   { className, rows = 3, ...rest },
   ref,
 ) {
-  return <textarea ref={ref} rows={rows} className={cx(fieldBase, 'py-2 leading-relaxed', className)} {...rest} />;
+  return <textarea ref={ref} rows={rows} className={cx(fieldBase(className), 'py-2 leading-relaxed', className)} {...rest} />;
 });
 
 export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(function Select({ className, children, ...rest }, ref) {
   return (
-    <select ref={ref} className={cx(fieldBase, 'h-[var(--gc-control-h)] pr-8', className)} {...rest}>
+    <select ref={ref} className={cx(fieldBase(className), 'h-[var(--gc-control-h)] pr-8', className)} {...rest}>
       {children}
     </select>
   );
@@ -386,7 +388,7 @@ export function Tabs<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="gc-scroll -mx-1 flex gap-1 overflow-x-auto border-b border-border px-1">
+    <div className="gc-scroll relative -mx-1 flex gap-1 overflow-x-auto border-b border-border px-1">
       {tabs.map((t) => (
         <button
           key={t.value}
@@ -464,7 +466,7 @@ export function Menu({ items, label = 'Más acciones', align = 'right' }: { item
 
 export function Table({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className="gc-scroll overflow-x-auto">
+    <div className="gc-scroll relative overflow-x-auto">
       <table className={cx('w-full text-left text-sm [&_td]:px-4 [&_td]:py-3 [&_th]:px-4 [&_th]:py-2.5 [&_th]:text-xs [&_th]:font-semibold [&_th]:tracking-wide [&_th]:text-muted [&_th]:uppercase [&_tbody_tr]:border-t [&_tbody_tr]:border-border [&_tbody_tr:hover]:bg-subtle', className)}>
         {children}
       </table>
@@ -476,9 +478,9 @@ export function Stat({ label, value, hint, icon, tone }: { label: ReactNode; val
   return (
     <div className="gc-card p-4">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm text-muted">{label}</span>
+        <span className="min-w-0 text-sm text-muted">{label}</span>
         {icon && (
-          <span className="rounded-ui p-2 [&_svg]:size-4" style={{ background: `color-mix(in srgb, ${tone ?? 'var(--gc-primary)'} 12%, transparent)`, color: tone ?? 'var(--gc-primary)' }}>
+          <span className="shrink-0 rounded-ui p-2 [&_svg]:size-4" style={{ background: `color-mix(in srgb, ${tone ?? 'var(--gc-primary)'} 12%, transparent)`, color: tone ?? 'var(--gc-primary)' }}>
             {icon}
           </span>
         )}

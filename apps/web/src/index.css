@@ -77,6 +77,14 @@ body {
   border-color: var(--gc-border);
 }
 
+/*
+ * Los elementos de una grilla pueden achicarse hasta el ancho disponible: sin esto, un texto en
+ * una sola línea o una tabla ensancha toda la página en celulares y tablets.
+ */
+:where(.grid) > * {
+  min-width: 0;
+}
+
 :focus-visible {
   outline: 2px solid var(--gc-primary);
   outline-offset: 2px;
