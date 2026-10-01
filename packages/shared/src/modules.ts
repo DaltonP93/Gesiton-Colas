@@ -9,7 +9,7 @@ import type { PlanId } from './plans';
  * Funciones que el superadministrador activa o desactiva por organización.
  * La atención (sucursales, servicios, usuarios, consola) es la base y siempre está activa.
  */
-export const MODULE_IDS = ['displays', 'kiosks', 'advertising', 'reports', 'integrations', 'notifications', 'surveys', 'payments', 'appointments'] as const;
+export const MODULE_IDS = ['displays', 'kiosks', 'advertising', 'reports', 'integrations', 'notifications', 'surveys', 'payments', 'appointments', 'invoicing'] as const;
 export type ModuleId = (typeof MODULE_IDS)[number];
 
 export interface ModuleInfo {
@@ -26,6 +26,10 @@ export const MODULES: Record<ModuleId, ModuleInfo> = {
   notifications: { name: 'Avisos por WhatsApp y SMS', description: 'Confirmación, «faltan N turnos», llamado y encuesta en el celular del cliente.' },
   surveys: { name: 'Encuestas de satisfacción', description: 'Constructor de encuestas, envío tras la atención y métricas (NPS, CSAT).' },
   payments: { name: 'Cobros a clientes', description: 'Cobro de servicios con Bancard, PagoPar, Stripe o registro manual.' },
+  invoicing: {
+    name: 'Factura electrónica SIFEN',
+    description: 'Facturas electrónicas firmadas y enviadas a la SET (Paraguay), con CDC, QR y KuDE; también al cobrar.',
+  },
   appointments: {
     name: 'Citas con fecha y hora',
     description: 'Citas de su sistema (API, webhook o CSV) o reservadas en línea; llegada en el kiosco con prioridad por horario y recordatorios.',

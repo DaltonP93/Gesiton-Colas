@@ -78,6 +78,8 @@ const envSchema = z.object({
   S3_FORCE_PATH_STYLE: bool(true),
   /** Permite webhooks hacia IPs privadas (solo instalaciones on-premise). */
   WEBHOOKS_ALLOW_PRIVATE: bool(false),
+  /** Solo para pruebas: dirección de un simulador de los servicios de la SET (SIFEN). */
+  SIFEN_BASE_URL: z.string().optional().transform((v) => v?.trim() || undefined),
   /** Carpeta con el build del frontend para servirlo desde la API. */
   WEB_DIST: z.string().optional(),
   LOG_LEVEL: z.string().default('info'),

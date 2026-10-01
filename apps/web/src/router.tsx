@@ -47,6 +47,8 @@ const PaymentPage = lazy(() => import('./features/payment/PaymentPage'));
 const AppointmentsPage = lazy(() => import('./features/admin/AppointmentsPage'));
 const BookingPage = lazy(() => import('./features/booking/BookingPage'));
 const AppointmentPage = lazy(() => import('./features/booking/AppointmentPage'));
+const InvoicesPage = lazy(() => import('./features/admin/InvoicesPage'));
+const KudePage = lazy(() => import('./features/invoice/KudePage'));
 
 function Lazy({ children }: { children: ReactNode }) {
   return <Suspense fallback={<Loading />}>{children}</Suspense>;
@@ -133,6 +135,7 @@ export const router = createBrowserRouter([
       { path: 'sonidos', element: page(<SoundsPage />, 'manager', ['displays']) },
       { path: 'atencion', element: page(<AgentConsole />) },
       { path: 'citas', element: page(<AppointmentsPage />, 'agent', ['appointments']) },
+      { path: 'facturas', element: page(<InvoicesPage />, 'agent', ['invoicing']) },
       { path: 'monitor', element: page(<MonitorPage />, 'manager') },
       { path: 'configuracion', element: page(<ConfigurationPage />, 'admin') },
       { path: 'configuracion/:section', element: page(<ConfigurationPage />, 'admin') },
@@ -192,6 +195,14 @@ export const router = createBrowserRouter([
     element: (
       <Lazy>
         <BookingPage />
+      </Lazy>
+    ),
+  },
+  {
+    path: '/factura/:token',
+    element: (
+      <Lazy>
+        <KudePage />
       </Lazy>
     ),
   },

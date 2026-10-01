@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { appointmentSettingsSchema } from './appointments';
+import { fiscalProfileSchema } from './sifen';
 import { ALERT_SOUNDS, DISPLAY_LAYOUTS, LOCALES } from './enums';
 import { notificationSettingsSchema } from './notifications';
 import { tenantPaymentSettingsSchema } from './payments';
@@ -148,6 +149,8 @@ export const tenantSettingsSchema = z.object({
   payments: tenantPaymentSettingsSchema.prefault({}),
   alerts: z.object({ devices: deviceAlertSchema }).prefault({}),
   appointments: appointmentSettingsSchema,
+  /** Datos para la factura que la plataforma le emite a la organización. */
+  fiscal: fiscalProfileSchema,
 });
 export type TenantSettings = z.infer<typeof tenantSettingsSchema>;
 

@@ -5,6 +5,7 @@ import {
   ChevronRight,
   ClipboardList,
   CreditCard,
+  FileText,
   Globe,
   Hash,
   History,
@@ -42,9 +43,10 @@ const NotificationsPage = lazy(() => import('./NotificationsPage'));
 const PaymentsSettingsPage = lazy(() => import('./PaymentsSettingsPage'));
 const AlertsSettingsPage = lazy(() => import('./AlertsSettingsPage'));
 const AppointmentsSettingsPage = lazy(() => import('./AppointmentsSettingsPage'));
+const InvoicingSettingsPage = lazy(() => import('./InvoicingSettingsPage'));
 
 type TabKey = 'marca' | 'region' | 'terminologia' | 'turnos' | 'cliente';
-type PageKey = 'sucursales' | 'servicios' | 'citas' | 'alertas' | 'usuarios' | 'actividad' | 'correo' | 'avisos' | 'cobros' | 'integraciones';
+type PageKey = 'sucursales' | 'servicios' | 'citas' | 'alertas' | 'usuarios' | 'actividad' | 'correo' | 'avisos' | 'cobros' | 'factura' | 'integraciones';
 export type ConfigSection = 'inicio' | TabKey | PageKey;
 
 interface SectionDef {
@@ -76,6 +78,7 @@ const PAGE_COMPONENTS: Record<PageKey, ComponentType> = {
   correo: MailSection,
   avisos: NotificationsPage,
   cobros: PaymentsSettingsPage,
+  factura: InvoicingSettingsPage,
   integraciones: IntegrationsPage,
 };
 function ActivitySection() {
@@ -128,6 +131,7 @@ export default function ConfigurationPage() {
       { key: 'correo', label: 'Correo saliente', short: 'Correo', description: 'Servidor SMTP para invitaciones y avisos', icon: <Mail />, group: 'Equipo e integraciones' },
       { key: 'avisos', label: 'Avisos por WhatsApp y SMS', short: 'WhatsApp y SMS', description: 'Mensajes al sacar turno, al acercarse y al llamar', icon: <MessageCircle />, group: 'Equipo e integraciones', module: 'notifications' },
       { key: 'cobros', label: 'Cobros y pagos', short: 'Cobros', description: 'Pasarela (Bancard, PagoPar, Stripe) y cobro en el puesto', icon: <CreditCard />, group: 'Equipo e integraciones', module: 'payments' },
+      { key: 'factura', label: 'Factura electrónica (SIFEN)', short: 'Factura electrónica', description: 'RUC, timbrado, certificado digital y CSC', icon: <FileText />, group: 'Equipo e integraciones', module: 'invoicing' },
       { key: 'integraciones', label: 'Integraciones y API', short: 'Integraciones', description: 'API keys, webhooks y documentación', icon: <Plug />, group: 'Equipo e integraciones', module: 'integrations' },
       ] as SectionDef[]
     ).filter((s) => !s.module || hasModule(s.module)),

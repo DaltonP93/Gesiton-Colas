@@ -39,6 +39,7 @@ import { auditRoutes } from './modules/audit/routes';
 import { alertRoutes } from './modules/alerts/routes';
 import { bookingRoutes } from './modules/appointments/public';
 import { appointmentRoutes } from './modules/appointments/routes';
+import { sifenRoutes } from './modules/sifen/routes';
 import { backupRoutes } from './modules/backups/routes';
 import { pairingRoutes } from './modules/pairing/routes';
 import { platformRoutes } from './modules/platform/routes';
@@ -201,6 +202,7 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
       await api.register(alertRoutes(ctx));
       await api.register(appointmentRoutes(ctx));
       await api.register(bookingRoutes(ctx));
+      await api.register(sifenRoutes(ctx));
       await api.register(agentRoutes(ctx));
       await api.register(deviceRoutes(ctx));
       await api.register(mediaRoutes(ctx));

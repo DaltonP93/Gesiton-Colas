@@ -11,6 +11,7 @@ import { createMailer, type Mailer } from './lib/mailer';
 import { Appointments } from './lib/appointments';
 import { Audit } from './lib/audit';
 import { Backups } from './lib/backups';
+import { Sifen } from './lib/sifen/service';
 import { DeviceMonitor } from './lib/deviceMonitor';
 import { Notifier } from './lib/notifier';
 import { Payments } from './lib/payments/service';
@@ -47,6 +48,8 @@ export interface AppContext {
   backups: Backups;
   /** Citas con fecha y hora (módulo de citas). */
   appointments: Appointments;
+  /** Factura electrónica SIFEN (Paraguay). */
+  sifen: Sifen;
   /** Notifica un cambio de turno a pantallas, operadores, seguimiento público y webhooks. */
   publishTicket(
     tenantId: string,
@@ -98,6 +101,7 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
     const { brand } = await platform.get();
     return brandFrom({ appName: brand.appName, logoUrl: brand.logoUrl, primaryColor: brand.primaryColor }, publicUrl);
   };
+  const sifen = new Sifen({ config, db, log, mailer, emailBrand, modulesOf });
   const payments = new Payments({
     config,
     db,
@@ -107,6 +111,8 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
     emailBrand,
     audit,
     onTicketPaid(payment) {
+      // Factura electrónica automática (si la organización la activó).
+      void sifen.autoIssueForPayment(payment).catch((error) => log.error({ err: error, paymentId: payment.id }, 'sifen: no se pudo facturar el cobro'));
       void webhooks
         .dispatch(payment.tenantId, 'payment.paid', {
           payment: { id: payment.id, amount: payment.amount, currency: payment.currency, provider: payment.provider, method: payment.method, reference: payment.reference, paidAt: payment.paidAt },
@@ -143,6 +149,7 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
     backups: new Backups({ config, db, log, mailer, platformSettings: () => platform.get() }),
     // Se crea al final: usa publishTicket de este mismo contexto.
     appointments: null as unknown as Appointments,
+    sifen,
     log,
     emailBrand,
     publishTicket(tenantId, event, ticket, extra = {}, options = {}) {

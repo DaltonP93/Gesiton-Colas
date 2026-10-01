@@ -1,7 +1,9 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { AlertTriangle, CreditCard, Info, Receipt } from 'lucide-react';
-import { MODULES, PAYMENT_GATEWAY_INFO, formatMoney, type BillingOverviewDTO } from '@gc/shared';
-import { Badge, Button, EmptyState, Loading, PageHeader, Table, useFeedback } from '../../components/ui';
+import { MODULES, PAYMENT_GATEWAY_INFO, formatMoney, type BillingOverviewDTO, type FiscalProfile } from '@gc/shared';
+import { Badge, Button, Card, EmptyState, Field, Input, Loading, PageHeader, Table, useFeedback } from '../../components/ui';
+import { useSaveTenant } from './customization/common';
 import { api, errorMessage } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { InvoiceLines, dateOnly, statusBadge } from '../platform/BillingTab';
@@ -144,6 +146,40 @@ export default function BillingPage() {
           </div>
         )}
       </section>
+      <FiscalCard />
     </div>
   );
 }
+
+/** Datos con los que la plataforma le emite la factura (RUC y razón social). */
+function FiscalCard() {
+  const { settings } = useAuth();
+  const { save, saving } = useSaveTenant();
+  const [form, setForm] = useState<FiscalProfile>(settings.fiscal);
+  const dirty = JSON.stringify(form) !== JSON.stringify(settings.fiscal);
+  const set = <K extends keyof FiscalProfile>(k: K, v: FiscalProfile[K]) => setForm((f) => ({ ...f, [k]: v }));
+  return (
+    <Card title="Datos para su factura" description="RUC y razón social con los que se emiten las facturas de su plan.">
+      <div className="grid gap-4 md:grid-cols-2">
+        <Field label="RUC" hint="Con dígito verificador: 80012345-6">
+          <Input value={form.ruc} onChange={(e) => set('ruc', e.target.value.trim())} maxLength={20} />
+        </Field>
+        <Field label="Razón social">
+          <Input value={form.name} onChange={(e) => set('name', e.target.value)} maxLength={255} />
+        </Field>
+        <Field label="Correo para las facturas">
+          <Input type="email" value={form.email} onChange={(e) => set('email', e.target.value.trim())} maxLength={80} />
+        </Field>
+        <Field label="Dirección">
+          <Input value={form.address} onChange={(e) => set('address', e.target.value)} maxLength={255} />
+        </Field>
+      </div>
+      <div className="mt-4 flex justify-end">
+        <Button disabled={!dirty} loading={saving} onClick={() => void save({ settings: { fiscal: form } }, 'Datos de facturación guardados')}>
+          Guardar
+        </Button>
+      </div>
+    </Card>
+  );
+}
+

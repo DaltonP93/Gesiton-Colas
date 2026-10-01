@@ -17,6 +17,13 @@ import {
 } from 'drizzle-orm/pg-core';
 import type {
   ApiKeyScope,
+  SifenEnvironment,
+  SifenIssuerSettings,
+  SifenItem,
+  SifenKudeDTO,
+  SifenReceiver,
+  SifenStatus,
+  SifenTotals,
   AppointmentCustomer,
   AppointmentSource,
   AppointmentStatus,
@@ -874,3 +881,79 @@ export const bookingSchedules = pgTable(
   (t) => [index('booking_schedules_branch_idx').on(t.branchId, t.serviceId)],
 );
 export type BookingSchedule = typeof bookingSchedules.$inferSelect;
+
+/* ------------------------------------------------------------------ */
+/* Factura electrónica SIFEN                                           */
+/* ------------------------------------------------------------------ */
+
+/** Emisor: la plataforma (`scope = 'platform'`) o una organización (`scope = id`). */
+export const sifenIssuers = pgTable(
+  'sifen_issuers',
+  {
+    id: id(),
+    scope: text('scope').notNull(),
+    tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }),
+    settings: jsonb('settings').$type<SifenIssuerSettings>().notNull(),
+    /** Certificado .p12 (base64) cifrado, su clave y el CSC, cifrados con JWT_SECRET. */
+    certEnc: text('cert_enc').notNull().default(''),
+    certPasswordEnc: text('cert_password_enc').notNull().default(''),
+    certInfo: jsonb('cert_info').$type<{ subject: string; validFrom: string; validTo: string } | null>(),
+    cscEnc: text('csc_enc').notNull().default(''),
+    nextNumber: integer('next_number').notNull().default(1),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex('sifen_issuers_scope_idx').on(t.scope)],
+);
+export type SifenIssuer = typeof sifenIssuers.$inferSelect;
+
+export const sifenDocuments = pgTable(
+  'sifen_documents',
+  {
+    id: id(),
+    scope: text('scope').notNull(),
+    tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }),
+    cdc: text('cdc').notNull(),
+    type: integer('type').notNull().default(1),
+    establishment: text('establishment').notNull(),
+    point: text('point').notNull(),
+    number: integer('number').notNull(),
+    status: text('status').$type<SifenStatus>().notNull().default('pending'),
+    environment: text('environment').$type<SifenEnvironment>().notNull(),
+    issuedAt: timestamp('issued_at', { withTimezone: true }).notNull(),
+    receiver: jsonb('receiver').$type<SifenReceiver>().notNull(),
+    items: jsonb('items').$type<SifenItem[]>().notNull(),
+    currency: text('currency').$type<'PYG' | 'USD'>().notNull().default('PYG'),
+    exchangeRate: real('exchange_rate'),
+    condition: text('condition').$type<'cash' | 'credit'>().notNull().default('cash'),
+    paymentType: integer('payment_type').notNull().default(1),
+    creditDays: integer('credit_days'),
+    notes: text('notes').notNull().default(''),
+    totals: jsonb('totals').$type<SifenTotals>().notNull(),
+    /** XML firmado con el QR (lo que se envía a la SET). */
+    xml: text('xml').notNull(),
+    qrUrl: text('qr_url').notNull(),
+    /** Datos del emisor al emitir (el KuDE no cambia si después se cambia la configuración). */
+    issuer: jsonb('issuer').$type<SifenKudeDTO['issuer']>().notNull(),
+    setCode: text('set_code'),
+    setMessage: text('set_message'),
+    setProtocol: text('set_protocol'),
+    sourceType: text('source_type').$type<'payment' | 'invoice' | 'manual'>().notNull().default('manual'),
+    sourceId: uuid('source_id'),
+    publicToken: text('public_token').notNull(),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+    approvedAt: timestamp('approved_at', { withTimezone: true }),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    cancelReason: text('cancel_reason'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex('sifen_documents_number_idx').on(t.scope, t.type, t.establishment, t.point, t.number),
+    uniqueIndex('sifen_documents_cdc_idx').on(t.cdc),
+    uniqueIndex('sifen_documents_token_idx').on(t.publicToken),
+    index('sifen_documents_scope_created_idx').on(t.scope, t.createdAt),
+    index('sifen_documents_source_idx').on(t.sourceType, t.sourceId),
+  ],
+);
+export type SifenDocument = typeof sifenDocuments.$inferSelect;

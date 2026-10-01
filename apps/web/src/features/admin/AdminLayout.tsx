@@ -6,6 +6,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   CreditCard,
+  FileText,
   Headset,
   LayoutGrid,
   LogOut,
@@ -90,6 +91,7 @@ export function AdminLayout() {
         { to: '/app/reportes', label: 'Reportes', icon: <BarChart3 />, role: 'manager', also: ['/app/resumen'], module: ['reports'] },
         { to: '/app/encuestas', label: 'Encuestas', icon: <Star />, role: 'manager', module: ['surveys'] },
         { to: '/app/cobros', label: 'Cobros', icon: <CreditCard />, role: 'manager', module: ['payments'] },
+        { to: '/app/facturas', label: 'Facturas', icon: <FileText />, role: 'agent', module: ['invoicing'] },
       ],
     },
     {

@@ -213,3 +213,15 @@ export function appointmentMail(
   });
   return { to, subject: `${title} · ${appt.organization}`, html, text, fromName: brand.appName, tag: `appointment_${kind}` };
 }
+
+/** Factura electrónica aprobada por la SET, con el enlace al KuDE. */
+export function sifenMail(to: string, name: string, doc: { issuer: string; number: string; cdc: string }, url: string, brand: EmailBrand): MailMessage {
+  const { html, text } = layout({
+    brand,
+    title: `Factura electrónica ${doc.number}`,
+    intro: [greet(name || ''), `${doc.issuer} le emitió la factura electrónica ${doc.number}, aprobada por la SET.`, `CDC: ${doc.cdc.replace(/(.{4})/g, '$1 ').trim()}`],
+    cta: { label: 'Ver e imprimir la factura', url },
+    outro: ['Puede verificarla con el código QR del documento en el portal e-Kuatia de la SET.'],
+  });
+  return { to, subject: `Factura electrónica ${doc.number} · ${doc.issuer}`, html, text, fromName: brand.appName, tag: 'sifen_invoice' };
+}
