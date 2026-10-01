@@ -229,6 +229,29 @@ describe('cobros de turnos', () => {
     expect((await api(app, null, 'GET', `/public/tickets/${ticket.publicToken}`)).body.charge).toMatchObject({ status: 'paid' });
   });
 
+  it('un doble clic no abre dos cobros y se puede pagar después de la atención', async () => {
+    const ticket = await issue();
+    const before = received.filter((r) => r.path === '/vpos/api/0.3/single_buy').length;
+    const results = await Promise.all([1, 2, 3].map(() => api(app, null, 'POST', `/public/tickets/${ticket.publicToken}/pay`)));
+    expect(results.map((r) => r.status)).toEqual([200, 200, 200]);
+    expect(new Set(results.map((r) => r.body.url)).size).toBe(1);
+    expect(received.filter((r) => r.path === '/vpos/api/0.3/single_buy').length - before).toBe(1);
+
+    // Turno ya atendido con el cobro pendiente: el pago en línea sigue disponible.
+    await api(app, org, 'PUT', '/agent/workstation', { branchId: branch.id, counterId: (await api(app, org, 'GET', `/counters?branchId=${branch.id}`)).body[0].id, serviceIds: [service.id], paused: false });
+    const finished = await issue();
+    await api(app, org, 'POST', `/tickets/${finished.id}/cancel`, {}).catch(() => undefined);
+    const served = await issue();
+    const called = (await api(app, org, 'POST', `/agent/tickets/${served.id}/call`)).body.ticket;
+    expect(called.id).toBe(served.id);
+    await api(app, org, 'POST', `/agent/tickets/${served.id}/finish`);
+    const tracking = await api(app, null, 'GET', `/public/tickets/${served.publicToken}`);
+    expect(tracking.body).toMatchObject({ status: 'finished', charge: { status: 'pending', online: true } });
+    expect((await api(app, null, 'POST', `/public/tickets/${served.publicToken}/pay`)).status).toBe(200);
+    // Un turno cancelado ya no se cobra.
+    expect((await api(app, null, 'POST', `/public/tickets/${finished.publicToken}/pay`)).status).toBe(400);
+  });
+
   it('si la confirmación no llega, se consulta a la pasarela al volver', async () => {
     const ticket = await issue();
     const start = await api(app, null, 'POST', `/public/tickets/${ticket.publicToken}/pay`);

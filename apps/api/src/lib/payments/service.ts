@@ -199,58 +199,83 @@ export class Payments {
     if (!gw) throw badRequest('No hay una pasarela de pago en línea activa');
     if (!PAYMENT_GATEWAY_INFO[gw.rt.provider].currencies.includes(input.currency)) throw badRequest(`${PAYMENT_GATEWAY_INFO[gw.rt.provider].name} no cobra en ${input.currency}`);
     const target = input.kind === 'invoice' ? eq(payments.invoiceId, input.invoiceId!) : eq(payments.ticketId, input.ticketId!);
-    const [reusable] = await this.deps.db
-      .select()
-      .from(payments)
-      .where(
-        and(
-          target,
-          eq(payments.status, 'pending'),
-          eq(payments.provider, gw.rt.provider),
-          eq(payments.amount, input.amount),
-          sql`${payments.createdAt} > now() - interval '1 hour'`,
-        ),
-      )
-      .orderBy(desc(payments.createdAt))
-      .limit(1);
-    if (reusable && (reusable.checkoutUrl || reusable.raw?.processId)) return { payment: reusable, url: `${this.base}/pago/${reusable.publicToken}` };
+    const url = (p: Payment) => `${this.base}/pago/${p.publicToken}`;
+    const hasCheckout = (p: Payment) => Boolean(p.checkoutUrl || p.raw?.processId);
 
-    const [payment] = await this.deps.db
-      .insert(payments)
-      .values({
-        tenantId: input.tenantId,
-        kind: input.kind,
-        invoiceId: input.invoiceId ?? null,
-        ticketId: input.ticketId ?? null,
-        description: input.description,
-        amount: input.amount,
-        currency: input.currency,
-        provider: gw.rt.provider,
-        publicToken: randomToken(24),
-        returnUrl: input.returnUrl ?? null,
-      })
-      .returning();
+    // Un pago en línea por factura/turno a la vez: con el bloqueo, un doble clic o un reintento
+    // reutiliza el pago en curso en lugar de abrir otro checkout (y otro cobro) en la pasarela.
+    const lockKey = `payment:${input.kind}:${input.invoiceId ?? input.ticketId}`;
+    const { reuse, payment } = await this.deps.db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`);
+      const [existing] = await tx
+        .select()
+        .from(payments)
+        .where(
+          and(
+            target,
+            eq(payments.status, 'pending'),
+            eq(payments.provider, gw.rt.provider),
+            eq(payments.amount, input.amount),
+            sql`${payments.createdAt} > now() - interval '1 hour'`,
+            // Sin checkout todavía = otro pedido lo está creando (si no quedó colgado hace más de un minuto).
+            sql`(${payments.checkoutUrl} IS NOT NULL OR ${payments.raw} ? 'processId' OR ${payments.createdAt} > now() - interval '1 minute')`,
+          ),
+        )
+        .orderBy(desc(payments.createdAt))
+        .limit(1);
+      if (existing) return { reuse: existing, payment: null };
+      const [created] = await tx
+        .insert(payments)
+        .values({
+          tenantId: input.tenantId,
+          kind: input.kind,
+          invoiceId: input.invoiceId ?? null,
+          ticketId: input.ticketId ?? null,
+          description: input.description,
+          amount: input.amount,
+          currency: input.currency,
+          provider: gw.rt.provider,
+          publicToken: randomToken(24),
+          returnUrl: input.returnUrl ?? null,
+        })
+        .returning();
+      return { reuse: null, payment: created! };
+    });
+
+    if (reuse) {
+      if (hasCheckout(reuse)) return { payment: reuse, url: url(reuse) };
+      // Espera a que el otro pedido termine de crear el checkout (máx. 20 s, el tiempo de espera de la pasarela).
+      for (let i = 0; i < 40; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+        const [row] = await this.deps.db.select().from(payments).where(eq(payments.id, reuse.id));
+        if (row && hasCheckout(row)) return { payment: row, url: url(row) };
+        if (!row || row.status !== 'pending') break;
+      }
+      throw badRequest('El pago se está preparando. Intente de nuevo en unos segundos.');
+    }
+    if (!payment) throw badRequest('No se pudo iniciar el pago');
+
     try {
       const result = await createCheckout(gw.rt, {
-        seq: payment!.seq,
-        token: payment!.publicToken,
+        seq: payment.seq,
+        token: payment.publicToken,
         amount: input.amount,
         currency: input.currency,
         description: input.description,
-        returnUrl: `${this.base}/pago/${payment!.publicToken}?r=ok`,
-        cancelUrl: `${this.base}/pago/${payment!.publicToken}?r=cancel`,
+        returnUrl: `${url(payment)}?r=ok`,
+        cancelUrl: `${url(payment)}?r=cancel`,
         email: input.email,
         name: input.name,
       });
       const [updated] = await this.deps.db
         .update(payments)
         .set({ providerRef: result.providerRef, checkoutUrl: result.checkoutUrl, raw: result.processId ? { processId: result.processId } : null })
-        .where(eq(payments.id, payment!.id))
+        .where(eq(payments.id, payment.id))
         .returning();
-      return { payment: updated!, url: `${this.base}/pago/${updated!.publicToken}` };
+      return { payment: updated!, url: url(updated!) };
     } catch (error) {
-      await this.deps.db.update(payments).set({ status: 'failed', raw: { error: this.describe(error) } }).where(eq(payments.id, payment!.id));
-      this.deps.log.warn({ err: error, payment: payment!.id }, 'pagos: no se pudo iniciar el cobro');
+      await this.deps.db.update(payments).set({ status: 'failed', raw: { error: this.describe(error) } }).where(eq(payments.id, payment.id));
+      this.deps.log.warn({ err: error, payment: payment.id }, 'pagos: no se pudo iniciar el cobro');
       throw badRequest(this.describe(error));
     }
   }

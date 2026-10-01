@@ -165,7 +165,7 @@ export default function TrackingPage() {
           </p>
         </div>
 
-        {ticket.charge && <ChargeCard token={token} charge={ticket.charge} active={active} t={t} />}
+        {ticket.charge && <ChargeCard token={token} charge={ticket.charge} payable={!['cancelled', 'no_show'].includes(ticket.status)} t={t} />}
 
         {ticket.survey && (
           <div className="mt-4">
@@ -287,7 +287,8 @@ function PhoneOptIn({ token, phone, t, onSaved }: { token: string; phone: string
 }
 
 /** Importe del turno y pago en línea (módulo «Pagos»). */
-function ChargeCard({ token, charge, active, t }: { token: string; charge: NonNullable<PublicTicketDTO['charge']>; active: boolean; t: ReturnType<typeof translator> }) {
+/** Se puede pagar mientras espera, durante la atención y también después (si quedó pendiente). */
+function ChargeCard({ token, charge, payable, t }: { token: string; charge: NonNullable<PublicTicketDTO['charge']>; payable: boolean; t: ReturnType<typeof translator> }) {
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const amount = formatMoney(charge.amount, charge.currency);
@@ -320,7 +321,7 @@ function ChargeCard({ token, charge, active, t }: { token: string; charge: NonNu
           </span>
         )}
       </div>
-      {charge.status === 'pending' && active && (
+      {charge.status === 'pending' && payable && (
         <div className="mt-3">
           {charge.online ? (
             <button type="button" onClick={() => void pay()} disabled={paying} className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 font-bold text-primary-fg disabled:opacity-60">

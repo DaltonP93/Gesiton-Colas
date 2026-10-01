@@ -1,10 +1,11 @@
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { normalizePhone } from '@gc/shared';
 import { notifyMessages, notifyProviders } from '../src/db/schema';
+import { runMaintenance } from '../src/lib/maintenance';
 import { api, createTestApp, registerTenant, uniqueEmail, type TenantSession } from './helpers';
 
 const ROOT = { email: 'root@plataforma.test', password: 'rootClave123' };
@@ -217,6 +218,24 @@ describe('avisos por WhatsApp y SMS', () => {
     expect(msg!.path).toBe('/sms?to=595981400400');
     expect(msg!.headers.authorization).toBe('Bearer sms-123');
     expect(JSON.parse(msg!.body).texto).toMatch(/Mensaje de prueba/);
+  });
+
+  it('el borrado a pedido y el plazo de conservación alcanzan al historial de avisos', async () => {
+    const log = (await api(app, org, 'GET', '/notifications/messages')).body as { to: string }[];
+    expect(log.some((m) => m.to === '595981200001')).toBe(true);
+    const erased = await api(app, org, 'POST', '/privacy/erase', { field: 'phone', value: '0981 200 001' });
+    expect(erased.status).toBe(200);
+    expect(erased.body.messages).toBeGreaterThanOrEqual(2);
+    const after = (await api(app, org, 'GET', '/notifications/messages')).body as { to: string }[];
+    expect(after.some((m) => m.to === '595981200001')).toBe(false);
+
+    // Plazo de conservación de 30 días: los avisos más viejos se borran.
+    await api(app, org, 'PUT', '/tenant', { settings: { privacy: { retentionDays: 30 } } });
+    const [old] = await app.ctx.db.select().from(notifyMessages).where(eq(notifyMessages.tenantId, org.tenantId)).limit(1);
+    await app.ctx.db.update(notifyMessages).set({ createdAt: sql`now() - interval '40 days'` }).where(eq(notifyMessages.id, old!.id));
+    await runMaintenance(app.ctx);
+    expect(await app.ctx.db.select().from(notifyMessages).where(eq(notifyMessages.id, old!.id))).toEqual([]);
+    await api(app, org, 'PUT', '/tenant', { settings: { privacy: { retentionDays: 0 } } });
   });
 
   it('sin proveedor propio usa el de la plataforma', async () => {
