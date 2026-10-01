@@ -20,3 +20,11 @@ export const notFound = (what = 'Recurso') => {
 };
 export const conflict = (message: string, details?: unknown) => new AppError(409, 'conflict', message, details);
 export const planLimit = (message: string) => new AppError(402, 'plan_limit', message);
+
+/** ¿Es una violación de un índice único de PostgreSQL (opcionalmente, uno en particular)? */
+export function isUniqueViolation(error: unknown, constraint?: string): boolean {
+  for (let e = error as { code?: string; constraint?: string; cause?: unknown } | undefined, i = 0; e && i < 3; e = e.cause as typeof e, i++) {
+    if (e.code === '23505') return !constraint || e.constraint === constraint;
+  }
+  return false;
+}

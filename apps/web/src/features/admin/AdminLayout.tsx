@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Activity,
   BarChart3,
+  CalendarClock,
   ChevronsLeft,
   ChevronsRight,
   CreditCard,
@@ -84,6 +85,7 @@ export function AdminLayout() {
       items: [
         { to: '/app', label: 'Inicio', icon: <LayoutGrid />, role: 'agent', end: true },
         { to: '/app/atencion', label: 'Atención', icon: <Headset />, role: 'agent' },
+        { to: '/app/citas', label: 'Citas', icon: <CalendarClock />, role: 'agent', module: ['appointments'] },
         { to: '/app/monitor', label: 'Monitor en vivo', icon: <Activity />, role: 'manager' },
         { to: '/app/reportes', label: 'Reportes', icon: <BarChart3 />, role: 'manager', also: ['/app/resumen'], module: ['reports'] },
         { to: '/app/encuestas', label: 'Encuestas', icon: <Star />, role: 'manager', module: ['surveys'] },

@@ -19,36 +19,13 @@ import {
 } from './schema';
 import { hashPassword } from '../lib/auth';
 import { randomToken } from '../lib/crypto';
-import { dayInTimezone } from '../lib/tz';
+import { dayInTimezone, localToUtc } from '../lib/tz';
 import { issueTicket } from '../modules/tickets/queue';
 
 const CUSTOMERS = [
   'María López', 'Juan Pérez', 'Carlos Gómez', 'Lucía Fernández', 'Pedro Ruiz', 'Ana Torres', 'Sofía Díaz', 'Diego Castro',
   'Laura Méndez', 'Jorge Silva', 'Valentina Rojas', 'Mateo Benítez', 'Camila Duarte', 'Martín Acosta', 'Florencia Vera', 'Gabriel Ortiz',
 ];
-
-/** Diferencia (ms) entre la hora local de una zona y UTC para un instante dado. */
-function tzOffsetMs(instant: Date, timezone: string) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
-    hourCycle: 'h23',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).formatToParts(instant);
-  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
-  return Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second')) - instant.getTime();
-}
-
-/** Convierte una fecha y hora locales de una zona horaria a un instante UTC. */
-export function localToUtc(day: string, minutes: number, timezone: string): Date {
-  const [y, m, d] = day.split('-').map(Number) as [number, number, number];
-  const guess = Date.UTC(y, m - 1, d, Math.floor(minutes / 60), minutes % 60);
-  return new Date(guess - tzOffsetMs(new Date(guess), timezone));
-}
 
 const pick = <T,>(list: T[]) => list[Math.floor(Math.random() * list.length)]!;
 const between = (min: number, max: number) => min + Math.random() * (max - min);

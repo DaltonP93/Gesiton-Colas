@@ -82,3 +82,45 @@ export const STATUS_COLORS: Record<string, string> = {
   cancelled: '#9ca3af',
   transferred: '#0891b2',
 };
+
+/** Fecha (YYYY-MM-DD) de un instante en una zona horaria. */
+export function dayInZone(date: Date | string, timeZone: string): string {
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(date));
+  } catch {
+    return new Date(date).toISOString().slice(0, 10);
+  }
+}
+
+/** Hora (HH:MM) de un instante en una zona horaria. */
+export function timeInZone(date: Date | string, timeZone: string): string {
+  try {
+    return new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(date));
+  } catch {
+    return formatTime(new Date(date).toISOString());
+  }
+}
+
+function zoneOffsetMs(instant: number, timeZone: string) {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(new Date(instant));
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second')) - instant;
+}
+
+/** Fecha y hora locales de una zona horaria → instante ISO (UTC). */
+export function zonedToIso(day: string, hhmm: string, timeZone: string): string {
+  const [y, m, d] = day.split('-').map(Number) as [number, number, number];
+  const [h, min] = hhmm.split(':').map(Number) as [number, number];
+  const guess = Date.UTC(y, m - 1, d, h, min);
+  try {
+    const first = guess - zoneOffsetMs(guess, timeZone);
+    return new Date(guess - zoneOffsetMs(first, timeZone)).toISOString();
+  } catch {
+    return new Date(guess).toISOString();
+  }
+}
+
+/** «lunes 5 de octubre». */
+export function longDate(day: string, locale = 'es'): string {
+  return new Date(`${day}T12:00:00Z`).toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+}

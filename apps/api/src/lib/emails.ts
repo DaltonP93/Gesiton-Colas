@@ -28,11 +28,12 @@ interface LayoutInput {
   intro: string[];
   cta?: { label: string; url: string };
   code?: string;
+  codeLabel?: string;
   outro?: string[];
 }
 
 /** Maqueta HTML compatible con la mayoría de los clientes de correo (tablas y estilos en línea). */
-function layout({ brand, title, intro, cta, code, outro = [] }: LayoutInput): { html: string; text: string } {
+function layout({ brand, title, intro, cta, code, codeLabel = 'O ingrese este código:', outro = [] }: LayoutInput): { html: string; text: string } {
   const p = (t: string) => `<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#334155">${escapeHtml(t)}</p>`;
   const header = brand.logoUrl
     ? `<img src="${escapeHtml(brand.logoUrl)}" alt="${escapeHtml(brand.appName)}" style="max-height:44px;max-width:220px">`
@@ -43,7 +44,7 @@ function layout({ brand, title, intro, cta, code, outro = [] }: LayoutInput): { 
       </td></tr></table>`
     : '';
   const codeBlock = code
-    ? `<p style="margin:8px 0 6px;font-size:13px;color:#64748b">O ingrese este código:</p>
+    ? `<p style="margin:8px 0 6px;font-size:13px;color:#64748b">${escapeHtml(codeLabel)}</p>
        <p style="margin:0 0 20px;font-size:32px;font-weight:800;letter-spacing:8px;color:#0f172a;font-family:Menlo,Consolas,monospace">${escapeHtml(code)}</p>`
     : '';
   const link = cta
@@ -182,4 +183,33 @@ export function deviceAlertMail(
       : [],
   });
   return { to, subject: `${title} · ${alert.organization}`, html, text, fromName: brand.appName, tag: 'device_alert' };
+}
+
+/** Confirmación o recordatorio de una cita (módulo de citas). */
+export function appointmentMail(
+  to: string,
+  kind: 'confirmation' | 'reminder' | 'cancelled',
+  appt: { name: string; organization: string; date: string; time: string; service: string; branch: string; address: string; professional: string | null; code: string },
+  url: string,
+  brand: EmailBrand,
+): MailMessage {
+  const title = kind === 'confirmation' ? 'Su cita quedó agendada' : kind === 'reminder' ? 'Recordatorio de su cita' : 'Su cita fue cancelada';
+  const details = [
+    `• Fecha: ${appt.date} a las ${appt.time}`,
+    `• ${appt.service} en ${appt.branch}${appt.address ? ` (${appt.address})` : ''}`,
+    ...(appt.professional ? [`• Profesional: ${appt.professional}`] : []),
+  ];
+  const { html, text } = layout({
+    brand,
+    title,
+    intro: [greet(appt.name), ...details],
+    code: kind === 'cancelled' ? undefined : appt.code,
+    codeLabel: 'Código de la cita (para presentarse en el kiosco):',
+    cta: kind === 'cancelled' ? undefined : { label: 'Ver o cancelar la cita', url },
+    outro:
+      kind === 'cancelled'
+        ? ['Si fue un error, puede agendar una nueva cita.']
+        : ['Al llegar, preséntese en el kiosco con su documento o con este código y espere el llamado en la pantalla.'],
+  });
+  return { to, subject: `${title} · ${appt.organization}`, html, text, fromName: brand.appName, tag: `appointment_${kind}` };
 }

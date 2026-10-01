@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { appointmentSettingsSchema } from './appointments';
 import { ALERT_SOUNDS, DISPLAY_LAYOUTS, LOCALES } from './enums';
 import { notificationSettingsSchema } from './notifications';
 import { tenantPaymentSettingsSchema } from './payments';
@@ -146,6 +147,7 @@ export const tenantSettingsSchema = z.object({
   notifications: notificationSettingsSchema.prefault({}),
   payments: tenantPaymentSettingsSchema.prefault({}),
   alerts: z.object({ devices: deviceAlertSchema }).prefault({}),
+  appointments: appointmentSettingsSchema,
 });
 export type TenantSettings = z.infer<typeof tenantSettingsSchema>;
 
@@ -372,6 +374,8 @@ export const kioskConfigSchema = z.object({
   priorityMode: z.enum(['buttons', 'list', 'none']).default('buttons'),
   /** Campos del cliente que se piden antes de emitir el turno (claves de customerFields o name/document/phone/email). */
   askFields: z.array(z.string()).default([]),
+  /** Botón «Tengo una cita» (módulo de citas): el cliente se presenta con su documento o código. */
+  appointments: z.boolean().default(true),
   showQr: z.boolean().default(true),
   showWaitingCount: z.boolean().default(true),
   showBranch: z.boolean().default(true),

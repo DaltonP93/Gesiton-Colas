@@ -143,6 +143,8 @@ export interface TicketDTO {
   callCount: number;
   publicToken: string;
   transferredFromId: string | null;
+  /** Cita de la que viene el turno (módulo de citas). */
+  appointmentId: string | null;
   createdAt: ISODate;
   calledAt: ISODate | null;
   startedAt: ISODate | null;
@@ -286,6 +288,8 @@ export interface KioskBootstrapDTO {
   idlePlaylist: PlaylistDTO | null;
   /** Mostrar el precio de los servicios (módulo «Pagos»). */
   prices: { currency: Currency } | null;
+  /** Botón «Tengo una cita» (módulo de citas activo y habilitado en el kiosco). */
+  appointments: boolean;
 }
 
 export interface IssuedTicketDTO {

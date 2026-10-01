@@ -8,6 +8,7 @@ import { createAuth, type Auth } from './lib/auth';
 import { tenantSettings, toCallDTO } from './lib/dto';
 import { brandFrom, type EmailBrand } from './lib/emails';
 import { createMailer, type Mailer } from './lib/mailer';
+import { Appointments } from './lib/appointments';
 import { Audit } from './lib/audit';
 import { Backups } from './lib/backups';
 import { DeviceMonitor } from './lib/deviceMonitor';
@@ -44,6 +45,8 @@ export interface AppContext {
   devices: DeviceMonitor;
   /** Copias de seguridad de la base y los archivos. */
   backups: Backups;
+  /** Citas con fecha y hora (módulo de citas). */
+  appointments: Appointments;
   /** Notifica un cambio de turno a pantallas, operadores, seguimiento público y webhooks. */
   publishTicket(
     tenantId: string,
@@ -123,7 +126,7 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
     },
   });
 
-  return {
+  const app: AppContext = {
     config,
     db,
     auth,
@@ -138,6 +141,8 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
     audit,
     devices: new DeviceMonitor({ config, db, log, mailer, notifier, modulesOf, emailBrand, onChange: (tenantId) => rt.emit(rooms.tenant(tenantId), RT.devicesStatus, {}) }),
     backups: new Backups({ config, db, log, mailer, platformSettings: () => platform.get() }),
+    // Se crea al final: usa publishTicket de este mismo contexto.
+    appointments: null as unknown as Appointments,
     log,
     emailBrand,
     publishTicket(tenantId, event, ticket, extra = {}, options = {}) {
@@ -161,6 +166,9 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
         .dispatch(tenantId, event, { ticket, ...extra })
         .catch((error) => log.error({ err: error }, 'webhooks: dispatch'));
       notifier.onTicketEvent(tenantId, event, ticket).catch((error) => log.error({ err: error }, 'avisos: evento'));
+      if (event === 'ticket.finished' && ticket.appointmentId) {
+        app.appointments.onTicketFinished(ticket.appointmentId).catch((error) => log.error({ err: error }, 'citas: turno terminado'));
+      }
     },
     refreshDevices(tenantId, target) {
       if (target?.displayId) rt.emit(rooms.display(target.displayId), RT.displayConfig, {});
@@ -171,4 +179,6 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
       }
     },
   };
+  app.appointments = new Appointments(app);
+  return app;
 }

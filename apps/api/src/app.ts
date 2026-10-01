@@ -37,6 +37,8 @@ import { billingRoutes } from './modules/billing/routes';
 import { paymentRoutes } from './modules/payments/routes';
 import { auditRoutes } from './modules/audit/routes';
 import { alertRoutes } from './modules/alerts/routes';
+import { bookingRoutes } from './modules/appointments/public';
+import { appointmentRoutes } from './modules/appointments/routes';
 import { backupRoutes } from './modules/backups/routes';
 import { pairingRoutes } from './modules/pairing/routes';
 import { platformRoutes } from './modules/platform/routes';
@@ -197,6 +199,8 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
       await api.register(paymentRoutes(ctx));
       await api.register(auditRoutes(ctx));
       await api.register(alertRoutes(ctx));
+      await api.register(appointmentRoutes(ctx));
+      await api.register(bookingRoutes(ctx));
       await api.register(agentRoutes(ctx));
       await api.register(deviceRoutes(ctx));
       await api.register(mediaRoutes(ctx));
@@ -247,6 +251,7 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
     ctx.notifier.start();
     ctx.devices.start();
     ctx.backups.start();
+    ctx.appointments.start();
   }
   await ensureSuperadmin(ctx);
 
@@ -256,6 +261,7 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
     ctx.notifier.stop();
     ctx.devices.stop();
     ctx.backups.stop();
+    ctx.appointments.stop();
     ctx.rt.close();
     await pool?.pool.end();
   });

@@ -56,6 +56,8 @@ const SCOPE_DESCRIPTIONS: Record<ApiKeyScope, string> = {
   'catalog:write': 'Crear y modificar sucursales, servicios, prioridades y puestos de atención.',
   'reports:read': 'Consultar estadísticas y exportar reportes.',
   'displays:write': 'Administrar pantallas, kioscos y contenido multimedia.',
+  'appointments:read': 'Consultar las citas y la disponibilidad de horarios.',
+  'appointments:write': 'Crear, modificar, cancelar y dar llegada a citas desde otro sistema.',
 };
 
 const EVENT_DESCRIPTIONS: Record<WebhookEvent, string> = {
@@ -71,6 +73,11 @@ const EVENT_DESCRIPTIONS: Record<WebhookEvent, string> = {
   'queue.reset': 'Se reinició la cola de una sucursal.',
   'survey.answered': 'Un cliente respondió la encuesta de satisfacción.',
   'payment.paid': 'Se acreditó el pago de un turno (en línea o registrado en el puesto).',
+  'appointment.created': 'Se agendó una cita (panel, reserva en línea, API o CSV).',
+  'appointment.updated': 'Se modificó una cita (fecha, hora o datos).',
+  'appointment.cancelled': 'Se canceló una cita.',
+  'appointment.checked_in': 'El cliente llegó a su cita y se le emitió el turno.',
+  'appointment.no_show': 'El cliente no se presentó a su cita.',
 };
 
 const DELIVERY_STATUS: Record<WebhookDeliveryDTO['status'], { label: string; color: string }> = {

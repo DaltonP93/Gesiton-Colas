@@ -1,6 +1,7 @@
 import {
   BellRing,
   Building2,
+  CalendarClock,
   ChevronRight,
   ClipboardList,
   CreditCard,
@@ -40,9 +41,10 @@ const IntegrationsPage = lazy(() => import('./IntegrationsPage'));
 const NotificationsPage = lazy(() => import('./NotificationsPage'));
 const PaymentsSettingsPage = lazy(() => import('./PaymentsSettingsPage'));
 const AlertsSettingsPage = lazy(() => import('./AlertsSettingsPage'));
+const AppointmentsSettingsPage = lazy(() => import('./AppointmentsSettingsPage'));
 
 type TabKey = 'marca' | 'region' | 'terminologia' | 'turnos' | 'cliente';
-type PageKey = 'sucursales' | 'servicios' | 'alertas' | 'usuarios' | 'actividad' | 'correo' | 'avisos' | 'cobros' | 'integraciones';
+type PageKey = 'sucursales' | 'servicios' | 'citas' | 'alertas' | 'usuarios' | 'actividad' | 'correo' | 'avisos' | 'cobros' | 'integraciones';
 export type ConfigSection = 'inicio' | TabKey | PageKey;
 
 interface SectionDef {
@@ -70,6 +72,7 @@ const PAGE_COMPONENTS: Record<PageKey, ComponentType> = {
   usuarios: UsersPage,
   actividad: ActivitySection,
   alertas: AlertsSettingsPage,
+  citas: AppointmentsSettingsPage,
   correo: MailSection,
   avisos: NotificationsPage,
   cobros: PaymentsSettingsPage,
@@ -118,6 +121,7 @@ export default function ConfigurationPage() {
       { key: 'servicios', label: `${terms.services} y prioridades`, short: terms.services, description: 'Qué se atiende y quién pasa primero', icon: <ClipboardList />, group: 'Atención' },
       { key: 'turnos', label: `Numeración de ${terms.tickets.toLowerCase()}`, short: 'Numeración', description: 'Dígitos, reinicio y rellamados', icon: <Hash />, group: 'Atención' },
       { key: 'cliente', label: `Datos del ${terms.customer.toLowerCase()}`, short: `Datos del ${terms.customer.toLowerCase()}`, description: 'Qué se pide al sacar turno', icon: <TextCursorInput />, group: 'Atención' },
+      { key: 'citas', label: 'Citas y reserva en línea', short: 'Citas', description: 'Llegada, recordatorios, horarios y reservas', icon: <CalendarClock />, group: 'Atención', module: 'appointments' },
       { key: 'alertas', label: 'Alertas de equipos', short: 'Alertas', description: 'Aviso si una TV o un kiosco se desconecta', icon: <BellRing />, group: 'Atención' },
       { key: 'usuarios', label: 'Usuarios', short: 'Usuarios', description: 'Equipo, roles e invitaciones', icon: <Users />, group: 'Equipo e integraciones' },
       { key: 'actividad', label: 'Registro de actividad', short: 'Actividad', description: 'Quién cambió qué y cuándo', icon: <History />, group: 'Equipo e integraciones' },

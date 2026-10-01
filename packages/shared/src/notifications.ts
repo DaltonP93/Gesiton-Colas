@@ -96,7 +96,7 @@ export type NotifyMessageStatus = 'pending' | 'sent' | 'failed' | 'skipped';
 
 export interface NotifyMessageDTO {
   id: string;
-  event: NotifyEvent | 'test' | 'alert';
+  event: NotifyEvent | 'test' | 'alert' | 'appointment' | 'reminder';
   to: string;
   body: string;
   provider: NotifyProvider | null;

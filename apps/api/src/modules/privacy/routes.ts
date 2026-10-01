@@ -3,7 +3,7 @@ import { normalizePhone } from '@gc/shared';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { AppContext } from '../../context';
-import { notifyMessages, tenants, tickets } from '../../db/schema';
+import { appointments, notifyMessages, tenants, tickets } from '../../db/schema';
 import { tenantIdOf } from '../../lib/auth';
 import { tenantSettings } from '../../lib/dto';
 
@@ -39,6 +39,16 @@ export const privacyRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (
         .set({ customer: {} })
         .where(and(eq(tickets.tenantId, tenantId), match))
         .returning({ id: tickets.id });
+      // También en las citas (módulo de citas): quedan sin datos del cliente.
+      const appointmentMatch =
+        field === 'email'
+          ? sql`lower(${appointments.customer}->>'email') = ${normalized}`
+          : sql`regexp_replace(coalesce(${appointments.customer}->>${field}, ''), '[\\s.-]', '', 'g') = ${normalized}`;
+      const erasedAppointments = await ctx.db
+        .update(appointments)
+        .set({ customer: {}, document: '', updatedAt: new Date() })
+        .where(and(eq(appointments.tenantId, tenantId), field === 'document' ? sql`(${appointmentMatch} OR ${appointments.document} = ${normalized.toUpperCase()})` : appointmentMatch))
+        .returning({ id: appointments.id });
       // El historial de avisos guarda el teléfono y el texto enviado (con el nombre).
       let messages = 0;
       if (updated.length) {
@@ -59,8 +69,11 @@ export const privacyRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (
           messages += removed.length;
         }
       }
-      request.log.info({ tenantId, field, count: updated.length, messages, by: request.auth?.kind === 'user' ? request.auth.userId : 'api' }, 'datos personales borrados a pedido');
-      return { ok: true, erased: updated.length, messages };
+      request.log.info(
+        { tenantId, field, count: updated.length, appointments: erasedAppointments.length, messages, by: request.auth?.kind === 'user' ? request.auth.userId : 'api' },
+        'datos personales borrados a pedido',
+      );
+      return { ok: true, erased: updated.length, appointments: erasedAppointments.length, messages };
     },
   );
 };

@@ -21,6 +21,8 @@ Permisos de las API keys:
 | `catalog:write` | Crear y modificar el catálogo |
 | `reports:read` | Consultar reportes y exportar CSV |
 | `displays:write` | Administrar pantallas, kioscos, publicidad y listas |
+| `appointments:read` | Consultar citas y horarios libres (módulo de citas) |
+| `appointments:write` | Crear, actualizar, cancelar y dar llegada a citas |
 
 ## 2. Casos de uso frecuentes
 
@@ -87,6 +89,9 @@ Configure una URL en **Integraciones y API → Webhooks** y elija los eventos (o
 | `queue.reset` | Cierre de jornada de una sucursal |
 | `payment.paid` | Se acreditó el pago de un turno (en línea o en el puesto): `payment` y `ticketId` |
 | `survey.answered` | Un cliente respondió una encuesta (`survey`, `response` con NPS, calificación, comentario y respuestas, y `ticket` si vino del turno) |
+| `appointment.created` / `appointment.updated` | Se agendó o se modificó una cita (`appointment`) |
+| `appointment.cancelled` / `appointment.no_show` | Se canceló una cita o el cliente no vino |
+| `appointment.checked_in` | El cliente llegó a su cita: `appointment` y el `ticket` emitido |
 
 Formato del cuerpo (`POST`, JSON):
 
@@ -184,3 +189,45 @@ sucursal, luego servicio, luego sucursal y por último la general.
 - Métricas: `GET /api/v1/surveys/results?from=&to=&surveyId=&branchId=&serviceId=&agentId=` (NPS, CSAT, promedio, por día, servicio, operador, sucursal, pregunta y comentarios).
 - Exportación: `GET /api/v1/surveys/responses.csv` con los mismos filtros (con `surveyId`, una columna por pregunta).
 - Con una API key `reports:read` se pueden leer desde un BI (Power BI, Metabase, Looker Studio).
+
+## Citas con fecha y hora (HIS, ERP, agendas)
+
+Módulo **Citas**. La mayoría de los hospitales y empresas ya tienen su agenda: Gestión de Colas recibe esas citas y
+se encarga de la llegada y de la fila. Cuando el cliente se presenta (kiosco con su documento o código, recepción o su
+propio sistema), se emite un turno **ordenado por la hora de la cita**: si llega antes espera su horario y si llega un
+poco tarde (dentro de la tolerancia) no pierde su lugar frente a quienes vinieron sin cita.
+
+**Sincronizar desde su sistema** (crea o actualiza por su propio identificador; la sucursal va por código y el servicio
+por nombre o prefijo, para no guardar UUIDs):
+
+```bash
+curl -X PUT https://colas.ejemplo.com/api/v1/appointments/external/HIS-2026-000123 \
+  -H "X-API-Key: gc_xxxxxxxx_xxxxxxxxxxxxxxxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "branchCode": "001",
+    "serviceName": "Cardiología",
+    "scheduledAt": "2026-10-05T10:30:00-03:00",
+    "durationMinutes": 20,
+    "customer": { "name": "María López", "document": "1.234.567", "phone": "0981123456", "email": "maria@correo.com" },
+    "professional": "Dra. Benítez",
+    "notify": false
+  }'
+```
+
+- `201` si se creó, `200` si se actualizó (reprogramar = enviar otra `scheduledAt`; el recordatorio se vuelve a enviar).
+- `GET /api/v1/appointments/external/{id}`, `POST /api/v1/appointments/external/{id}/cancel` y `POST /api/v1/appointments/external/{id}/check-in` (dar llegada desde la recepción del HIS; con `"force": true` fuera del horario permitido).
+- `GET /api/v1/appointments?from=2026-10-05&to=2026-10-05&branchId=&serviceId=&status=&q=` lista las citas (con `counts` por estado) y `GET /api/v1/appointments.csv` las exporta.
+- `GET /api/v1/appointments/availability?branchId=&serviceId=&from=&days=7` devuelve los horarios libres según los horarios con cita configurados.
+- Webhook `appointment.checked_in` para que su sistema sepa que el paciente llegó, con el turno emitido.
+
+**Sin programar:** exporte la agenda a CSV (separado por coma o punto y coma) e impórtela en **Citas → Importar CSV**
+(`POST /api/v1/appointments/import` con `{ "csv": "…" }`). Columnas reconocidas: `fecha` y `hora` (o `fecha_hora`),
+`nombre`, `documento`, `telefono`, `email`, `servicio`, `sucursal`, `profesional`, `notas`, `duracion` e `id_externo`
+(si viene, la fila actualiza la cita existente).
+
+**Reserva propia:** con la reserva en línea activa (Configuración → Citas), los clientes reservan en
+`/reservar/{organización}` según los horarios con cita de cada servicio y sucursal (cupo por horario, anticipación mínima,
+feriados) y reciben un enlace `/cita/{token}` para ver o cancelar. La confirmación y el recordatorio salen por correo y,
+con el módulo de avisos, por WhatsApp o SMS.
+

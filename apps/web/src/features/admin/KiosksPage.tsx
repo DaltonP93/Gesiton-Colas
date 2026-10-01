@@ -185,7 +185,7 @@ type EditorTab = 'general' | 'appearance' | 'print' | 'link';
 function KioskEditor({ kiosk, onClose }: { kiosk: KioskDTO; onClose: () => void }) {
   const qc = useQueryClient();
   const { toast, confirm } = useFeedback();
-  const { settings, terms, me, can } = useAuth();
+  const { settings, terms, me, can, hasModule } = useAuth();
   const branches = useBranches();
   const services = useServices();
   const [tab, setTab] = useState<EditorTab>('general');
@@ -327,6 +327,14 @@ function KioskEditor({ kiosk, onClose }: { kiosk: KioskDTO; onClose: () => void 
               <Toggle checked={config.showWaitingCount} onChange={(showWaitingCount) => set({ showWaitingCount })} label="Mostrar personas en espera" />
               <Toggle checked={config.showQr} onChange={(showQr) => set({ showQr })} label="Mostrar QR de seguimiento" hint="El cliente sigue su turno desde el celular." />
               <Toggle checked={config.showBranch} onChange={(showBranch) => set({ showBranch })} label={`Mostrar el nombre de la ${terms.branch.toLowerCase()}`} />
+              {hasModule('appointments') && (
+                <Toggle
+                  checked={config.appointments}
+                  onChange={(appointments) => set({ appointments })}
+                  label="Botón «Tengo una cita»"
+                  hint="El cliente se presenta con su documento o el código de su cita y pasa a la fila por su horario."
+                />
+              )}
             </div>
             <Field label="Texto al pie" hint="Horarios, avisos o un mensaje de bienvenida. Opcional.">
               <Input value={config.footerText} maxLength={300} onChange={(e) => set({ footerText: e.target.value })} placeholder="Ej.: Horario de atención de lunes a viernes de 7 a 19 h" />

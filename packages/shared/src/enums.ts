@@ -70,6 +70,11 @@ export const WEBHOOK_EVENTS = [
   'queue.reset',
   'survey.answered',
   'payment.paid',
+  'appointment.created',
+  'appointment.updated',
+  'appointment.cancelled',
+  'appointment.checked_in',
+  'appointment.no_show',
 ] as const;
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
 
@@ -80,6 +85,8 @@ export const API_KEY_SCOPES = [
   'catalog:write',
   'reports:read',
   'displays:write',
+  'appointments:read',
+  'appointments:write',
 ] as const;
 export type ApiKeyScope = (typeof API_KEY_SCOPES)[number];
 
@@ -97,6 +104,8 @@ export const RT = {
   tenantSettings: 'tenant.settings',
   /** Cambió el estado de conexión de las TVs o kioscos. */
   devicesStatus: 'devices.status',
+  /** Cambió una cita (agenda del panel). */
+  appointmentsChanged: 'appointments.changed',
 } as const;
 
 /**

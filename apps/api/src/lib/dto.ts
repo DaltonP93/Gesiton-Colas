@@ -156,6 +156,7 @@ export function toTicketDTO(t: Ticket, rel: TicketRelations = {}): TicketDTO {
     callCount: t.callCount,
     publicToken: t.publicToken,
     transferredFromId: t.transferredFromId,
+    appointmentId: t.appointmentId ?? null,
     createdAt: t.createdAt.toISOString(),
     calledAt: iso(t.calledAt),
     startedAt: iso(t.startedAt),

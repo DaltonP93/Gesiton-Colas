@@ -6,6 +6,7 @@ import type { AppContext } from '../../context';
 import { auditLogs, tenants, type AuditLog } from '../../db/schema';
 import { tenantIdOf } from '../../lib/auth';
 import { dateOnly } from '../../lib/schemas';
+import { csvCell } from '../../lib/csv';
 
 const query = z.object({
   from: dateOnly.optional(),
@@ -17,13 +18,6 @@ const query = z.object({
   offset: z.coerce.number().int().min(0).max(1_000_000).default(0),
 });
 type Query = z.infer<typeof query>;
-
-function csvCell(value: unknown): string {
-  if (value === null || value === undefined) return '';
-  const s = typeof value === 'object' ? JSON.stringify(value) : String(value);
-  const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
-  return /[",\n;]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
-}
 
 const toDTO = (row: AuditLog, tenantName: string | null = null): AuditLogDTO => ({
   id: row.id,

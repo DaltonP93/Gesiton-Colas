@@ -32,6 +32,15 @@ export async function runMaintenance(ctx: Pick<AppContext, 'db' | 'log'> & Parti
       AND t.customer <> '{}'::jsonb
       AND t.created_at < now() - make_interval(days => (o.settings->'privacy'->>'retentionDays')::int)`);
   if (anonymized.rowCount) ctx.log.info({ count: anonymized.rowCount }, 'mantenimiento: datos personales vencidos borrados');
+  // Lo mismo en las citas ya pasadas.
+  const appointmentsAnon = await ctx.db.execute(sql`
+    UPDATE appointments a SET customer = '{}'::jsonb, document = ''
+    FROM tenants o
+    WHERE a.tenant_id = o.id
+      AND coalesce((o.settings->'privacy'->>'retentionDays')::int, 0) > 0
+      AND a.customer <> '{}'::jsonb
+      AND a.scheduled_at < now() - make_interval(days => (o.settings->'privacy'->>'retentionDays')::int)`);
+  if (appointmentsAnon.rowCount) ctx.log.info({ count: appointmentsAnon.rowCount }, 'mantenimiento: datos personales de citas vencidos borrados');
   // Historial de avisos: el plazo de la organización (si es menor) o 90 días.
   const messages = await ctx.db.execute(sql`
     DELETE FROM notify_messages m

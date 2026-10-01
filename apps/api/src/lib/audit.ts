@@ -128,6 +128,14 @@ const ROUTES: Record<string, RouteMeta> = {
   'POST /platform/billing/generate': M('invoice.generate', 'invoice', 'Generó las facturas del mes'),
   'POST /platform/billing/invoices/:id/pay': M('invoice.pay', 'invoice', 'Registró el pago de una factura'),
   'POST /platform/billing/invoices/:id/void': M('invoice.void', 'invoice', 'Anuló una factura'),
+  'POST /appointments': M('appointment.create', 'appointment', 'Agendó una cita'),
+  'PUT /appointments/:id': M('appointment.update', 'appointment', 'Modificó una cita'),
+  'POST /appointments/:id/cancel': M('appointment.cancel', 'appointment', 'Canceló una cita'),
+  'POST /appointments/:id/no-show': M('appointment.no_show', 'appointment', 'Marcó una cita como «No vino»'),
+  'POST /appointments/import': M('appointment.import', 'appointment', 'Importó citas (CSV)'),
+  'POST /appointment-schedules': M('appointment.schedule_create', 'appointment', 'Agregó un horario de citas'),
+  'PUT /appointment-schedules/:id': M('appointment.schedule_update', 'appointment', 'Modificó un horario de citas'),
+  'DELETE /appointment-schedules/:id': M('appointment.schedule_delete', 'appointment', 'Quitó un horario de citas'),
 };
 
 /** Rutas que no se registran: operación diaria (ya queda en el historial de cada turno), pruebas y consultas. */
@@ -135,6 +143,9 @@ const SKIP = [
   /^POST \/agent\//,
   /^PUT \/agent\//,
   /^POST \/tickets$/,
+  // Llegadas y sincronización con otros sistemas: quedan en la cita y en el turno.
+  /^POST \/appointments\/:id\/check-in$/,
+  /^(PUT|POST) \/appointments\/external\//,
   /^POST \/media\/detect$/,
   /\/test$/,
   /^POST \/notifications\/messages\/:id\/retry$/,

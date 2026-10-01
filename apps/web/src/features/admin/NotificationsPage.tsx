@@ -266,7 +266,7 @@ function HistoryTab() {
                 <tr key={m.id}>
                   <td className="whitespace-nowrap text-muted">{formatDateTime(m.createdAt)}</td>
                   <td className="font-semibold whitespace-nowrap">{m.ticketCode ?? '—'}</td>
-                  <td className="whitespace-nowrap">{m.event === 'test' ? 'Prueba' : m.event === 'alert' ? 'Alerta de equipos' : NOTIFY_EVENT_LABELS[m.event].name}</td>
+                  <td className="whitespace-nowrap">{m.event === 'test' ? 'Prueba' : m.event === 'alert' ? 'Alerta de equipos' : m.event === 'appointment' ? 'Cita agendada' : m.event === 'reminder' ? 'Recordatorio de cita' : NOTIFY_EVENT_LABELS[m.event].name}</td>
                   <td className="whitespace-nowrap tabular-nums">+{m.to}</td>
                   <td>
                     <Badge color={badge.color}>{badge.label}</Badge>

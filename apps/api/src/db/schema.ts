@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import {
   bigint,
   boolean,
@@ -16,6 +17,9 @@ import {
 } from 'drizzle-orm/pg-core';
 import type {
   ApiKeyScope,
+  AppointmentCustomer,
+  AppointmentSource,
+  AppointmentStatus,
   AuditActorKind,
   AuditEntity,
   CustomerData,
@@ -253,14 +257,18 @@ export const tickets = pgTable(
     publicToken: text('public_token').notNull(),
     transferredFromId: uuid('transferred_from_id'),
     serviceDay: date('service_day').notNull(),
+    /** Cita de la que viene el turno (módulo de citas). */
+    appointmentId: uuid('appointment_id'),
     createdAt: createdAt(),
+    /** Orden en la fila: la hora de emisión o, para las citas, la hora de la cita. */
+    sortAt: timestamp('sort_at', { withTimezone: true }).defaultNow().notNull(),
     calledAt: timestamp('called_at', { withTimezone: true }),
     startedAt: timestamp('started_at', { withTimezone: true }),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
   },
   (t) => [
     uniqueIndex('tickets_public_token_idx').on(t.publicToken),
-    index('tickets_queue_idx').on(t.branchId, t.status, t.createdAt),
+    index('tickets_queue_idx').on(t.branchId, t.status, t.sortAt),
     index('tickets_tenant_created_idx').on(t.tenantId, t.createdAt),
     index('tickets_agent_idx').on(t.agentId, t.status),
   ],
@@ -792,3 +800,77 @@ export type AuditLog = typeof auditLogs.$inferSelect;
 export type Backup = typeof backups.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
 export type PaymentGatewayRow = typeof paymentGateways.$inferSelect;
+
+/* ------------------------------------------------------------------ */
+/* Citas                                                               */
+/* ------------------------------------------------------------------ */
+
+export const appointments = pgTable(
+  'appointments',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    branchId: uuid('branch_id')
+      .notNull()
+      .references(() => branches.id, { onDelete: 'cascade' }),
+    serviceId: uuid('service_id')
+      .notNull()
+      .references(() => services.id, { onDelete: 'cascade' }),
+    /** Código corto para presentarse en el kiosco. */
+    code: text('code').notNull(),
+    /** Identificador en el sistema de origen (HIS, ERP, agenda propia). */
+    externalId: text('external_id'),
+    source: text('source').$type<AppointmentSource>().notNull(),
+    status: text('status').$type<AppointmentStatus>().notNull().default('booked'),
+    scheduledAt: timestamp('scheduled_at', { withTimezone: true }).notNull(),
+    durationMinutes: integer('duration_minutes').notNull().default(15),
+    customer: jsonb('customer').$type<AppointmentCustomer>().notNull().default({}),
+    /** Documento normalizado (sin puntos ni guiones) para buscar al presentarse. */
+    document: text('document').notNull().default(''),
+    professional: text('professional'),
+    notes: text('notes').notNull().default(''),
+    publicToken: text('public_token').notNull(),
+    ticketId: uuid('ticket_id').references(() => tickets.id, { onDelete: 'set null' }),
+    checkedInAt: timestamp('checked_in_at', { withTimezone: true }),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    cancelReason: text('cancel_reason'),
+    reminderSentAt: timestamp('reminder_sent_at', { withTimezone: true }),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex('appointments_tenant_code_idx').on(t.tenantId, t.code),
+    uniqueIndex('appointments_public_token_idx').on(t.publicToken),
+    uniqueIndex('appointments_external_idx').on(t.tenantId, t.externalId).where(sql`${t.externalId} IS NOT NULL`),
+    index('appointments_branch_time_idx').on(t.branchId, t.scheduledAt),
+    index('appointments_tenant_time_idx').on(t.tenantId, t.scheduledAt),
+    index('appointments_document_idx').on(t.tenantId, t.document),
+  ],
+);
+export type Appointment = typeof appointments.$inferSelect;
+
+/** Horarios con cita de cada servicio en cada sucursal (agenda de la reserva en línea). */
+export const bookingSchedules = pgTable(
+  'booking_schedules',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    branchId: uuid('branch_id')
+      .notNull()
+      .references(() => branches.id, { onDelete: 'cascade' }),
+    serviceId: uuid('service_id')
+      .notNull()
+      .references(() => services.id, { onDelete: 'cascade' }),
+    days: jsonb('days').$type<number[]>().notNull(),
+    from: text('from_time').notNull(),
+    to: text('to_time').notNull(),
+    slotMinutes: integer('slot_minutes').notNull(),
+    capacity: integer('capacity').notNull().default(1),
+    online: boolean('online').notNull().default(true),
+    active: boolean('active').notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (t) => [index('booking_schedules_branch_idx').on(t.branchId, t.serviceId)],
+);
+export type BookingSchedule = typeof bookingSchedules.$inferSelect;
