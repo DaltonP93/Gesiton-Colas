@@ -1,6 +1,6 @@
 # Migración desde la versión anterior (NovoSGA 2)
 
-La versión 3 es una reescritura completa. El código anterior (Symfony 4 / PHP 7.1, paneles Vue compilados y el paquete `novosga/*`) se conserva sin cambios en [`legacy/novosga`](../legacy/novosga) como referencia.
+La versión 3 es una reescritura completa y no comparte código con el sistema anterior (Symfony 4 / PHP 7.1). Esta guía sirve para pasar una instalación existente a la nueva versión.
 
 ## Equivalencias
 

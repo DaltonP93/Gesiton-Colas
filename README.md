@@ -2,8 +2,6 @@
 
 Plataforma **SaaS** de gestión de turnos, pantallas y publicidad digital. Organiza la atención de todas sus sucursales, muestra contenido en las salas de espera y se integra con cualquier sistema mediante API REST, webhooks y eventos en tiempo real.
 
-> Versión 3 — reescritura completa del sistema anterior (NovoSGA 2 / Symfony 4). El código original se conserva como referencia en [`legacy/novosga`](legacy/novosga).
-
 ## Qué incluye
 
 | Módulo | Descripción |
@@ -52,7 +50,6 @@ apps/
   web/        Panel, consola, pantallas, kioscos y seguimiento (React 19, Vite, Tailwind CSS 4)
 packages/
   shared/     Tipos, esquemas de configuración, detección de plataformas y plantillas
-legacy/       Sistema anterior (solo referencia)
 docs/         Guías de integración y despliegue
 ```
 
