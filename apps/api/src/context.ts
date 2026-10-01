@@ -8,6 +8,11 @@ import { createAuth, type Auth } from './lib/auth';
 import { tenantSettings, toCallDTO } from './lib/dto';
 import { brandFrom, type EmailBrand } from './lib/emails';
 import { createMailer, type Mailer } from './lib/mailer';
+import { Appointments } from './lib/appointments';
+import { Audit } from './lib/audit';
+import { Backups } from './lib/backups';
+import { Sifen } from './lib/sifen/service';
+import { DeviceMonitor } from './lib/deviceMonitor';
 import { Notifier } from './lib/notifier';
 import { Payments } from './lib/payments/service';
 import { surveyLinkFor } from './lib/surveys';
@@ -35,6 +40,16 @@ export interface AppContext {
   notifier: Notifier;
   /** Pasarelas, cobros y facturación de la plataforma. */
   payments: Payments;
+  /** Registro de auditoría: quién cambió qué. */
+  audit: Audit;
+  /** Alertas de TVs y kioscos desconectados. */
+  devices: DeviceMonitor;
+  /** Copias de seguridad de la base y los archivos. */
+  backups: Backups;
+  /** Citas con fecha y hora (módulo de citas). */
+  appointments: Appointments;
+  /** Factura electrónica SIFEN (Paraguay). */
+  sifen: Sifen;
   /** Notifica un cambio de turno a pantallas, operadores, seguimiento público y webhooks. */
   publishTicket(
     tenantId: string,
@@ -78,6 +93,7 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
   const storage = createStorage(config);
   const mailer = createMailer(config, db, log);
   const notifier = new Notifier({ config, db, log, modulesOf });
+  const audit = new Audit(db, log);
   notifier.surveyLink = async (tenant, ticket) => ((await modulesOf(tenant)).includes('surveys') ? surveyLinkFor(db, config.PUBLIC_URL, tenant, ticket) : null);
   const publicUrl = config.PUBLIC_URL.replace(/\/$/, '');
   const emailBrand = async (tenant: Tenant | null | undefined) => {
@@ -85,6 +101,7 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
     const { brand } = await platform.get();
     return brandFrom({ appName: brand.appName, logoUrl: brand.logoUrl, primaryColor: brand.primaryColor }, publicUrl);
   };
+  const sifen = new Sifen({ config, db, log, mailer, emailBrand, modulesOf });
   const payments = new Payments({
     config,
     db,
@@ -92,7 +109,10 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
     mailer,
     platformSettings: () => platform.get(),
     emailBrand,
+    audit,
     onTicketPaid(payment) {
+      // Factura electrónica automática (si la organización la activó).
+      void sifen.autoIssueForPayment(payment).catch((error) => log.error({ err: error, paymentId: payment.id }, 'sifen: no se pudo facturar el cobro'));
       void webhooks
         .dispatch(payment.tenantId, 'payment.paid', {
           payment: { id: payment.id, amount: payment.amount, currency: payment.currency, provider: payment.provider, method: payment.method, reference: payment.reference, paidAt: payment.paidAt },
@@ -112,7 +132,7 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
     },
   });
 
-  return {
+  const app: AppContext = {
     config,
     db,
     auth,
@@ -124,6 +144,12 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
     modulesOf,
     notifier,
     payments,
+    audit,
+    devices: new DeviceMonitor({ config, db, log, mailer, notifier, modulesOf, emailBrand, onChange: (tenantId) => rt.emit(rooms.tenant(tenantId), RT.devicesStatus, {}) }),
+    backups: new Backups({ config, db, log, mailer, platformSettings: () => platform.get() }),
+    // Se crea al final: usa publishTicket de este mismo contexto.
+    appointments: null as unknown as Appointments,
+    sifen,
     log,
     emailBrand,
     publishTicket(tenantId, event, ticket, extra = {}, options = {}) {
@@ -147,6 +173,9 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
         .dispatch(tenantId, event, { ticket, ...extra })
         .catch((error) => log.error({ err: error }, 'webhooks: dispatch'));
       notifier.onTicketEvent(tenantId, event, ticket).catch((error) => log.error({ err: error }, 'avisos: evento'));
+      if (event === 'ticket.finished' && ticket.appointmentId) {
+        app.appointments.onTicketFinished(ticket.appointmentId).catch((error) => log.error({ err: error }, 'citas: turno terminado'));
+      }
     },
     refreshDevices(tenantId, target) {
       if (target?.displayId) rt.emit(rooms.display(target.displayId), RT.displayConfig, {});
@@ -157,4 +186,6 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
       }
     },
   };
+  app.appointments = new Appointments(app);
+  return app;
 }

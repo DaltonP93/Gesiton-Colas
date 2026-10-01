@@ -19,7 +19,7 @@ Se encontraron y **corrigieron** los siguientes problemas:
 | 5 | Media | `legacy/novosga/public/.htaccess` tenía una contraseña real de MySQL. | **Corregido en el archivo.** Queda en el historial de git: **cambie esa contraseña** si todavía se usa y, si el repositorio se compartió, púrguelo con `git filter-repo`. |
 | 6 | Media | Sin SMTP, los enlaces de recuperación y códigos de acceso se escribían en el log. | **Corregido**: en producción solo se registra el destinatario. |
 | 7 | Media | Un operador asignado a una sucursal veía turnos y datos personales de todas. | **Corregido**: listados, cola, detalle y tiempo real limitados a sus sucursales. |
-| 8 | Media | Los datos personales se guardaban para siempre y cualquier supervisor los exportaba. | **Corregido**: plazo de conservación configurable, borrado a pedido del titular y exportación de datos personales solo para administradores. El historial de webhooks se borra a los 30 días y el de avisos por WhatsApp/SMS (teléfono y texto) con el plazo de la organización o a los 90 días; el borrado a pedido también lo alcanza. |
+| 8 | Media | Los datos personales se guardaban para siempre y cualquier supervisor los exportaba. | **Corregido**: plazo de conservación configurable, borrado a pedido del titular y exportación de datos personales solo para administradores. El historial de webhooks se borra a los 30 días y el de avisos por WhatsApp/SMS (teléfono y texto) con el plazo de la organización o a los 90 días; el borrado a pedido también lo alcanza. Las citas (módulo de citas) siguen el mismo plazo y el mismo borrado a pedido. |
 | 9 | Media | El CSS propio de una organización se aplicaba en la sesión del superadministrador. | **Corregido.** |
 | 10 | Baja | El máximo de 5 intentos por código no era atómico. | **Corregido.** |
 | 11 | Baja | El ingreso por código no se desactivaba en todos los caminos. | **Corregido.** |
@@ -34,13 +34,15 @@ Se encontraron y **corrigieron** los siguientes problemas:
 - Confirmaciones de pago verificadas (firma HMAC de Stripe, tokens de PagoPar y Bancard) y limitadas a la organización dueña de la pasarela; los pagos acreditados no cambian de estado.
 - Sesiones JWT con algoritmo fijo que se invalidan al cambiar o restablecer la contraseña.
 - Rol y estado del usuario leídos de la base en cada pedido; módulos y suspensión aplicados en la API.
+- **Registro de auditoría** (Configuración → Registro de actividad; Plataforma → Actividad): cada cambio guarda quién lo hizo, cuándo, desde qué IP y los datos enviados (sin contraseñas ni claves), además de los ingresos y los intentos fallidos. Lo que hace un superadministrador dentro de una organización queda marcado como «Soporte» y la organización lo ve. Se conserva un año.
+- **Copias de seguridad** diarias (base y archivos) con permisos `600`, descarga solo para superadministradores y registrada en la actividad; restauración en una sola transacción con copia previa automática.
 - Consultas parametrizadas, protección contra inyección de fórmulas en CSV, archivos subidos con nombres generados y servidos con `CSP sandbox`.
 - Política de contenido (CSP) en el panel, las pantallas y los kioscos: solo se ejecuta código propio y la API de YouTube.
 
 ## Recomendaciones pendientes para la instalación
 
 1. **HTTPS con dominio** (Caddy o Nginx con Let's Encrypt) y luego `TRUST_PROXY=1`. Hoy el acceso por IP viaja sin cifrar.
-2. **Copias de seguridad** diarias de la base y del volumen `/data` (ver `docs/DESPLIEGUE.md`).
+2. **Copias de seguridad fuera del servidor**: la copia diaria automática ya viene activada (Plataforma → Copias); active la subida a S3 o descárguelas periódicamente, y guarde `JWT_SECRET` aparte (ver `docs/DESPLIEGUE.md` → Copias de seguridad).
 3. `JWT_SECRET` de al menos 32 caracteres (`openssl rand -hex 32`); no reutilizarlo en otros sistemas.
 4. No usar `DEV_OUTBOX=true` en una instalación real.
 5. Rotar la contraseña de MySQL del sistema anterior (hallazgo 5).

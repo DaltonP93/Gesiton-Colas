@@ -85,13 +85,14 @@ export async function loadTicket(db: DbOrTx, tenantId: string, ticketId: string)
 }
 
 /** Cantidad de turnos que se atenderán antes que este (misma sucursal y servicio). */
-export async function countAhead(db: DbOrTx, ticket: Pick<TicketDTO, 'id' | 'branchId' | 'serviceId' | 'createdAt' | 'priority'>) {
+export async function countAhead(db: DbOrTx, ticket: Pick<TicketDTO, 'id' | 'branchId' | 'serviceId' | 'priority'>) {
   const weight = ticket.priority?.weight ?? 0;
+  // Mismo orden que la fila: prioridad y luego `sort_at` (hora de emisión o de la cita).
   const result = await db.execute<{ n: number }>(sql`
     SELECT count(*)::int AS n FROM tickets t JOIN priorities p ON p.id = t.priority_id
     WHERE t.branch_id = ${ticket.branchId} AND t.service_id = ${ticket.serviceId}
       AND t.status = 'waiting' AND t.id <> ${ticket.id}
-      AND (p.weight > ${weight} OR (p.weight = ${weight} AND t.created_at < ${ticket.createdAt}))`);
+      AND (p.weight > ${weight} OR (p.weight = ${weight} AND t.sort_at < (SELECT sort_at FROM tickets WHERE id = ${ticket.id})))`);
   return result.rows[0]?.n ?? 0;
 }
 
@@ -112,7 +113,7 @@ async function branchDay(db: DbOrTx, tenantId: string, branchId: string) {
   return dayInTimezone(new Date(), branch.timezone ?? settings.timezone);
 }
 
-const waitingOrder = [desc(priorities.weight), asc(tickets.createdAt)];
+const waitingOrder = [desc(priorities.weight), asc(tickets.sortAt)];
 
 export async function queueSnapshot(
   db: DbOrTx,
@@ -161,6 +162,9 @@ export interface IssueInput {
   notes?: string;
   channel: TicketChannel;
   userId?: string | null;
+  /** Orden en la fila (por defecto, ahora). Las citas usan su horario. */
+  sortAt?: Date;
+  appointmentId?: string | null;
 }
 
 function sanitizeCustomer(customer: CustomerData | undefined): CustomerData {
@@ -237,6 +241,8 @@ export async function issueTicket(ctx: QueueCtx, input: IssueInput) {
         publicToken: randomToken(20),
         serviceDay: day,
         createdAt: now,
+        sortAt: input.sortAt ?? now,
+        appointmentId: input.appointmentId ?? null,
       })
       .returning({ id: tickets.id });
     await tx.insert(ticketEvents).values({
@@ -244,7 +250,7 @@ export async function issueTicket(ctx: QueueCtx, input: IssueInput) {
       ticketId: ticket!.id,
       type: 'created',
       userId: input.userId ?? null,
-      data: { channel: input.channel },
+      data: { channel: input.channel, ...(input.appointmentId ? { appointmentId: input.appointmentId } : {}) },
     });
     return { ticketId: ticket!.id, announceName: settings.tickets.announceCustomerName };
   });
@@ -397,7 +403,7 @@ export async function callNext(ctx: QueueCtx, tenantId: string, userId: string):
       SELECT t.id FROM tickets t JOIN priorities p ON p.id = t.priority_id
       WHERE t.tenant_id = ${tenantId} AND t.branch_id = ${ws.branchId}
         AND t.status = 'waiting' AND t.service_id IN (${serviceList})
-      ORDER BY ${preferNormal ? sql`(p.weight = 0) DESC,` : sql``} p.weight DESC, t.created_at ASC
+      ORDER BY ${preferNormal ? sql`(p.weight = 0) DESC,` : sql``} p.weight DESC, t.sort_at ASC
       LIMIT 1
       FOR UPDATE OF t SKIP LOCKED`);
     const id = candidate.rows[0]?.id;
@@ -594,7 +600,9 @@ export async function transferTicket(
         publicToken: original.publicToken,
         transferredFromId: original.id,
         serviceDay: original.serviceDay,
+        appointmentId: original.appointmentId,
         createdAt: now,
+        sortAt: now,
       })
       .returning({ id: tickets.id });
     await tx.insert(ticketEvents).values([

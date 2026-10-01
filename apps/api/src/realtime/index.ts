@@ -1,5 +1,5 @@
 import type { Server as HttpServer } from 'node:http';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { Server, type Socket } from 'socket.io';
 import { hasRole } from '@gc/shared';
 import type { FastifyBaseLogger } from 'fastify';
@@ -64,7 +64,12 @@ export class Realtime {
       const heartbeat = setInterval(touch, 60_000);
       socket.on('disconnect', () => {
         clearInterval(heartbeat);
-        void touch();
+        // La hora de la desconexión no es señal de vida: si ya se avisó que se cortó, no la cuenta como «volvió».
+        void this.db
+          .update(displays)
+          .set({ lastSeenAt: new Date() })
+          .where(and(eq(displays.id, display.id), isNull(displays.offlineAlertedAt)))
+          .catch(() => undefined);
       });
       socket.emit('ready', { kind: 'display', id: display.id });
       return;
@@ -74,7 +79,18 @@ export class Realtime {
       const [kiosk] = await this.db.select().from(kiosks).where(eq(kiosks.token, token)).limit(1);
       if (!kiosk) throw new Error('kiosco inválido');
       await socket.join([rooms.kioskBranch(kiosk.branchId), rooms.kiosk(kiosk.id), rooms.devices(kiosk.tenantId)]);
-      await this.db.update(kiosks).set({ lastSeenAt: new Date() }).where(eq(kiosks.id, kiosk.id));
+      // Igual que las pantallas: latido cada minuto para saber si sigue conectado.
+      const touch = () => this.db.update(kiosks).set({ lastSeenAt: new Date() }).where(eq(kiosks.id, kiosk.id)).catch(() => undefined);
+      await touch();
+      const heartbeat = setInterval(touch, 60_000);
+      socket.on('disconnect', () => {
+        clearInterval(heartbeat);
+        void this.db
+          .update(kiosks)
+          .set({ lastSeenAt: new Date() })
+          .where(and(eq(kiosks.id, kiosk.id), isNull(kiosks.offlineAlertedAt)))
+          .catch(() => undefined);
+      });
       socket.emit('ready', { kind: 'kiosk', id: kiosk.id });
       return;
     }

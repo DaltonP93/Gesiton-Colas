@@ -11,7 +11,7 @@ import { AppError, forbidden, unauthorized } from './errors';
 
 export type AuthInfo =
   | { kind: 'user'; userId: string; tenantId: string | null; role: Role; user: User; tenant: Tenant | null }
-  | { kind: 'apiKey'; keyId: string; tenantId: string; role: Role; scopes: ApiKeyScope[]; tenant: Tenant };
+  | { kind: 'apiKey'; keyId: string; keyName: string; tenantId: string; role: Role; scopes: ApiKeyScope[]; tenant: Tenant };
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -97,6 +97,7 @@ export function createAuth(config: AppConfig, db: Database, modulesOf?: ModulesR
     return {
       kind: 'apiKey',
       keyId: found.key.id,
+      keyName: found.key.name,
       tenantId: found.key.tenantId,
       role: 'admin',
       scopes: found.key.scopes,

@@ -285,6 +285,23 @@ export class Notifier {
     return { ok: true, message: `Mensaje de prueba enviado a +${to}.` };
   }
 
+  /** Envía un mensaje libre (alertas al personal, citas) con el canal de la organización y lo deja en el historial. */
+  async sendText(tenant: Tenant, phone: string, text: string, event: 'alert' | 'appointment' | 'reminder' = 'alert'): Promise<boolean> {
+    const to = normalizePhone(phone, tenantSettings(tenant).notifications.countryCode);
+    const { runtime } = await this.resolve(tenant.id);
+    if (!to || !runtime) return false;
+    try {
+      const ref = await deliver(runtime, { to, body: text, params: [] });
+      await this.deps.db.insert(notifyMessages).values({ tenantId: tenant.id, event, to, body: text, provider: runtime.provider, status: 'sent', attempts: 1, providerRef: ref, sentAt: new Date(), nextAttemptAt: null });
+      return true;
+    } catch (error) {
+      await this.deps.db
+        .insert(notifyMessages)
+        .values({ tenantId: tenant.id, event, to, body: text, provider: runtime.provider, status: 'failed', attempts: 1, error: (error instanceof Error ? error.message : 'Error').slice(0, 500), nextAttemptAt: null });
+      return false;
+    }
+  }
+
   /* ------------------------------ Eventos ----------------------------- */
 
   /** Llamado en cada cambio de turno: arma los avisos que correspondan. */
@@ -303,7 +320,7 @@ export class Notifier {
         .from(tickets)
         .innerJoin(priorities, eq(priorities.id, tickets.priorityId))
         .where(and(eq(tickets.branchId, ticket.branchId), eq(tickets.serviceId, ticket.serviceId), eq(tickets.status, 'waiting')))
-        .orderBy(desc(priorities.weight), asc(tickets.createdAt))
+        .orderBy(desc(priorities.weight), asc(tickets.sortAt))
         .offset(settings.nearAhead)
         .limit(1);
       if (next[0]) {

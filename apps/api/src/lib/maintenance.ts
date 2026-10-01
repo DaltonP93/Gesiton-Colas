@@ -1,6 +1,6 @@
 import { and, isNotNull, lt, or, sql } from 'drizzle-orm';
 import type { AppContext } from '../context';
-import { authTokens, devicePairings, tenants, webhookDeliveries } from '../db/schema';
+import { auditLogs, authTokens, devicePairings, tenants, webhookDeliveries } from '../db/schema';
 
 /** Días que se conservan las demos vencidas antes de borrarlas definitivamente. */
 const DEMO_RETENTION_DAYS = 30;
@@ -8,6 +8,8 @@ const DEMO_RETENTION_DAYS = 30;
 const WEBHOOK_RETENTION_DAYS = 30;
 /** Días que se conserva, como máximo, el historial de avisos por WhatsApp/SMS (teléfono y texto enviado). */
 const NOTIFY_RETENTION_DAYS = 90;
+/** Días que se conserva el registro de auditoría. */
+const AUDIT_RETENTION_DAYS = 365;
 
 /** Limpieza periódica: enlaces vencidos, vinculaciones viejas y demos abandonadas. */
 export async function runMaintenance(ctx: Pick<AppContext, 'db' | 'log'> & Partial<Pick<AppContext, 'payments'>>) {
@@ -30,6 +32,15 @@ export async function runMaintenance(ctx: Pick<AppContext, 'db' | 'log'> & Parti
       AND t.customer <> '{}'::jsonb
       AND t.created_at < now() - make_interval(days => (o.settings->'privacy'->>'retentionDays')::int)`);
   if (anonymized.rowCount) ctx.log.info({ count: anonymized.rowCount }, 'mantenimiento: datos personales vencidos borrados');
+  // Lo mismo en las citas ya pasadas.
+  const appointmentsAnon = await ctx.db.execute(sql`
+    UPDATE appointments a SET customer = '{}'::jsonb, document = ''
+    FROM tenants o
+    WHERE a.tenant_id = o.id
+      AND coalesce((o.settings->'privacy'->>'retentionDays')::int, 0) > 0
+      AND a.customer <> '{}'::jsonb
+      AND a.scheduled_at < now() - make_interval(days => (o.settings->'privacy'->>'retentionDays')::int)`);
+  if (appointmentsAnon.rowCount) ctx.log.info({ count: appointmentsAnon.rowCount }, 'mantenimiento: datos personales de citas vencidos borrados');
   // Historial de avisos: el plazo de la organización (si es menor) o 90 días.
   const messages = await ctx.db.execute(sql`
     DELETE FROM notify_messages m
@@ -38,6 +49,7 @@ export async function runMaintenance(ctx: Pick<AppContext, 'db' | 'log'> & Parti
       AND m.status <> 'pending'
       AND m.created_at < now() - make_interval(days => least(${NOTIFY_RETENTION_DAYS}, coalesce(nullif((o.settings->'privacy'->>'retentionDays')::int, 0), ${NOTIFY_RETENTION_DAYS})))`);
   if (messages.rowCount) ctx.log.info({ count: messages.rowCount }, 'mantenimiento: historial de avisos vencido borrado');
+  await ctx.db.delete(auditLogs).where(lt(auditLogs.createdAt, new Date(now.getTime() - AUDIT_RETENTION_DAYS * 24 * 3600 * 1000)));
   // Facturación: factura del mes y suspensión por falta de pago (si el superadministrador lo activó).
   await ctx.payments?.runCycle();
 }

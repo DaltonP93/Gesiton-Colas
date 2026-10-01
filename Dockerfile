@@ -17,9 +17,14 @@ COPY apps/web apps/web
 RUN npm run build
 
 FROM node:22-alpine AS runtime
+# pg_dump / pg_restore / psql para las copias de seguridad, de la misma versión que la base de
+# docker-compose (postgres:16). Si actualiza la base a otra versión, cambie también este paquete
+# (postgresql17-client, postgresql18-client…): pg_dump no copia bases más nuevas que él.
+RUN apk add --no-cache postgresql16-client
 ENV NODE_ENV=production \
     PORT=3000 \
     UPLOAD_DIR=/data/uploads \
+    BACKUP_DIR=/data/backups \
     WEB_DIST=/app/apps/web/dist
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -31,7 +36,7 @@ RUN npm ci --omit=dev --no-audit --no-fund --workspace @gc/api --workspace @gc/s
 COPY --from=build /app/apps/api/dist apps/api/dist
 COPY --from=build /app/apps/api/drizzle apps/api/drizzle
 COPY --from=build /app/apps/web/dist apps/web/dist
-RUN mkdir -p /data/uploads && chown -R node:node /data
+RUN mkdir -p /data/uploads /data/backups && chown -R node:node /data
 USER node
 VOLUME ["/data"]
 EXPOSE 3000

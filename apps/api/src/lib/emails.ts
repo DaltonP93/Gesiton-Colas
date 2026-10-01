@@ -28,11 +28,12 @@ interface LayoutInput {
   intro: string[];
   cta?: { label: string; url: string };
   code?: string;
+  codeLabel?: string;
   outro?: string[];
 }
 
 /** Maqueta HTML compatible con la mayoría de los clientes de correo (tablas y estilos en línea). */
-function layout({ brand, title, intro, cta, code, outro = [] }: LayoutInput): { html: string; text: string } {
+function layout({ brand, title, intro, cta, code, codeLabel = 'O ingrese este código:', outro = [] }: LayoutInput): { html: string; text: string } {
   const p = (t: string) => `<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#334155">${escapeHtml(t)}</p>`;
   const header = brand.logoUrl
     ? `<img src="${escapeHtml(brand.logoUrl)}" alt="${escapeHtml(brand.appName)}" style="max-height:44px;max-width:220px">`
@@ -43,7 +44,7 @@ function layout({ brand, title, intro, cta, code, outro = [] }: LayoutInput): { 
       </td></tr></table>`
     : '';
   const codeBlock = code
-    ? `<p style="margin:8px 0 6px;font-size:13px;color:#64748b">O ingrese este código:</p>
+    ? `<p style="margin:8px 0 6px;font-size:13px;color:#64748b">${escapeHtml(codeLabel)}</p>
        <p style="margin:0 0 20px;font-size:32px;font-weight:800;letter-spacing:8px;color:#0f172a;font-family:Menlo,Consolas,monospace">${escapeHtml(code)}</p>`
     : '';
   const link = cta
@@ -160,4 +161,67 @@ export function invoiceMail(
     outro: instructions ? [instructions] : [],
   });
   return { to, subject: `Factura ${invoice.number} · ${invoice.amount}`, html, text, fromName: brand.appName, tag: 'invoice' };
+}
+
+export function deviceAlertMail(
+  to: string,
+  name: string,
+  alert: { organization: string; offline: { name: string; kind: string; branch: string; since: string }[]; recovered: { name: string; kind: string; branch: string }[] },
+  url: string,
+  brand: EmailBrand,
+): MailMessage {
+  const offline = alert.offline.map((d) => `• ${d.kind} «${d.name}» (${d.branch}): sin conexión desde ${d.since}.`);
+  const recovered = alert.recovered.map((d) => `• ${d.kind} «${d.name}» (${d.branch}) volvió a conectarse.`);
+  const title = alert.offline.length ? (alert.offline.length === 1 ? 'Un equipo se desconectó' : `${alert.offline.length} equipos se desconectaron`) : 'Los equipos volvieron a conectarse';
+  const { html, text } = layout({
+    brand,
+    title,
+    intro: [greet(name), ...offline, ...recovered],
+    cta: { label: 'Ver los equipos', url },
+    outro: alert.offline.length
+      ? ['Revise que la TV o la tablet esté encendida, con la página abierta y con conexión a Internet. Si se reinició, ábrala de nuevo desde el enlace o vincúlela con un código.']
+      : [],
+  });
+  return { to, subject: `${title} · ${alert.organization}`, html, text, fromName: brand.appName, tag: 'device_alert' };
+}
+
+/** Confirmación o recordatorio de una cita (módulo de citas). */
+export function appointmentMail(
+  to: string,
+  kind: 'confirmation' | 'reminder' | 'cancelled',
+  appt: { name: string; organization: string; date: string; time: string; service: string; branch: string; address: string; professional: string | null; code: string },
+  url: string,
+  brand: EmailBrand,
+): MailMessage {
+  const title = kind === 'confirmation' ? 'Su cita quedó agendada' : kind === 'reminder' ? 'Recordatorio de su cita' : 'Su cita fue cancelada';
+  const details = [
+    `• Fecha: ${appt.date} a las ${appt.time}`,
+    `• ${appt.service} en ${appt.branch}${appt.address ? ` (${appt.address})` : ''}`,
+    ...(appt.professional ? [`• Profesional: ${appt.professional}`] : []),
+  ];
+  const { html, text } = layout({
+    brand,
+    title,
+    intro: [greet(appt.name), ...details],
+    code: kind === 'cancelled' ? undefined : appt.code,
+    codeLabel: 'Código de la cita (para presentarse en el kiosco):',
+    cta: kind === 'cancelled' ? undefined : { label: 'Ver o cancelar la cita', url },
+    outro:
+      kind === 'cancelled'
+        ? ['Si fue un error, puede agendar una nueva cita.']
+        : ['Al llegar, preséntese en el kiosco con su documento o con este código y espere el llamado en la pantalla.'],
+  });
+  return { to, subject: `${title} · ${appt.organization}`, html, text, fromName: brand.appName, tag: `appointment_${kind}` };
+}
+
+/** Factura electrónica aprobada por la SET, con el enlace al KuDE. */
+export function sifenMail(to: string, name: string, doc: { issuer: string; number: string; cdc: string }, url: string, brand: EmailBrand): MailMessage {
+  const { html, text } = layout({
+    brand,
+    title: `Factura electrónica ${doc.number}`,
+    intro: [greet(name || ''), `${doc.issuer} le emitió la factura electrónica ${doc.number}, aprobada por la SET.`, `CDC: ${doc.cdc.replace(/(.{4})/g, '$1 ').trim()}`],
+    cta: { label: 'Ver e imprimir la factura', url },
+    outro: ['Puede verificarla con el código QR del documento en el portal e-Kuatia de la SET.'],
+  });
+  return { to, subject: `Factura electrónica ${doc.number} · ${doc.issuer}`, html, text, fromName: brand.appName, tag: 'sifen_invoice' };
 }

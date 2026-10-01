@@ -1,26 +1,75 @@
 /**
- * Tareas de mantenimiento por consola (recuperar el acceso a la plataforma).
+ * Tareas de mantenimiento por consola.
  *
  *   Crear un superadministrador o restablecer su contraseña:
  *     node apps/api/dist/db/admin-cli.js superadmin correo@empresa.com [contraseña]
  *   Con Docker:
  *     docker compose exec app node apps/api/dist/db/admin-cli.js superadmin correo@empresa.com
+ *   Sin contraseña se genera una al azar y se muestra una sola vez.
  *
- * Sin contraseña se genera una al azar y se muestra una sola vez.
+ *   Copia de seguridad ahora / restaurar una copia (con la aplicación detenida):
+ *     node apps/api/dist/db/admin-cli.js backup
+ *     node apps/api/dist/db/admin-cli.js restore /data/backups/<archivo>.tar.gz --confirm
+ *   Antes de restaurar se guarda una copia de lo actual (…-previa.tar.gz), salvo con --sin-copia-previa.
  */
+import { existsSync } from 'node:fs';
 import { eq } from 'drizzle-orm';
 import { loadConfig } from '../config';
 import { hashPassword, sessionsResetNow } from '../lib/auth';
+import { backupDir, createBackupArchive, restoreBackupArchive } from '../lib/backups';
 import { randomToken } from '../lib/crypto';
 import { createDatabase } from './client';
 import { runMigrations } from './migrate';
 import { users } from './schema';
 
-const [command, rawEmail, rawPassword] = process.argv.slice(2);
+const args = process.argv.slice(2);
+const flags = new Set(args.filter((a) => a.startsWith('--')));
+const [command, rawEmail, rawPassword] = args.filter((a) => !a.startsWith('--'));
 
 function usage(): never {
-  console.log('Uso: admin-cli superadmin <correo> [contraseña]');
+  console.log('Uso:\n  admin-cli superadmin <correo> [contraseña]\n  admin-cli backup\n  admin-cli restore <archivo.tar.gz> --confirm [--sin-copia-previa]');
   process.exit(1);
+}
+
+const mb = (n: number) => `${(n / 1024 / 1024).toFixed(1)} MB`;
+
+if (command === 'backup') {
+  const config = loadConfig();
+  const dir = backupDir(config);
+  const { file, size } = await createBackupArchive(config, { includeUploads: true, dir });
+  console.log(`✔ Copia creada: ${dir}/${file} (${mb(size)})`);
+  process.exit(0);
+}
+
+if (command === 'restore') {
+  const archive = rawEmail;
+  if (!archive) usage();
+  if (!existsSync(archive)) {
+    console.error(`No existe el archivo ${archive}`);
+    process.exit(1);
+  }
+  if (!flags.has('--confirm')) {
+    console.error('Restaurar REEMPLAZA todos los datos actuales por los de la copia.');
+    console.error('Detenga la aplicación y repita el comando agregando --confirm.');
+    process.exit(1);
+  }
+  const config = loadConfig();
+  try {
+    if (!flags.has('--sin-copia-previa')) {
+      const { file } = await createBackupArchive(config, { includeUploads: true, dir: backupDir(config), suffix: 'previa' });
+      console.log(`✔ Copia de lo actual guardada por las dudas: ${backupDir(config)}/${file}`);
+    }
+    await restoreBackupArchive(config, archive);
+    const { db, pool } = createDatabase(config.DATABASE_URL, 1);
+    await runMigrations(db);
+    await pool.end();
+    console.log('✔ Copia restaurada. Inicie la aplicación.');
+    process.exit(0);
+  } catch (error) {
+    console.error(`✘ No se pudo restaurar: ${error instanceof Error ? error.message : String(error)}`);
+    console.error('  La base quedó como estaba (la restauración se hace en una sola transacción).');
+    process.exit(1);
+  }
 }
 
 if (command !== 'superadmin' || !rawEmail || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(rawEmail)) usage();

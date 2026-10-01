@@ -113,4 +113,19 @@ export function useStaffRealtime(branchId: string | null | undefined, onEvent?: 
   }, [branchId, qc]);
 }
 
+/** Escucha un evento en tiempo real de la organización (p. ej. cambios en la agenda de citas). */
+export function useTenantEvent(event: string, onEvent: (payload: unknown) => void, enabled = true) {
+  const handler = useRef(onEvent);
+  handler.current = onEvent;
+  useEffect(() => {
+    const token = session.token;
+    if (!enabled || !token) return;
+    const socket = connectSocket('user', token);
+    socket.on(event, (payload: unknown) => handler.current(payload));
+    return () => {
+      socket.close();
+    };
+  }, [event, enabled]);
+}
+
 export { usePublicConfig, type PublicConfig } from './publicConfig';

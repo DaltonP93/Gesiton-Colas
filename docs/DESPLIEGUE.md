@@ -10,7 +10,7 @@ docker compose up -d
 
 - La imagen incluye API y frontend; escucha en el puerto `3000`. Las migraciones se aplican solas al iniciar (`AUTO_MIGRATE=true`).
 - Coloque un proxy inverso con HTTPS delante (Nginx, Caddy, Traefik o el balanceador de su nube). Debe permitir **WebSockets** en `/socket.io/`.
-- Los archivos subidos se guardan en el volumen `uploads` (`/data/uploads`). Haga copias de seguridad del volumen y de PostgreSQL.
+- Los archivos subidos se guardan en el volumen `uploads` (`/data/uploads`) y las copias de seguridad automáticas en el volumen `backups` (`/data/backups`; ver [Copias de seguridad](#copias-de-seguridad)).
 
 Ejemplo con Caddy:
 
@@ -53,9 +53,34 @@ S3_PUBLIC_URL=https://cdn.ejemplo.com   # dominio público del bucket o CDN
 
 Con S3 los videos se sirven directamente desde el bucket/CDN, lo que descarga al servidor.
 
+### Copias de seguridad
+
+Desde **Plataforma → Copias** el superadministrador programa una copia diaria automática (hora, zona horaria y cuántos días se guardan), crea una en el momento, la descarga o la borra. Cada copia es un archivo `gestion-colas-AAAAMMDD-HHMMSS.tar.gz` con:
+
+- la base de datos completa (`pg_dump`, todas las organizaciones),
+- los archivos subidos (si se guardan en el servidor; con S3 ya quedan en el bucket),
+- un manifiesto con la fecha.
+
+Detalles:
+
+- La imagen de Docker trae `pg_dump`, `pg_restore` y `psql` de PostgreSQL 16, la misma versión de la base de `docker-compose.yml`; si actualiza la base a otra versión, cambie también el paquete `postgresql16-client` del `Dockerfile`. Sin Docker instale el cliente de PostgreSQL de la **misma versión** que el servidor, o indique su carpeta en `PG_BIN_DIR`; la carpeta de las copias se cambia con `BACKUP_DIR`.
+- Las copias más viejas que el plazo se borran solas después de cada copia correcta. Si una falla, se avisa por correo a los superadministradores.
+- **Guarde una copia fuera del servidor**: active «Subir también una copia a S3» (usa el bucket de `S3_BUCKET`, carpeta `backups/`) o descargue las copias periódicamente. Una copia en el mismo disco no sirve si se pierde el servidor.
+- Las copias contienen **todos los datos**, también las claves de las pasarelas de pago y del correo (cifradas con `JWT_SECRET`, que no viaja en la copia: guárdelo aparte; sin él esas claves no se pueden leer). Se guardan con permisos `600`, solo el superadministrador las descarga y cada descarga queda en el registro de actividad. Si usa S3, el bucket debe ser privado.
+
+**Restaurar una copia** reemplaza todos los datos actuales. Antes se guarda automáticamente una copia de lo actual (`…-previa.tar.gz`) y la restauración se hace en una sola transacción: si falla, la base queda como estaba.
+
+```bash
+docker compose stop app
+docker compose run --rm app node apps/api/dist/db/admin-cli.js restore /data/backups/gestion-colas-20261001-030000.tar.gz --confirm
+docker compose start app
+```
+
+Para restaurar un archivo descargado, cópielo primero al volumen: `docker compose cp ./gestion-colas-….tar.gz app:/data/backups/` (con la app iniciada) o `docker run --rm -v gestion-colas_backups:/data/backups -v "$PWD":/src alpine cp /src/gestion-colas-….tar.gz /data/backups/`. Después de restaurar, al iniciar se aplican las migraciones que falten (una copia vieja se actualiza sola). Sin Docker: `node apps/api/dist/db/admin-cli.js restore <archivo> --confirm`. También se puede crear una copia por consola con `admin-cli.js backup`.
+
 ### Varias instancias
 
-La API no guarda estado en memoria salvo las conexiones de Socket.IO. Para escalar horizontalmente use *sticky sessions* en el balanceador y el [adaptador Redis de Socket.IO](https://socket.io/docs/v4/redis-adapter/). Los webhooks usan bloqueo en base de datos, por lo que varias instancias pueden procesarlos sin duplicar envíos.
+La API no guarda estado en memoria salvo las conexiones de Socket.IO. Para escalar horizontalmente use *sticky sessions* en el balanceador y el [adaptador Redis de Socket.IO](https://socket.io/docs/v4/redis-adapter/). Los webhooks, las alertas de equipos y la copia de seguridad diaria usan bloqueos en la base de datos, por lo que varias instancias pueden funcionar juntas sin duplicar envíos ni copias. Con varias instancias, monte el mismo volumen de copias en todas (o use S3) para que el listado y las descargas coincidan.
 
 ### Modo SaaS y superadministrador
 

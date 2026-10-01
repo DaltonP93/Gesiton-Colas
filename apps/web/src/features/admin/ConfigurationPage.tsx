@@ -1,10 +1,14 @@
 import {
+  BellRing,
   Building2,
+  CalendarClock,
   ChevronRight,
   ClipboardList,
   CreditCard,
+  FileText,
   Globe,
   Hash,
+  History,
   LayoutGrid,
   Mail,
   MessageCircle,
@@ -19,6 +23,7 @@ import {
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
 import { Link, Navigate, useParams } from 'react-router';
 import type { ModuleId } from '@gc/shared';
+import { AuditLog } from '../../components/AuditLog';
 import { MailSettingsForm } from '../../components/MailSettingsForm';
 import { Button, Loading, PageHeader, cx } from '../../components/ui';
 import { useAuth } from '../../lib/auth';
@@ -36,9 +41,12 @@ const UsersPage = lazy(() => import('./UsersPage'));
 const IntegrationsPage = lazy(() => import('./IntegrationsPage'));
 const NotificationsPage = lazy(() => import('./NotificationsPage'));
 const PaymentsSettingsPage = lazy(() => import('./PaymentsSettingsPage'));
+const AlertsSettingsPage = lazy(() => import('./AlertsSettingsPage'));
+const AppointmentsSettingsPage = lazy(() => import('./AppointmentsSettingsPage'));
+const InvoicingSettingsPage = lazy(() => import('./InvoicingSettingsPage'));
 
 type TabKey = 'marca' | 'region' | 'terminologia' | 'turnos' | 'cliente';
-type PageKey = 'sucursales' | 'servicios' | 'usuarios' | 'correo' | 'avisos' | 'cobros' | 'integraciones';
+type PageKey = 'sucursales' | 'servicios' | 'citas' | 'alertas' | 'usuarios' | 'actividad' | 'correo' | 'avisos' | 'cobros' | 'factura' | 'integraciones';
 export type ConfigSection = 'inicio' | TabKey | PageKey;
 
 interface SectionDef {
@@ -64,11 +72,24 @@ const PAGE_COMPONENTS: Record<PageKey, ComponentType> = {
   sucursales: BranchesPage,
   servicios: ServicesPage,
   usuarios: UsersPage,
+  actividad: ActivitySection,
+  alertas: AlertsSettingsPage,
+  citas: AppointmentsSettingsPage,
   correo: MailSection,
   avisos: NotificationsPage,
   cobros: PaymentsSettingsPage,
+  factura: InvoicingSettingsPage,
   integraciones: IntegrationsPage,
 };
+function ActivitySection() {
+  return (
+    <div>
+      <PageHeader icon={<History />} title="Registro de actividad" description="Quién cambió qué y cuándo: configuración, usuarios, servicios, pantallas, cobros e ingresos al sistema. Se conserva un año." />
+      <AuditLog scope="tenant" />
+    </div>
+  );
+}
+
 function MailSection() {
   return (
     <div>
@@ -103,10 +124,14 @@ export default function ConfigurationPage() {
       { key: 'servicios', label: `${terms.services} y prioridades`, short: terms.services, description: 'Qué se atiende y quién pasa primero', icon: <ClipboardList />, group: 'Atención' },
       { key: 'turnos', label: `Numeración de ${terms.tickets.toLowerCase()}`, short: 'Numeración', description: 'Dígitos, reinicio y rellamados', icon: <Hash />, group: 'Atención' },
       { key: 'cliente', label: `Datos del ${terms.customer.toLowerCase()}`, short: `Datos del ${terms.customer.toLowerCase()}`, description: 'Qué se pide al sacar turno', icon: <TextCursorInput />, group: 'Atención' },
+      { key: 'citas', label: 'Citas y reserva en línea', short: 'Citas', description: 'Llegada, recordatorios, horarios y reservas', icon: <CalendarClock />, group: 'Atención', module: 'appointments' },
+      { key: 'alertas', label: 'Alertas de equipos', short: 'Alertas', description: 'Aviso si una TV o un kiosco se desconecta', icon: <BellRing />, group: 'Atención' },
       { key: 'usuarios', label: 'Usuarios', short: 'Usuarios', description: 'Equipo, roles e invitaciones', icon: <Users />, group: 'Equipo e integraciones' },
+      { key: 'actividad', label: 'Registro de actividad', short: 'Actividad', description: 'Quién cambió qué y cuándo', icon: <History />, group: 'Equipo e integraciones' },
       { key: 'correo', label: 'Correo saliente', short: 'Correo', description: 'Servidor SMTP para invitaciones y avisos', icon: <Mail />, group: 'Equipo e integraciones' },
       { key: 'avisos', label: 'Avisos por WhatsApp y SMS', short: 'WhatsApp y SMS', description: 'Mensajes al sacar turno, al acercarse y al llamar', icon: <MessageCircle />, group: 'Equipo e integraciones', module: 'notifications' },
       { key: 'cobros', label: 'Cobros y pagos', short: 'Cobros', description: 'Pasarela (Bancard, PagoPar, Stripe) y cobro en el puesto', icon: <CreditCard />, group: 'Equipo e integraciones', module: 'payments' },
+      { key: 'factura', label: 'Factura electrónica (SIFEN)', short: 'Factura electrónica', description: 'RUC, timbrado, certificado digital y CSC', icon: <FileText />, group: 'Equipo e integraciones', module: 'invoicing' },
       { key: 'integraciones', label: 'Integraciones y API', short: 'Integraciones', description: 'API keys, webhooks y documentación', icon: <Plug />, group: 'Equipo e integraciones', module: 'integrations' },
       ] as SectionDef[]
     ).filter((s) => !s.module || hasModule(s.module)),
@@ -277,6 +302,8 @@ function Overview({ sections }: { sections: SectionDef[] }) {
     turnos: `${settings.tickets.digits} dígitos · ${settings.tickets.reset === 'daily' ? 'reinicio diario' : 'sin reinicio'}`,
     cliente: settings.customerFields.length ? `${settings.customerFields.length} campos propios` : 'Nombre, documento, teléfono y email',
     usuarios: users.data ? `${users.data.length} ${users.data.length === 1 ? 'usuario' : 'usuarios'}` : '…',
+    actividad: 'Cambios e ingresos del último año',
+    alertas: settings.alerts.devices.enabled ? `A los ${settings.alerts.devices.minutes} min sin conexión` : 'Desactivadas',
     correo: 'Invitaciones, códigos de acceso y recuperación',
     cobros: `Moneda ${settings.payments.currency}${settings.payments.online ? ' · pago en línea' : ''}`,
     avisos: Object.values(settings.notifications.events).filter((e) => e.enabled).length + ' avisos activos',

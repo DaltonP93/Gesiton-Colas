@@ -12,3 +12,7 @@ export * from './types';
 export * from './surveys';
 export * from './currency';
 export * from './payments';
+export * from './billing';
+export * from './audit';
+export * from './appointments';
+export * from './sifen';

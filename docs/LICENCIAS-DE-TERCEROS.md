@@ -1,6 +1,6 @@
 # Avisos de software de terceros — Gestión de Colas 3.0.0
 
-Generado el 2026-09-30 a partir de `package-lock.json` y de los `package.json`/`LICENSE` instalados en `node_modules`.
+Generado el 2026-10-01 a partir de `package-lock.json` y de los `package.json`/`LICENSE` instalados en `node_modules`.
 Incluye el conjunto transitivo completo de dependencias de **producción** de los workspaces `apps/api`, `apps/web` y `packages/shared`
 (se excluyen las `devDependencies`: vite, typescript, vitest, playwright, drizzle-kit, tsup, tsx, pino-pretty, @tailwindcss/vite, etc.).
 
@@ -11,16 +11,17 @@ Incluye el conjunto transitivo completo de dependencias de **producción** de lo
 Los textos completos de cada licencia están en los ficheros `LICENSE` de cada paquete y en los enlaces SPDX indicados. 
 Para cumplir MIT/ISC/BSD/Apache-2.0, este documento (o uno equivalente con los textos de licencia) debe acompañar a cada copia distribuida del producto.
 
-## Resumen (245 paquetes únicos nombre@versión)
+## Resumen (286 paquetes únicos nombre@versión)
 
 | Licencia | Paquetes | Texto |
 | --- | ---: | --- |
-| MIT | 176 | https://spdx.org/licenses/MIT.html |
+| MIT | 204 | https://spdx.org/licenses/MIT.html |
+| ISC | 37 | https://spdx.org/licenses/ISC.html |
 | Apache-2.0 | 27 | https://www.apache.org/licenses/LICENSE-2.0 |
-| ISC | 26 | https://spdx.org/licenses/ISC.html |
 | BSD-3-Clause | 7 | https://spdx.org/licenses/BSD-3-Clause.html |
-| BlueOak-1.0.0 | 5 | https://blueoakcouncil.org/license/1.0.0 |
+| BlueOak-1.0.0 | 6 | https://blueoakcouncil.org/license/1.0.0 |
 | (MPL-2.0 OR Apache-2.0) | 1 | https://github.com/cure53/DOMPurify/blob/main/LICENSE |
+| (BSD-3-Clause OR GPL-2.0) | 1 |  |
 | MIT-0 | 1 | https://spdx.org/licenses/MIT-0.html |
 | 0BSD | 1 | https://spdx.org/licenses/0BSD.html |
 | MIT AND ISC | 1 | https://spdx.org/licenses/MIT.html + https://spdx.org/licenses/ISC.html |
@@ -32,7 +33,7 @@ Notas sobre licencias no estándar:
 - **BlueOak-1.0.0** (glob, minimatch, lru-cache, minipass, path-scurry, de Isaac Z. Schlueter): permisiva, equivalente a MIT.
 - **es-toolkit** (MIT) incluye un fichero NOTICE: partes derivadas de Lodash — "Copyright OpenJS Foundation and other contributors <https://openjsf.org/>", licencia MIT.
 
-## MIT (176)
+## MIT (204)
 
 | Paquete | Versión | Se distribuye en | Repositorio / web | Copyright |
 | --- | --- | --- | --- | --- |
@@ -78,27 +79,35 @@ Notas sobre licencias no estándar:
 | @types/trusted-types | 2.0.7 | solo tipos (no se ejecuta) | https://github.com/DefinitelyTyped/DefinitelyTyped | Copyright (c) Microsoft Corporation. |
 | @types/use-sync-external-store | 0.0.6 | solo tipos (no se ejecuta) | https://github.com/DefinitelyTyped/DefinitelyTyped | Copyright (c) Microsoft Corporation. |
 | @types/ws | 8.18.2 | solo tipos (no se ejecuta) | https://github.com/DefinitelyTyped/DefinitelyTyped | Copyright (c) Microsoft Corporation. |
+| @xmldom/is-dom-node | 1.0.1 | API/servidor | https://github.com/xmldom/is-dom-node | Copyright (c) 2023 Chris Barth |
+| @xmldom/xmldom | 0.8.15 | API/servidor | https://github.com/xmldom/xmldom | Copyright 2019 - present Christopher J. Brody and other contributors, as listed in: https://github.com/xmldom/xmldom/graphs/contributors / Copyright 2012 - 2017 @jindw <jindw@xidea.org> and other contributors, as listed in: https://github.com/jindw/xmldom/graphs/contributors |
+| @xmldom/xmldom | 0.9.12 | API/servidor | https://github.com/xmldom/xmldom | Copyright 2019 - present Christopher J. Brody and other contributors, as listed in: https://github.com/xmldom/xmldom/graphs/contributors / Copyright 2012 - 2017 @jindw <jindw@xidea.org> and other contributors, as listed in: https://github.com/jindw/xmldom/graphs/contributors |
 | abstract-logging | 2.0.1 | API/servidor | https://github.com/jsumners/abstract-logging | (autor según package.json: James Sumners) |
 | accepts | 1.3.8 | API/servidor | https://github.com/jshttp/accepts | Copyright (c) 2014 Jonathan Ong <me@jongleberry.com> / Copyright (c) 2015 Douglas Christopher Wilson <doug@somethingdoug.com> |
 | ajv | 8.20.0 | API/servidor | https://github.com/ajv-validator/ajv | Copyright (c) 2015-2021 Evgeny Poberezkin |
 | ajv-formats | 3.0.1 | API/servidor | https://github.com/ajv-validator/ajv-formats | Copyright (c) 2020 Evgeny Poberezkin |
-| ansi-regex | 5.0.1 | bundle web | https://github.com/chalk/ansi-regex | Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com) |
-| ansi-styles | 4.3.0 | bundle web | https://github.com/chalk/ansi-styles | Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com) |
+| ansi-regex | 5.0.1 | API/servidor, bundle web | https://github.com/chalk/ansi-regex | Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com) |
+| ansi-styles | 4.3.0 | API/servidor, bundle web | https://github.com/chalk/ansi-styles | Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com) |
 | atomic-sleep | 1.0.0 | API/servidor | https://github.com/davidmarkclements/atomic-sleep | Copyright (c) 2020 David Mark Clements |
 | avvio | 9.3.0 | API/servidor | https://github.com/fastify/avvio | Copyright (c) 2016-2020 Matteo Collina / Copyright (c) 2020-present The Fastify team <https://github.com/fastify/fastify#team> |
+| balanced-match | 1.0.2 | API/servidor | https://github.com/juliangruber/balanced-match | Copyright (c) 2013 Julian Gruber &lt;julian@juliangruber.com&gt; |
 | balanced-match | 4.0.4 | API/servidor | https://github.com/juliangruber/balanced-match | Original code Copyright Julian Gruber <julian@juliangruber.com> / Port to TypeScript Copyright Isaac Z. Schlueter <i@izs.me> |
 | base64-js | 1.5.1 | API/servidor | https://github.com/beatgammit/base64-js | Copyright (c) 2014 Jameson Little |
 | bowser | 2.14.1 | API/servidor | https://github.com/bowser-js/bowser | Copyright 2015, Dustin Diaz (the "Original Author") |
+| brace-expansion | 1.1.21 | API/servidor | https://github.com/juliangruber/brace-expansion | Copyright (c) 2013 Julian Gruber <julian@juliangruber.com> |
 | brace-expansion | 5.0.12 | API/servidor | https://github.com/juliangruber/brace-expansion | Copyright Julian Gruber <julian@juliangruber.com> / TypeScript port Copyright Isaac Z. Schlueter <i@izs.me> |
 | buffer | 5.6.0 | API/servidor | https://github.com/feross/buffer | Copyright (c) Feross Aboukhadijeh, and other contributors. |
 | camelcase | 5.3.1 | bundle web | https://github.com/sindresorhus/camelcase | Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com) |
 | clsx | 2.1.1 | bundle web | https://github.com/lukeed/clsx | Copyright (c) Luke Edwards <luke.edwards05@gmail.com> (lukeed.com) |
-| color-convert | 2.0.1 | bundle web | https://github.com/Qix-/color-convert | Copyright (c) 2011-2016 Heather Arthur <fayearthur@gmail.com> |
-| color-name | 1.1.4 | bundle web | https://github.com/colorjs/color-name | Copyright (c) 2015 Dmitry Ivanov |
+| color-convert | 2.0.1 | API/servidor, bundle web | https://github.com/Qix-/color-convert | Copyright (c) 2011-2016 Heather Arthur <fayearthur@gmail.com> |
+| color-name | 1.1.4 | API/servidor, bundle web | https://github.com/colorjs/color-name | Copyright (c) 2015 Dmitry Ivanov |
+| concat-map | 0.0.1 | API/servidor | https://github.com/substack/node-concat-map | (autor según package.json: James Halliday) |
 | content-disposition | 3.0.0 | API/servidor | https://github.com/jshttp/content-disposition | Copyright (c) 2014-2017 Douglas Christopher Wilson |
 | cookie | 0.7.2 | API/servidor | https://github.com/jshttp/cookie | Copyright (c) 2012-2014 Roman Shtylman <shtylman@gmail.com> / Copyright (c) 2015 Douglas Christopher Wilson <doug@somethingdoug.com> |
 | cookie | 1.1.1 | API/servidor | https://github.com/jshttp/cookie | Copyright (c) 2012-2014 Roman Shtylman <shtylman@gmail.com> / Copyright (c) 2015 Douglas Christopher Wilson <doug@somethingdoug.com> |
 | cookie-es | 3.1.1 | bundle web | https://github.com/unjs/cookie-es | Copyright (c) 2012-2014 Roman Shtylman <shtylman@gmail.com> / Copyright (c) 2015 Douglas Christopher Wilson <doug@somethingdoug.com> |
+| copyfiles | 2.4.1 | API/servidor | https://github.com/calvinmetcalf/copyfiles | Copyright (c) 2014-2018 Calvin Metcalf |
+| core-util-is | 1.0.3 | API/servidor | https://github.com/isaacs/core-util-is | Copyright Node.js contributors. All rights reserved. |
 | cors | 2.8.6 | API/servidor | https://github.com/expressjs/cors | Copyright (c) 2013 Troy Goode <troygoode@gmail.com> |
 | csstype | 3.2.3 | solo tipos (no se ejecuta) | https://github.com/frenic/csstype | Copyright (c) 2017-2018 Fredrik Nicol |
 | debug | 4.4.3 | API/servidor, bundle web | https://github.com/debug-js/debug | Copyright (c) 2014-2017 TJ Holowaychuk <tj@vision-media.ca> / Copyright (c) 2018-2021 Josh Junon |
@@ -107,14 +116,16 @@ Notas sobre licencias no estándar:
 | depd | 2.0.0 | API/servidor | https://github.com/dougwilson/nodejs-depd | Copyright (c) 2014-2018 Douglas Christopher Wilson |
 | dequal | 2.0.3 | API/servidor | https://github.com/lukeed/dequal | Copyright (c) Luke Edwards <luke.edwards05@gmail.com> (lukeed.com) |
 | dijkstrajs | 1.0.3 | bundle web | https://github.com/tcort/dijkstrajs | Copyright (C) 2008 |
-| emoji-regex | 8.0.0 | bundle web | https://github.com/mathiasbynens/emoji-regex | Copyright Mathias Bynens <https://mathiasbynens.be/> |
+| emoji-regex | 8.0.0 | API/servidor, bundle web | https://github.com/mathiasbynens/emoji-regex | Copyright Mathias Bynens <https://mathiasbynens.be/> |
 | engine.io | 6.6.11 | API/servidor | https://github.com/socketio/socket.io | Copyright (c) 2014-present Guillermo Rauch and Socket.IO contributors |
 | engine.io-client | 6.6.7 | bundle web | https://github.com/socketio/socket.io | Copyright (c) 2014-present Guillermo Rauch and Socket.IO contributors |
 | engine.io-parser | 5.2.3 | API/servidor, bundle web | https://github.com/socketio/socket.io | Copyright (c) 2014-present Guillermo Rauch and Socket.IO contributors |
 | es-toolkit | 1.52.0 | bundle web | https://github.com/toss/es-toolkit | Copyright (c) 2024 Viva Republica, Inc. |
+| escalade | 3.2.0 | API/servidor | https://github.com/lukeed/escalade | Copyright (c) Luke Edwards <luke.edwards05@gmail.com> (lukeed.com) |
 | escape-html | 1.0.3 | API/servidor | https://github.com/component/escape-html | Copyright (c) 2012-2013 TJ Holowaychuk / Copyright (c) 2015 Andreas Lubbe |
 | eventemitter3 | 5.0.4 | bundle web | https://github.com/primus/eventemitter3 | Copyright (c) 2014 Arnout Kazemier |
 | events | 3.3.0 | API/servidor | https://github.com/Gozala/events | Copyright Joyent, Inc. and other Node contributors. |
+| facturacionelectronicapy-xmlgen | 1.0.283 | API/servidor | https://github.com/marcosjara/facturacionelectronicapy-xmlgen | Copyright (c) 2020 Marcos Silva |
 | fast-decode-uri-component | 1.0.1 | API/servidor | https://github.com/delvedor/fast-decode-uri-component | Copyright (c) 2018 Tomas Della Vedova / Copyright (c) 2017 Justin Ridgewell |
 | fast-deep-equal | 3.1.3 | API/servidor | https://github.com/epoberezkin/fast-deep-equal | Copyright (c) 2017 Evgeny Poberezkin |
 | fast-json-stringify | 7.0.1 | API/servidor | https://github.com/fastify/fast-json-stringify | Copyright (c) 2016-present Matteo Collina / Copyright (c) 2016-present The Fastify team <https://github.com/fastify/fastify#team> |
@@ -129,7 +140,9 @@ Notas sobre licencias no estándar:
 | immer | 11.1.18 | bundle web | https://github.com/immerjs/immer | Copyright (c) 2017 Michel Weststrate |
 | ip-address | 10.7.2 | API/servidor | https://github.com/beaugunderson/ip-address | Copyright (C) 2011 by Beau Gunderson |
 | ipaddr.js | 2.5.0 | API/servidor | https://github.com/whitequark/ipaddr.js | Copyright (C) 2011-2017 whitequark <whitequark@whitequark.org> |
-| is-fullwidth-code-point | 3.0.0 | bundle web | https://github.com/sindresorhus/is-fullwidth-code-point | Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com) |
+| is-fullwidth-code-point | 3.0.0 | API/servidor, bundle web | https://github.com/sindresorhus/is-fullwidth-code-point | Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com) |
+| isarray | 0.0.1 | API/servidor | https://github.com/juliangruber/isarray | (autor según package.json: Julian Gruber) |
+| isarray | 1.0.0 | API/servidor | https://github.com/juliangruber/isarray | (autor según package.json: Julian Gruber) |
 | jose | 6.2.12 | API/servidor | https://github.com/panva/jose | Copyright (c) 2018 Filip Skokan |
 | json-schema-ref-resolver | 3.0.0 | API/servidor | https://github.com/fastify/json-schema-ref-resolver | Copyright (c) 2023 Fastify |
 | json-schema-resolver | 3.0.0 | API/servidor | https://github.com/Eomm/json-schema-resolver | Copyright (c) 2020 Manuel Spigolon |
@@ -138,6 +151,7 @@ Notas sobre licencias no estándar:
 | mime | 3.0.0 | API/servidor | https://github.com/broofa/mime | Copyright (c) 2010 Benjamin Thomas, Robert Kieffer |
 | mime-db | 1.52.0 | API/servidor | https://github.com/jshttp/mime-db | Copyright (c) 2014 Jonathan Ong <me@jongleberry.com> / Copyright (c) 2015-2022 Douglas Christopher Wilson <doug@somethingdoug.com> |
 | mime-types | 2.1.35 | API/servidor | https://github.com/jshttp/mime-types | Copyright (c) 2014 Jonathan Ong <me@jongleberry.com> / Copyright (c) 2015 Douglas Christopher Wilson <doug@somethingdoug.com> |
+| mkdirp | 1.0.4 | API/servidor | https://github.com/isaacs/node-mkdirp | Copyright James Halliday (mail@substack.net) and Isaac Z. Schlueter (i@izs.me) |
 | ms | 2.1.3 | API/servidor, bundle web | https://github.com/vercel/ms | Copyright (c) 2020 Vercel, Inc. |
 | negotiator | 0.6.3 | API/servidor | https://github.com/jshttp/negotiator | Copyright (c) 2012-2014 Federico Romero / Copyright (c) 2012-2014 Isaac Z. Schlueter |
 | object-assign | 4.1.1 | API/servidor | https://github.com/sindresorhus/object-assign | Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com) |
@@ -147,6 +161,7 @@ Notas sobre licencias no estándar:
 | p-locate | 4.1.0 | bundle web | https://github.com/sindresorhus/p-locate | Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com) |
 | p-try | 2.2.0 | bundle web | https://github.com/sindresorhus/p-try | Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com) |
 | path-exists | 4.0.0 | bundle web | https://github.com/sindresorhus/path-exists | Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com) |
+| path-is-absolute | 1.0.1 | API/servidor | https://github.com/sindresorhus/path-is-absolute | Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com) |
 | pg | 8.23.0 | API/servidor | https://github.com/brianc/node-postgres | Copyright (c) 2010 - 2021 Brian Carlson |
 | pg-cloudflare | 1.4.0 | API/servidor (opcional, no usado en Node) | https://github.com/brianc/node-postgres | Copyright (c) 2010 - 2021 Brian Carlson |
 | pg-connection-string | 2.14.0 | API/servidor | https://github.com/brianc/node-postgres | Copyright (c) 2014 Iced Development |
@@ -162,6 +177,7 @@ Notas sobre licencias no estándar:
 | postgres-bytea | 1.0.1 | API/servidor | https://github.com/bendrucker/postgres-bytea | Copyright (c) Ben Drucker <bvdrucker@gmail.com> (bendrucker.me) |
 | postgres-date | 1.0.7 | API/servidor | https://github.com/bendrucker/postgres-date | Copyright (c) Ben Drucker <bvdrucker@gmail.com> (bendrucker.me) |
 | postgres-interval | 1.2.0 | API/servidor | https://github.com/bendrucker/postgres-interval | Copyright (c) Ben Drucker <bvdrucker@gmail.com> (bendrucker.me) |
+| process-nextick-args | 2.0.1 | API/servidor | https://github.com/calvinmetcalf/process-nextick-args | Copyright (c) 2015 Calvin Metcalf |
 | process-warning | 4.0.1 | API/servidor | https://github.com/fastify/process-warning | Copyright (c) Fastify |
 | process-warning | 5.1.0 | API/servidor | https://github.com/fastify/process-warning | Copyright (c) 2020-present The Fastify team <https://github.com/fastify/fastify#team> |
 | qrcode | 1.5.4 | bundle web | https://github.com/soldair/node-qrcode | Copyright (c) 2012 Ryan Day |
@@ -171,18 +187,21 @@ Notas sobre licencias no estándar:
 | react-is | 19.3.0 | bundle web | https://github.com/react/react | Copyright (c) Meta Platforms, Inc. and affiliates. |
 | react-redux | 9.3.0 | bundle web | https://github.com/reduxjs/react-redux | Copyright (c) 2015-present Dan Abramov |
 | react-router | 8.4.0 | bundle web | https://github.com/remix-run/react-router | Copyright (c) React Training LLC 2015-2019 / Copyright (c) Remix Software Inc. 2020-2021 |
+| readable-stream | 1.0.34 | API/servidor | https://github.com/isaacs/readable-stream | Copyright Joyent, Inc. and other Node contributors. All rights reserved. |
+| readable-stream | 2.3.8 | API/servidor | https://github.com/nodejs/readable-stream | Copyright Node.js contributors. All rights reserved. / Copyright Joyent, Inc. and other Node contributors. All rights reserved. |
 | readable-stream | 3.6.2 | API/servidor | https://github.com/nodejs/readable-stream | Copyright Node.js contributors. All rights reserved. / Copyright Joyent, Inc. and other Node contributors. All rights reserved. |
 | real-require | 0.2.0 | API/servidor | https://github.com/pinojs/real-require | Copyright (c) 2021 Paolo Insogna and the real-require contributors |
 | real-require | 1.0.0 | API/servidor | https://github.com/pinojs/real-require | Copyright (c) 2021 Paolo Insogna and the real-require contributors |
 | recharts | 3.10.1 | bundle web | https://github.com/recharts/recharts | Copyright (c) 2015-present recharts |
 | redux | 5.0.1 | bundle web | https://github.com/reduxjs/redux | Copyright (c) 2015-present Dan Abramov |
 | redux-thunk | 3.1.0 | bundle web | https://github.com/reduxjs/redux-thunk | Copyright (c) 2015-present Dan Abramov |
-| require-directory | 2.1.1 | bundle web | https://github.com/troygoode/node-require-directory | Copyright (c) 2011 Troy Goode <troygoode@gmail.com> |
+| require-directory | 2.1.1 | API/servidor, bundle web | https://github.com/troygoode/node-require-directory | Copyright (c) 2011 Troy Goode <troygoode@gmail.com> |
 | require-from-string | 2.0.2 | API/servidor | https://github.com/floatdrop/require-from-string | Copyright (c) Vsevolod Strukchinsky <floatdrop@gmail.com> (github.com/floatdrop) |
 | reselect | 5.2.0 | bundle web | https://github.com/reduxjs/reselect | Copyright (c) 2015-2018 Reselect Contributors |
 | ret | 0.5.0 | API/servidor | https://github.com/fent/ret.js | Copyright (C) 2011 by fent |
 | reusify | 1.1.0 | API/servidor | https://github.com/mcollina/reusify | Copyright (c) 2015-2024 Matteo Collina |
 | rfdc | 1.4.1 | API/servidor | https://github.com/davidmarkclements/rfdc | Copyright 2019 "David Mark Clements <david.mark.clements@gmail.com>" |
+| safe-buffer | 5.1.2 | API/servidor | https://github.com/feross/safe-buffer | Copyright (c) Feross Aboukhadijeh |
 | safe-buffer | 5.2.1 | API/servidor | https://github.com/feross/safe-buffer | Copyright (c) Feross Aboukhadijeh |
 | safe-regex2 | 5.1.1 | API/servidor | https://github.com/fastify/safe-regex2 | Copyright (c) 2019-present The Fastify team <https://github.com/fastify/fastify#team> |
 | safe-stable-stringify | 2.5.0 | API/servidor | https://github.com/BridgeAR/safe-stable-stringify | Copyright (c) Ruben Bridgewater |
@@ -195,23 +214,75 @@ Notas sobre licencias no estándar:
 | sonic-boom | 4.2.1 | API/servidor | https://github.com/pinojs/sonic-boom | Copyright (c) 2017 Matteo Collina |
 | statuses | 2.0.2 | API/servidor | https://github.com/jshttp/statuses | Copyright (c) 2014 Jonathan Ong <me@jongleberry.com> / Copyright (c) 2016 Douglas Christopher Wilson <doug@somethingdoug.com> |
 | stream-browserify | 3.0.0 | API/servidor | https://github.com/browserify/stream-browserify | Copyright (c) James Halliday |
+| string_decoder | 0.10.31 | API/servidor | https://github.com/rvagg/string_decoder | Copyright Joyent, Inc. and other Node contributors. |
+| string_decoder | 1.1.1 | API/servidor | https://github.com/nodejs/string_decoder | Copyright Node.js contributors. All rights reserved. / Copyright Joyent, Inc. and other Node contributors. All rights reserved. |
 | string_decoder | 1.3.0 | API/servidor | https://github.com/nodejs/string_decoder | Copyright Node.js contributors. All rights reserved. / Copyright Joyent, Inc. and other Node contributors. All rights reserved. |
-| string-width | 4.2.3 | bundle web | https://github.com/sindresorhus/string-width | Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com) |
-| strip-ansi | 6.0.1 | bundle web | https://github.com/chalk/strip-ansi | Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com) |
+| string-width | 4.2.3 | API/servidor, bundle web | https://github.com/sindresorhus/string-width | Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com) |
+| strip-ansi | 6.0.1 | API/servidor, bundle web | https://github.com/chalk/strip-ansi | Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com) |
 | thread-stream | 4.2.0 | API/servidor | https://github.com/mcollina/thread-stream | Copyright (c) 2021 Matteo Collina |
+| through2 | 2.0.5 | API/servidor | https://github.com/rvagg/through2 | Copyright (c) Rod Vagg (the "Original Author") and additional contributors** |
 | tiny-invariant | 1.3.3 | bundle web | https://github.com/alexreardon/tiny-invariant | Copyright (c) 2019 Alexander Reardon |
 | toad-cache | 3.7.4 | API/servidor | https://github.com/kibertoad/toad-cache | Copyright (c) 2023 Igor Savin |
 | toidentifier | 1.0.1 | API/servidor | https://github.com/component/toidentifier | Copyright (c) 2016 Douglas Christopher Wilson <doug@somethingdoug.com> |
 | undici-types | 6.21.0 | API/servidor | https://github.com/nodejs/undici | Copyright (c) Matteo Collina and Undici contributors |
+| untildify | 4.0.0 | API/servidor | https://github.com/sindresorhus/untildify | Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com) |
 | use-sync-external-store | 1.7.0 | bundle web | https://github.com/react/react | Copyright (c) Meta Platforms, Inc. and affiliates. |
 | util-deprecate | 1.0.2 | API/servidor | https://github.com/TooTallNate/util-deprecate | Copyright (c) 2014 Nathan Rajlich <nathan@tootallnate.net> |
 | vary | 1.1.2 | API/servidor | https://github.com/jshttp/vary | Copyright (c) 2014-2017 Douglas Christopher Wilson |
 | wrap-ansi | 6.2.0 | bundle web | https://github.com/chalk/wrap-ansi | Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (sindresorhus.com) |
+| wrap-ansi | 7.0.0 | API/servidor | https://github.com/chalk/wrap-ansi | Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com) |
 | ws | 8.21.3 | API/servidor, bundle web | https://github.com/websockets/ws | Copyright (c) 2011 Einar Otto Stangvik <einaros@gmail.com> / Copyright (c) 2013 Arnout Kazemier and contributors |
+| xml-crypto | 6.3.2 | API/servidor | https://github.com/node-saml/xml-crypto | Copyright (c) Yaron Naveh <yaronn01@gmail.com> |
+| xml2js | 0.6.2 | API/servidor | https://github.com/Leonidas-from-XIV/node-xml2js | Copyright 2010, 2011, 2012, 2013. All rights reserved. |
+| xmlbuilder | 11.0.1 | API/servidor | https://github.com/oozcitak/xmlbuilder-js | Copyright (c) 2013 Ozgur Ozcitak |
 | xmlhttprequest-ssl | 2.1.2 | bundle web | https://github.com/mjwwit/node-XMLHttpRequest | Copyright (c) 2010 passive.ly LLC |
+| xpath | 0.0.33 | API/servidor | https://github.com/goto100/xpath | Copyright (c) 2018 Cameron McCormack |
 | xtend | 4.0.2 | API/servidor | https://github.com/Raynos/xtend | Copyright (c) 2012-2014 Raynos. |
 | yargs | 15.4.1 | bundle web | https://github.com/yargs/yargs | Copyright 2010 James Halliday (mail@substack.net); Modified work Copyright 2014 Contributors (ben@npmjs.com) |
+| yargs | 16.2.2 | API/servidor | https://github.com/yargs/yargs | Copyright 2010 James Halliday (mail@substack.net); Modified work Copyright 2014 Contributors (ben@npmjs.com) |
 | zod | 4.6.5 | API/servidor, bundle web | https://github.com/colinhacks/zod | Copyright (c) 2025 Colin McDonnell |
+
+## ISC (37)
+
+| Paquete | Versión | Se distribuye en | Repositorio / web | Copyright |
+| --- | --- | --- | --- | --- |
+| cliui | 6.0.0 | bundle web | https://github.com/yargs/cliui | Copyright (c) 2015, Contributors |
+| cliui | 7.0.4 | API/servidor | https://github.com/yargs/cliui | Copyright (c) 2015, Contributors |
+| d3-array | 3.2.4 | bundle web | https://github.com/d3/d3-array | Copyright 2010-2023 Mike Bostock |
+| d3-color | 3.1.0 | bundle web | https://github.com/d3/d3-color | Copyright 2010-2022 Mike Bostock |
+| d3-format | 3.1.2 | bundle web | https://github.com/d3/d3-format | Copyright 2010-2026 Mike Bostock |
+| d3-interpolate | 3.0.1 | bundle web | https://github.com/d3/d3-interpolate | Copyright 2010-2021 Mike Bostock |
+| d3-path | 3.1.0 | bundle web | https://github.com/d3/d3-path | Copyright 2015-2022 Mike Bostock |
+| d3-scale | 4.0.2 | bundle web | https://github.com/d3/d3-scale | Copyright 2010-2021 Mike Bostock |
+| d3-shape | 3.2.0 | bundle web | https://github.com/d3/d3-shape | Copyright 2010-2022 Mike Bostock |
+| d3-time | 3.1.0 | bundle web | https://github.com/d3/d3-time | Copyright 2010-2022 Mike Bostock |
+| d3-time-format | 4.1.0 | bundle web | https://github.com/d3/d3-time-format | Copyright 2010-2021 Mike Bostock |
+| d3-timer | 3.0.1 | bundle web | https://github.com/d3/d3-timer | Copyright 2010-2021 Mike Bostock |
+| fastq | 1.20.3 | API/servidor | https://github.com/mcollina/fastq | Copyright (c) 2015-2020, Matteo Collina <matteo.collina@gmail.com> |
+| fs | 0.0.1-security | API/servidor | https://github.com/npm/security-holder |  |
+| fs.realpath | 1.0.0 | API/servidor | https://github.com/isaacs/fs.realpath | Copyright (c) Isaac Z. Schlueter and Contributors / Copyright Joyent, Inc. and other Node contributors. |
+| get-caller-file | 2.0.5 | API/servidor, bundle web | https://github.com/stefanpenner/get-caller-file | Copyright 2018 Stefan Penner |
+| glob | 7.2.3 | API/servidor | https://github.com/isaacs/node-glob | Copyright (c) Isaac Z. Schlueter and Contributors |
+| inflight | 1.0.6 | API/servidor | https://github.com/npm/inflight | Copyright (c) Isaac Z. Schlueter |
+| inherits | 2.0.4 | API/servidor | https://github.com/isaacs/inherits | Copyright (c) Isaac Z. Schlueter |
+| internmap | 2.0.3 | bundle web | https://github.com/mbostock/internmap | Copyright 2021 Mike Bostock |
+| lucide-react | 1.48.0 | bundle web | https://github.com/lucide-icons/lucide | Copyright (c) 2026 Lucide Icons and Contributors / Copyright (c) 2013-present Cole Bemis |
+| minimatch | 3.1.5 | API/servidor | https://github.com/isaacs/minimatch | Copyright (c) Isaac Z. Schlueter and Contributors |
+| noms | 0.0.0 | API/servidor | https://github.com/calvinmetcalf/noms | (autor según package.json: Calvin Metcalf) |
+| once | 1.4.0 | API/servidor | https://github.com/isaacs/once | Copyright (c) Isaac Z. Schlueter and Contributors |
+| pg-int8 | 1.0.1 | API/servidor | https://github.com/charmander/pg-int8 | Copyright © 2017, Charmander <~@charmander.me> |
+| require-main-filename | 2.0.0 | bundle web | https://github.com/yargs/require-main-filename | Copyright (c) 2016, Contributors |
+| semver | 7.8.5 | API/servidor | https://github.com/npm/node-semver | Copyright (c) Isaac Z. Schlueter and Contributors |
+| set-blocking | 2.0.0 | bundle web | https://github.com/yargs/set-blocking | Copyright (c) 2016, Contributors |
+| setprototypeof | 1.2.0 | API/servidor | https://github.com/wesleytodd/setprototypeof | Copyright (c) 2015, Wes Todd |
+| split2 | 4.2.0 | API/servidor | https://github.com/mcollina/split2 | Copyright (c) 2014-2018, Matteo Collina <hello@matteocollina.com> |
+| which-module | 2.0.1 | bundle web | https://github.com/nexdrew/which-module | Copyright (c) 2016, Contributors |
+| wrappy | 1.0.2 | API/servidor | https://github.com/npm/wrappy | Copyright (c) Isaac Z. Schlueter and Contributors |
+| y18n | 4.0.3 | bundle web | https://github.com/yargs/y18n | Copyright (c) 2015, Contributors |
+| y18n | 5.0.8 | API/servidor | https://github.com/yargs/y18n | Copyright (c) 2015, Contributors |
+| yaml | 2.9.1 | API/servidor | https://github.com/eemeli/yaml | Copyright Eemeli Aro <eemeli@gmail.com> |
+| yargs-parser | 18.1.3 | bundle web | https://github.com/yargs/yargs-parser | Copyright (c) 2016, Contributors |
+| yargs-parser | 20.2.9 | API/servidor | https://github.com/yargs/yargs-parser | Copyright (c) 2016, Contributors |
 
 ## Apache-2.0 (27)
 
@@ -245,37 +316,6 @@ Notas sobre licencias no estándar:
 | drizzle-orm | 0.45.3 | API/servidor | https://github.com/drizzle-team/drizzle-orm | (autor según package.json: Drizzle Team) |
 | hls.js | 1.7.3 | bundle web | https://github.com/video-dev/hls.js | Copyright (c) 2017 Dailymotion (http://www.dailymotion.com) / Copyright (c) 2013-2015 Brightcove |
 
-## ISC (26)
-
-| Paquete | Versión | Se distribuye en | Repositorio / web | Copyright |
-| --- | --- | --- | --- | --- |
-| cliui | 6.0.0 | bundle web | https://github.com/yargs/cliui | Copyright (c) 2015, Contributors |
-| d3-array | 3.2.4 | bundle web | https://github.com/d3/d3-array | Copyright 2010-2023 Mike Bostock |
-| d3-color | 3.1.0 | bundle web | https://github.com/d3/d3-color | Copyright 2010-2022 Mike Bostock |
-| d3-format | 3.1.2 | bundle web | https://github.com/d3/d3-format | Copyright 2010-2026 Mike Bostock |
-| d3-interpolate | 3.0.1 | bundle web | https://github.com/d3/d3-interpolate | Copyright 2010-2021 Mike Bostock |
-| d3-path | 3.1.0 | bundle web | https://github.com/d3/d3-path | Copyright 2015-2022 Mike Bostock |
-| d3-scale | 4.0.2 | bundle web | https://github.com/d3/d3-scale | Copyright 2010-2021 Mike Bostock |
-| d3-shape | 3.2.0 | bundle web | https://github.com/d3/d3-shape | Copyright 2010-2022 Mike Bostock |
-| d3-time | 3.1.0 | bundle web | https://github.com/d3/d3-time | Copyright 2010-2022 Mike Bostock |
-| d3-time-format | 4.1.0 | bundle web | https://github.com/d3/d3-time-format | Copyright 2010-2021 Mike Bostock |
-| d3-timer | 3.0.1 | bundle web | https://github.com/d3/d3-timer | Copyright 2010-2021 Mike Bostock |
-| fastq | 1.20.3 | API/servidor | https://github.com/mcollina/fastq | Copyright (c) 2015-2020, Matteo Collina <matteo.collina@gmail.com> |
-| get-caller-file | 2.0.5 | bundle web | https://github.com/stefanpenner/get-caller-file | Copyright 2018 Stefan Penner |
-| inherits | 2.0.4 | API/servidor | https://github.com/isaacs/inherits | Copyright (c) Isaac Z. Schlueter |
-| internmap | 2.0.3 | bundle web | https://github.com/mbostock/internmap | Copyright 2021 Mike Bostock |
-| lucide-react | 1.48.0 | bundle web | https://github.com/lucide-icons/lucide | Copyright (c) 2026 Lucide Icons and Contributors / Copyright (c) 2013-present Cole Bemis |
-| pg-int8 | 1.0.1 | API/servidor | https://github.com/charmander/pg-int8 | Copyright © 2017, Charmander <~@charmander.me> |
-| require-main-filename | 2.0.0 | bundle web | https://github.com/yargs/require-main-filename | Copyright (c) 2016, Contributors |
-| semver | 7.8.5 | API/servidor | https://github.com/npm/node-semver | Copyright (c) Isaac Z. Schlueter and Contributors |
-| set-blocking | 2.0.0 | bundle web | https://github.com/yargs/set-blocking | Copyright (c) 2016, Contributors |
-| setprototypeof | 1.2.0 | API/servidor | https://github.com/wesleytodd/setprototypeof | Copyright (c) 2015, Wes Todd |
-| split2 | 4.2.0 | API/servidor | https://github.com/mcollina/split2 | Copyright (c) 2014-2018, Matteo Collina <hello@matteocollina.com> |
-| which-module | 2.0.1 | bundle web | https://github.com/nexdrew/which-module | Copyright (c) 2016, Contributors |
-| y18n | 4.0.3 | bundle web | https://github.com/yargs/y18n | Copyright (c) 2015, Contributors |
-| yaml | 2.9.1 | API/servidor | https://github.com/eemeli/yaml | Copyright Eemeli Aro <eemeli@gmail.com> |
-| yargs-parser | 18.1.3 | bundle web | https://github.com/yargs/yargs-parser | Copyright (c) 2016, Contributors |
-
 ## BSD-3-Clause (7)
 
 | Paquete | Versión | Se distribuye en | Repositorio / web | Copyright |
@@ -288,7 +328,7 @@ Notas sobre licencias no estándar:
 | light-my-request | 6.6.0 | API/servidor | https://github.com/fastify/light-my-request | Copyright (c) 2017 The Fastify Team / Copyright (c) 2012-2017, Project contributors |
 | secure-json-parse | 4.1.0 | API/servidor | https://github.com/fastify/secure-json-parse | Copyright (c) 2019, Sideway Inc, and project contributors / Copyright (c) 2019-present The Fastify team |
 
-## BlueOak-1.0.0 (5)
+## BlueOak-1.0.0 (6)
 
 | Paquete | Versión | Se distribuye en | Repositorio / web | Copyright |
 | --- | --- | --- | --- | --- |
@@ -297,12 +337,21 @@ Notas sobre licencias no estándar:
 | minimatch | 10.2.6 | API/servidor | https://github.com/isaacs/minimatch | (autor según package.json: Isaac Z. Schlueter) |
 | minipass | 7.1.3 | API/servidor | https://github.com/isaacs/minipass | (autor según package.json: Isaac Z. Schlueter) |
 | path-scurry | 2.0.2 | API/servidor | https://github.com/isaacs/path-scurry | (autor según package.json: Isaac Z. Schlueter) |
+| sax | 1.6.1 | API/servidor | https://github.com/isaacs/sax-js | (autor según package.json: Isaac Z. Schlueter) |
 
 ## (MPL-2.0 OR Apache-2.0) (1)
 
 | Paquete | Versión | Se distribuye en | Repositorio / web | Copyright |
 | --- | --- | --- | --- | --- |
 | dompurify | 3.4.16 | bundle web | https://github.com/cure53/DOMPurify | (autor según package.json: Dr.-Ing. Mario Heiderich, Cure53) |
+
+## (BSD-3-Clause OR GPL-2.0) (1)
+
+`node-forge` tiene licencia doble: se usa bajo **BSD-3-Clause** (sin obligaciones de copyleft).
+
+| Paquete | Versión | Se distribuye en | Repositorio / web | Copyright |
+| --- | --- | --- | --- | --- |
+| node-forge | 1.4.0 | API/servidor | https://github.com/digitalbazaar/forge | Copyright (c) 2010, Digital Bazaar, Inc. / Copyright (C) 1989, 1991 Free Software Foundation, Inc. |
 
 ## MIT-0 (1)
 
@@ -336,9 +385,9 @@ Notas sobre licencias no estándar:
 | doorbell-bingbong.wav — "Bingbong.wav" por Benboncan (freesound.org/s/76925) | CC BY 4.0 | Opcional | Atribución |
 | ding-dong.wav — "Ding_dong(Remix of 110165).wav" por 2887679652 (freesound.org/s/171755) | CC0 1.0 | Opcional | Ninguna |
 | infobleep.wav — "infobleep.wav" por Divinux (freesound.org/s/198414) | CC0 1.0 | Opcional | Ninguna |
-| toydoorbell.wav — "toydoorbell.wav" por AMPUL (freesound.org/s/29726) | CC Sampling+ 1.0 (distribución del sonido completo solo no comercial) | — | **Retirado del producto** |
-| quito-mariscal-sucre.wav — "quito Mariscal sucre.WAV" por milton. (freesound.org/s/81085) | CC BY-NC 3.0 | — | **Retirado del producto** |
-| ekiga-vm.wav | Desconocida (sin crédito; probablemente del softphone Ekiga, GPL-2.0+) | — | **Retirado del producto** |
+| toydoorbell.wav — "toydoorbell.wav" por AMPUL (freesound.org/s/29726) | CC Sampling+ 1.0 (distribución del sonido completo solo no comercial) | Opcional | **No apto para uso comercial tal cual — retirar** |
+| quito-mariscal-sucre.wav — "quito Mariscal sucre.WAV" por milton. (freesound.org/s/81085) | CC BY-NC 3.0 | Opcional | **No comercial — retirar** |
+| ekiga-vm.wav | Desconocida (sin crédito; probablemente del softphone Ekiga, GPL-2.0+) | Opcional | **Origen no documentado — retirar o sustituir** |
 | Imagen Docker base `node:22-alpine` (Node.js, npm, musl, BusyBox, OpenSSL, …) | MIT, Artistic-2.0, GPL-2.0 (BusyBox, apk-tools), Apache-2.0, etc. | Solo si se entrega la imagen al cliente (on-premise) | Mantener avisos de la imagen; para componentes GPL, ofrecer/enlazar el código fuente de Alpine correspondiente |
 
 ## Servicios de terceros integrados por URL (no se redistribuye su código)

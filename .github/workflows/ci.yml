@@ -30,6 +30,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # pg_dump / pg_restore / psql para las pruebas de copias de seguridad.
+      - run: pg_dump --version || (sudo apt-get update && sudo apt-get install -y postgresql-client)
       - run: npm run typecheck
       - run: npm test
       - run: npm run build

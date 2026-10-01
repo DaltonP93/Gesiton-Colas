@@ -217,6 +217,7 @@ export default function AgentConsole() {
                       <p className="flex items-center gap-2 font-bold tabular-nums">
                         {t.code}
                         {t.priority && t.priority.weight > 0 && <Badge color={t.priority.color}>{t.priority.name}</Badge>}
+                        {t.appointmentId && <Badge color="#7c3aed">{t.notes.match(/^Cita de las \d{2}:\d{2}/)?.[0] ?? 'Con cita'}</Badge>}
                       </p>
                       <p className="truncate text-xs text-muted">
                         {t.service?.name}
@@ -297,6 +298,7 @@ function CurrentTicket({
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {ticket.service && <Badge color={ticket.service.color}>{ticket.service.name}</Badge>}
             {ticket.priority && ticket.priority.weight > 0 && <Badge color={ticket.priority.color}>{ticket.priority.name}</Badge>}
+            {ticket.appointmentId && <Badge color="#7c3aed">{ticket.notes.match(/^Cita de las \d{2}:\d{2}/)?.[0] ?? 'Con cita'}</Badge>}
             {ticket.callCount > 1 && <Badge>Llamado {ticket.callCount} veces</Badge>}
           </div>
         </div>

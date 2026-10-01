@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { Banknote, CreditCard, Globe, Receipt } from 'lucide-react';
+import { Banknote, CreditCard, FileText, Globe, Receipt } from 'lucide-react';
 import { useState } from 'react';
-import { MANUAL_METHOD_LABELS, PAYMENT_GATEWAY_INFO, PAYMENT_STATUS_LABELS, formatMoney, type ManualMethod, type PaymentDTO, type PaymentStatus } from '@gc/shared';
-import { Badge, EmptyState, Field, Input, Loading, PageHeader, Select, Stat, Table, cx } from '../../components/ui';
+import { MANUAL_METHOD_LABELS, PAYMENT_GATEWAY_INFO, PAYMENT_STATUS_LABELS, formatMoney, fromMinor, type ManualMethod, type PaymentDTO, type PaymentStatus, type SifenDocumentDTO, type SifenIssuerDTO } from '@gc/shared';
+import { InvoiceForm, type InvoicePrefill } from '../../components/sifen/InvoiceForm';
+import { Badge, Button, EmptyState, Field, Input, Loading, PageHeader, Select, Stat, Table, cx } from '../../components/ui';
 import { api, errorMessage } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { formatDateTime, shiftDays, todayISO } from '../../lib/format';
@@ -24,7 +25,7 @@ const PRESETS = [
 
 /** Cobros de turnos del período (módulo «Pagos»). */
 export default function PaymentsPage() {
-  const { settings, terms } = useAuth();
+  const { settings, terms, hasModule } = useAuth();
   const today = todayISO();
   const [range, setRange] = useState(PRESETS[0]!.range(today));
   const [status, setStatus] = useState<PaymentStatus | ''>('');
@@ -32,6 +33,23 @@ export default function PaymentsPage() {
   const list = useQuery({ queryKey: ['payments', qs], queryFn: () => api.get<PaymentsList>(`/payments?${qs}`), refetchInterval: 30_000 });
   const currency = settings.payments.currency;
   const active = PRESETS.find((p) => JSON.stringify(p.range(today)) === JSON.stringify(range))?.key;
+  // Factura electrónica de cada cobro (módulo SIFEN).
+  const invoicing = hasModule('invoicing');
+  const [eInvoice, setEInvoice] = useState<InvoicePrefill | null>(null);
+  const issuer = useQuery({ queryKey: ['sifen', '/invoicing', 'issuer'], queryFn: () => api.get<SifenIssuerDTO>('/invoicing/issuer'), enabled: invoicing, retry: false });
+  const sifenReady = Boolean(issuer.data?.enabled && !issuer.data.missing.length);
+  const eDocs = useQuery({
+    queryKey: ['sifen', '/invoicing', 'by-payment', range.from, range.to],
+    queryFn: () => api.get<SifenDocumentDTO[]>(`/invoicing/documents?sourceType=payment&from=${range.from}&to=${range.to}`),
+    enabled: sifenReady,
+  });
+  const eDocOf = (paymentId: string) => eDocs.data?.find((d) => d.source.id === paymentId && d.status !== 'rejected' && d.status !== 'error');
+  const prefillFor = (p: PaymentDTO): InvoicePrefill => ({
+    receiver: { kind: 'ci' },
+    items: [{ code: '', description: (p.service ?? p.description).slice(0, 120), quantity: 1, unitPrice: fromMinor(p.amount, p.currency), iva: issuer.data?.defaultIva ?? 10 }],
+    paymentType: p.provider !== 'manual' ? 21 : p.method === 'cash' ? 1 : p.method === 'card' ? 3 : p.method === 'transfer' ? 5 : p.method === 'qr' ? 21 : 99,
+    source: { type: 'payment', id: p.id },
+  });
 
   return (
     <div className="space-y-6">
@@ -93,6 +111,7 @@ export default function PaymentsPage() {
                     <th className="text-right">Monto</th>
                     <th>Forma de pago</th>
                     <th>Estado</th>
+                    {sifenReady && <th>Factura</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -112,6 +131,21 @@ export default function PaymentsPage() {
                       <td>
                         <Badge color={STATUS_COLORS[p.status]}>{PAYMENT_STATUS_LABELS[p.status]}</Badge>
                       </td>
+                      {sifenReady && (
+                        <td className="whitespace-nowrap">
+                          {p.status === 'paid' && (p.currency === 'PYG' || p.currency === 'USD') ? (
+                            eDocOf(p.id) ? (
+                              <a href={eDocOf(p.id)!.kudeUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline">
+                                <FileText className="size-3.5" /> {eDocOf(p.id)!.number}
+                              </a>
+                            ) : (
+                              <Button size="sm" variant="secondary" icon={<FileText className="size-3.5" />} onClick={() => setEInvoice(prefillFor(p))}>
+                                Facturar
+                              </Button>
+                            )
+                          ) : null}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -119,6 +153,9 @@ export default function PaymentsPage() {
             </div>
           )}
         </>
+      )}
+      {eInvoice && (
+        <InvoiceForm base="/invoicing" defaultIva={issuer.data?.defaultIva ?? 10} prefill={eInvoice} onClose={() => setEInvoice(null)} onIssued={() => void eDocs.refetch()} />
       )}
     </div>
   );

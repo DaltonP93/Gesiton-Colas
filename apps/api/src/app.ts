@@ -35,6 +35,12 @@ import { privacyRoutes } from './modules/privacy/routes';
 import { surveyRoutes } from './modules/surveys/routes';
 import { billingRoutes } from './modules/billing/routes';
 import { paymentRoutes } from './modules/payments/routes';
+import { auditRoutes } from './modules/audit/routes';
+import { alertRoutes } from './modules/alerts/routes';
+import { bookingRoutes } from './modules/appointments/public';
+import { appointmentRoutes } from './modules/appointments/routes';
+import { sifenRoutes } from './modules/sifen/routes';
+import { backupRoutes } from './modules/backups/routes';
 import { pairingRoutes } from './modules/pairing/routes';
 import { platformRoutes } from './modules/platform/routes';
 import { publicRoutes } from './modules/public/routes';
@@ -179,6 +185,8 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
 
   await app.register(
     async (api) => {
+      // Registro de auditoría de todos los cambios (lo hereda cada módulo).
+      api.addHook('onSend', ctx.audit.hook());
       await api.register(authRoutes(ctx));
       await api.register(tenantRoutes(ctx));
       await api.register(catalogRoutes(ctx));
@@ -190,12 +198,18 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
       await api.register(surveyRoutes(ctx));
       await api.register(billingRoutes(ctx));
       await api.register(paymentRoutes(ctx));
+      await api.register(auditRoutes(ctx));
+      await api.register(alertRoutes(ctx));
+      await api.register(appointmentRoutes(ctx));
+      await api.register(bookingRoutes(ctx));
+      await api.register(sifenRoutes(ctx));
       await api.register(agentRoutes(ctx));
       await api.register(deviceRoutes(ctx));
       await api.register(mediaRoutes(ctx));
       await api.register(integrationRoutes(ctx));
       await api.register(reportRoutes(ctx));
       await api.register(platformRoutes(ctx));
+      await api.register(backupRoutes(ctx));
       await api.register(publicRoutes(ctx));
       await api.register(pairingRoutes(ctx));
     },
@@ -237,6 +251,9 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
   if (config.NODE_ENV !== 'test') {
     ctx.webhooks.start();
     ctx.notifier.start();
+    ctx.devices.start();
+    ctx.backups.start();
+    ctx.appointments.start();
   }
   await ensureSuperadmin(ctx);
 
@@ -244,6 +261,9 @@ export async function buildApp({ config, db: externalDb, logger = true }: BuildO
     stopMaintenance();
     ctx.webhooks.stop();
     ctx.notifier.stop();
+    ctx.devices.stop();
+    ctx.backups.stop();
+    ctx.appointments.stop();
     ctx.rt.close();
     await pool?.pool.end();
   });

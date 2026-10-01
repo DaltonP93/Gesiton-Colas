@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Check, Loader2, Maximize, Printer, Smartphone, Star, Users } from 'lucide-react';
+import { ArrowLeft, CalendarCheck2, Check, ChevronRight, Loader2, Maximize, Printer, Search, Smartphone, Star, Users } from 'lucide-react';
 import QRCode from 'qrcode';
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
@@ -10,6 +10,7 @@ import {
   isImageIcon,
   type CustomerField,
   type IssuedTicketDTO,
+  type KioskAppointmentMatchDTO,
   type KioskBootstrapDTO,
   type PriorityDTO,
 } from '@gc/shared';
@@ -53,7 +54,9 @@ type Step =
   | { name: 'priority'; service: Service }
   | { name: 'form'; service: Service; priority: PriorityDTO | null }
   | { name: 'issuing' }
-  | { name: 'done'; result: IssuedTicketDTO; qr: string | null; service: Service; priority: PriorityDTO | null }
+  | { name: 'appointment' }
+  | { name: 'appointmentPick'; query: string; matches: KioskAppointmentMatchDTO[] }
+  | { name: 'done'; result: IssuedTicketDTO; qr: string | null; service: Pick<Service, 'name'>; priority: PriorityDTO | null; note?: string }
   | { name: 'error'; message: string };
 
 export default function KioskPage() {
@@ -126,7 +129,7 @@ function Kiosk({ boot, token, refetch }: { boot: KioskBootstrapDTO; token: strin
 
   // Vuelve al inicio si nadie interactúa en los pasos intermedios.
   useEffect(() => {
-    if (step.name !== 'priority' && step.name !== 'form' && step.name !== 'error') return;
+    if (!['priority', 'form', 'error', 'appointment', 'appointmentPick'].includes(step.name)) return;
     let timer = setTimeout(reset, 45_000);
     const bump = () => {
       clearTimeout(timer);
@@ -179,35 +182,53 @@ function Kiosk({ boot, token, refetch }: { boot: KioskBootstrapDTO; token: strin
         customer,
         channel: mobile ? 'mobile' : 'kiosk',
       });
-      const trackingUrl = `${window.location.origin}/t/${result.ticket.publicToken}`;
-      const qr = config.showQr ? await QRCode.toDataURL(trackingUrl, { width: 360, margin: 1 }).catch(() => null) : null;
-      setStep({ name: 'done', result: { ...result, trackingUrl }, qr, service, priority });
-      if (config.print.enabled && !mobile) {
-        const now = new Date(result.ticket.createdAt);
-        const locale = tenant.locale === 'pt' ? 'pt-BR' : tenant.locale;
-        void printTicket(config.print, {
-          qrDataUrl: qr,
-          logoUrl: tenant.branding.logoUrl ? assetUrl(tenant.branding.logoUrl) : null,
-          vars: {
-            code: result.ticket.code,
-            service: service.name,
-            priority: priority && priority.weight > 0 ? priority.name : '',
-            branch: boot.branch.name,
-            organization: tenant.name,
-            date: now.toLocaleDateString(locale),
-            time: now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }),
-            waiting: result.waitingAhead,
-            customer: customer.name ?? '',
-            trackingUrl,
-            header: config.print.headerText,
-            footer: config.print.footerText,
-          },
-        }).catch(() => undefined);
-      }
-      refetch();
+      await finish(result, service, priority, customer.name ?? '');
     } catch (error) {
       setStep({ name: 'error', message: errorMessage(error) || t('kiosk.error') });
     }
+  }
+
+  /** Llegada a una cita: emite el turno (ordenado por la hora de la cita). */
+  async function checkIn(match: KioskAppointmentMatchDTO, query: string) {
+    setStep({ name: 'issuing' });
+    try {
+      const result = await api.public<IssuedTicketDTO>(`/public/kiosks/${token}/appointments/${match.id}/check-in`, { query });
+      const service = services.find((s) => s.id === result.ticket.serviceId) ?? { name: match.service };
+      const priority = priorities.find((p) => p.id === result.ticket.priorityId) ?? null;
+      await finish(result, service, priority, result.ticket.customer?.name ?? '', t('kiosk.appointmentAt', { time: match.time }));
+    } catch (error) {
+      setStep({ name: 'error', message: errorMessage(error) || t('kiosk.error') });
+    }
+  }
+
+  /** Muestra el turno emitido y, en el tótem, lo imprime. */
+  async function finish(result: IssuedTicketDTO, service: Pick<Service, 'name'>, priority: PriorityDTO | null, customerName: string, note?: string) {
+    const trackingUrl = `${window.location.origin}/t/${result.ticket.publicToken}`;
+    const qr = config.showQr ? await QRCode.toDataURL(trackingUrl, { width: 360, margin: 1 }).catch(() => null) : null;
+    setStep({ name: 'done', result: { ...result, trackingUrl }, qr, service, priority, note });
+    if (config.print.enabled && !mobile) {
+      const now = new Date(result.ticket.createdAt);
+      const locale = tenant.locale === 'pt' ? 'pt-BR' : tenant.locale;
+      void printTicket(config.print, {
+        qrDataUrl: qr,
+        logoUrl: tenant.branding.logoUrl ? assetUrl(tenant.branding.logoUrl) : null,
+        vars: {
+          code: result.ticket.code,
+          service: service.name,
+          priority: priority && priority.weight > 0 ? priority.name : '',
+          branch: boot.branch.name,
+          organization: tenant.name,
+          date: now.toLocaleDateString(locale),
+          time: now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }),
+          waiting: result.waitingAhead,
+          customer: customerName,
+          trackingUrl,
+          header: note ? [note, config.print.headerText].filter(Boolean).join(' · ') : config.print.headerText,
+          footer: config.print.footerText,
+        },
+      }).catch(() => undefined);
+    }
+    refetch();
   }
 
   function chooseService(service: Service) {
@@ -274,7 +295,50 @@ function Kiosk({ boot, token, refetch }: { boot: KioskBootstrapDTO; token: strin
             prices={prices}
             t={t}
             onChoose={chooseService}
+            onAppointment={boot.appointments ? () => setStep({ name: 'appointment' }) : undefined}
           />
+        )}
+        {step.name === 'appointment' && (
+          <StepFrame title={t('kiosk.haveAppointment')} subtitle={t('kiosk.appointmentQuery')} onBack={reset} t={t}>
+            <AppointmentLookup
+              token={token}
+              t={t}
+              shape={shapeClass(theme)}
+              onFound={(query, matches) => (matches.length === 1 && matches[0]!.canCheckIn ? void checkIn(matches[0]!, query) : setStep({ name: 'appointmentPick', query, matches }))}
+            />
+          </StepFrame>
+        )}
+        {step.name === 'appointmentPick' && (
+          <StepFrame title={step.matches.length ? t('kiosk.chooseAppointment') : t('kiosk.haveAppointment')} onBack={() => setStep({ name: 'appointment' })} t={t}>
+            {step.matches.length === 0 ? (
+              <p className="text-[1.4em] font-semibold">{t('kiosk.noAppointment')}</p>
+            ) : (
+              <div className="grid gap-4">
+                {step.matches.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    disabled={!m.canCheckIn}
+                    onClick={() => void checkIn(m, step.query)}
+                    className={cx('flex w-full items-center gap-5 px-7 py-6 text-left shadow-lg transition active:scale-[0.99] disabled:opacity-70 disabled:active:scale-100', shapeClass(theme))}
+                    style={buttonColors(theme, m.canCheckIn ? theme.buttonBackground : '#64748b', m.canCheckIn ? theme.buttonText : undefined)}
+                  >
+                    <span className="text-[2.2em] font-black tabular-nums">{m.time}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[1.4em] font-bold">{m.service}</span>
+                      <span className="block text-[1em] opacity-85">{[m.customer, m.professional].filter(Boolean).join(' · ')}</span>
+                      {m.reason && <span className="mt-1 block text-[0.95em] font-semibold">{m.reason}</span>}
+                    </span>
+                    {m.canCheckIn && (
+                      <span className="inline-flex items-center gap-2 text-[1.2em] font-bold">
+                        {t('kiosk.checkIn')} <ChevronRight className="size-6" />
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </StepFrame>
         )}
         {step.name === 'priority' && (
           <StepFrame title={t('kiosk.choosePriority')} subtitle={step.service.name} onBack={reset} t={t}>
@@ -456,6 +520,7 @@ function ServicesStep({
   prices,
   t,
   onChoose,
+  onAppointment,
 }: {
   services: Service[];
   departments: KioskBootstrapDTO['departments'];
@@ -463,6 +528,8 @@ function ServicesStep({
   prices: KioskBootstrapDTO['prices'];
   t: ReturnType<typeof translator>;
   onChoose: (s: Service) => void;
+  /** Botón «Tengo una cita» (módulo de citas). */
+  onAppointment?: () => void;
 }) {
   const groups = useMemo(() => {
     if (!config.groupByDepartment) return [{ id: 'all', name: '', services }];
@@ -481,6 +548,21 @@ function ServicesStep({
         <h1 className="text-[2.6em] leading-tight font-extrabold">{config.title}</h1>
         {config.subtitle && <p className="mt-2 text-[1.3em] opacity-70">{config.subtitle}</p>}
       </div>
+      {onAppointment && (
+        <button
+          type="button"
+          onClick={onAppointment}
+          className={cx('mx-auto mt-8 flex w-full max-w-3xl items-center gap-5 px-7 py-5 text-left shadow-lg transition active:scale-[0.99] hover:brightness-110', shapeClass(config.theme))}
+          style={buttonColors(config.theme, config.theme.priorityButtonBackground)}
+        >
+          <CalendarCheck2 className="size-10 shrink-0" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-[1.5em] leading-tight font-bold">{t('kiosk.haveAppointment')}</span>
+            <span className="block text-[1em] opacity-85">{t('kiosk.haveAppointmentHint')}</span>
+          </span>
+          <ChevronRight className="size-8 shrink-0" />
+        </button>
+      )}
       {services.length === 0 ? (
         <p className="mt-16 text-center text-[1.4em] opacity-70">{t('kiosk.noServices')}</p>
       ) : (
@@ -615,6 +697,70 @@ function CustomerForm({ fields, t, onSubmit, shape }: { fields: CustomerField[];
   );
 }
 
+function AppointmentLookup({
+  token,
+  t,
+  shape,
+  onFound,
+}: {
+  token: string;
+  t: ReturnType<typeof translator>;
+  shape: string;
+  onFound: (query: string, matches: KioskAppointmentMatchDTO[]) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    const q = query.trim();
+    if (q.length < 3) return;
+    setBusy(true);
+    setError('');
+    try {
+      onFound(q, await api.public<KioskAppointmentMatchDTO[]>(`/public/kiosks/${token}/appointments/lookup`, { query: q }));
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const press = (key: string) => setQuery((v) => (key === '⌫' ? v.slice(0, -1) : (v + key).slice(0, 30)));
+  return (
+    <form onSubmit={(e) => void submit(e)} className="space-y-5">
+      <input
+        autoFocus
+        value={query}
+        onChange={(e) => setQuery(e.target.value.toUpperCase())}
+        maxLength={30}
+        aria-label={t('kiosk.appointmentQuery')}
+        className="h-20 w-full rounded-2xl border-2 border-black/10 bg-white px-6 text-center font-mono text-[2em] tracking-widest text-slate-900 outline-none focus:border-[var(--k-btn)]"
+      />
+      {/* Teclado numérico en pantalla para los tótems sin teclado. */}
+      <div className="mx-auto grid max-w-md grid-cols-3 gap-3">
+        {['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'].map((k) =>
+          k ? (
+            <button key={k} type="button" onClick={() => press(k)} className="h-16 rounded-2xl bg-white/90 text-[1.8em] font-bold text-slate-900 shadow active:scale-95">
+              {k}
+            </button>
+          ) : (
+            <span key="blank" />
+          ),
+        )}
+      </div>
+      {error && <p className="text-center text-[1.2em] font-semibold">{error}</p>}
+      <button
+        type="submit"
+        disabled={busy || query.trim().length < 3}
+        className={cx('flex h-20 w-full items-center justify-center gap-3 text-[1.5em] font-bold shadow-lg active:scale-[0.99] disabled:opacity-60', shape)}
+        style={{ background: 'var(--k-btn)', color: 'var(--k-btn-fg)' }}
+      >
+        {busy ? <Loader2 className="size-7 animate-spin" /> : <Search className="size-7" />} {t('kiosk.search')}
+      </button>
+    </form>
+  );
+}
+
 function DoneStep({
   step,
   config,
@@ -636,6 +782,7 @@ function DoneStep({
         {result.ticket.code}
       </p>
       <p className="text-[1.6em] font-bold">{service.name}</p>
+      {step.note && <p className="mt-1 text-[1.2em] font-semibold opacity-80">{step.note}</p>}
       {priority && priority.weight > 0 && (
         <span className="mt-2 rounded-full px-4 py-1 font-bold" style={{ background: config.theme.priorityButtonBackground, color: readableOn(config.theme.priorityButtonBackground) }}>
           {priority.name}

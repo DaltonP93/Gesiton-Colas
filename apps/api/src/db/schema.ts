@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import {
   bigint,
   boolean,
@@ -16,6 +17,18 @@ import {
 } from 'drizzle-orm/pg-core';
 import type {
   ApiKeyScope,
+  SifenEnvironment,
+  SifenIssuerSettings,
+  SifenItem,
+  SifenKudeDTO,
+  SifenReceiver,
+  SifenStatus,
+  SifenTotals,
+  AppointmentCustomer,
+  AppointmentSource,
+  AppointmentStatus,
+  AuditActorKind,
+  AuditEntity,
   CustomerData,
   DisplayConfig,
   KioskConfig,
@@ -30,6 +43,7 @@ import type {
   Role,
   Schedule,
   Currency,
+  InvoiceLine,
   InvoiceStatus,
   PaymentGateway,
   PaymentProvider,
@@ -250,14 +264,18 @@ export const tickets = pgTable(
     publicToken: text('public_token').notNull(),
     transferredFromId: uuid('transferred_from_id'),
     serviceDay: date('service_day').notNull(),
+    /** Cita de la que viene el turno (módulo de citas). */
+    appointmentId: uuid('appointment_id'),
     createdAt: createdAt(),
+    /** Orden en la fila: la hora de emisión o, para las citas, la hora de la cita. */
+    sortAt: timestamp('sort_at', { withTimezone: true }).defaultNow().notNull(),
     calledAt: timestamp('called_at', { withTimezone: true }),
     startedAt: timestamp('started_at', { withTimezone: true }),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
   },
   (t) => [
     uniqueIndex('tickets_public_token_idx').on(t.publicToken),
-    index('tickets_queue_idx').on(t.branchId, t.status, t.createdAt),
+    index('tickets_queue_idx').on(t.branchId, t.status, t.sortAt),
     index('tickets_tenant_created_idx').on(t.tenantId, t.createdAt),
     index('tickets_agent_idx').on(t.agentId, t.status),
   ],
@@ -377,6 +395,8 @@ export const displays = pgTable(
     config: jsonb('config').$type<DisplayConfig>().notNull(),
     playlistId: uuid('playlist_id').references(() => playlists.id, { onDelete: 'set null' }),
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
+    /** Se avisó que está desconectada (se limpia al volver). */
+    offlineAlertedAt: timestamp('offline_alerted_at', { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -395,6 +415,8 @@ export const kiosks = pgTable(
     token: text('token').notNull(),
     config: jsonb('config').$type<KioskConfig>().notNull(),
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
+    /** Se avisó que está desconectado (se limpia al volver). */
+    offlineAlertedAt: timestamp('offline_alerted_at', { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -635,6 +657,8 @@ export const invoices = pgTable(
     description: text('description').notNull(),
     amount: bigint('amount', { mode: 'number' }).notNull(),
     currency: text('currency').$type<Currency>().notNull(),
+    /** Detalle: plan y módulos adicionales. */
+    lines: jsonb('lines').$type<InvoiceLine[]>().notNull().default([]),
     status: text('status').$type<InvoiceStatus>().notNull().default('pending'),
     dueDate: date('due_date').notNull(),
     issuedAt: timestamp('issued_at', { withTimezone: true }).defaultNow().notNull(),
@@ -713,6 +737,50 @@ export const paymentGateways = pgTable(
   (t) => [uniqueIndex('payment_gateways_webhook_idx').on(t.webhookToken)],
 );
 
+/** Registro de auditoría: quién cambió qué (organización o plataforma). */
+export const auditLogs = pgTable(
+  'audit_logs',
+  {
+    id: id(),
+    /** null = acción de la plataforma (superadministrador). */
+    tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }),
+    actorKind: text('actor_kind').$type<AuditActorKind>().notNull(),
+    actorId: uuid('actor_id'),
+    actorName: text('actor_name').notNull(),
+    actorEmail: text('actor_email'),
+    actorRole: text('actor_role'),
+    support: boolean('support').notNull().default(false),
+    action: text('action').notNull(),
+    entity: text('entity').$type<AuditEntity>().notNull(),
+    entityId: text('entity_id'),
+    summary: text('summary').notNull(),
+    changes: jsonb('changes').$type<Record<string, unknown>>(),
+    ip: text('ip'),
+    userAgent: text('user_agent'),
+    createdAt: createdAt(),
+  },
+  (t) => [index('audit_logs_tenant_idx').on(t.tenantId, t.createdAt), index('audit_logs_entity_idx').on(t.entity, t.entityId), index('audit_logs_created_idx').on(t.createdAt)],
+);
+
+/** Copias de seguridad de la instalación. */
+export const backups = pgTable(
+  'backups',
+  {
+    id: id(),
+    file: text('file').notNull(),
+    sizeBytes: bigint('size_bytes', { mode: 'number' }).notNull().default(0),
+    status: text('status').$type<'running' | 'ok' | 'failed'>().notNull(),
+    error: text('error'),
+    trigger: text('trigger').$type<'auto' | 'manual'>().notNull(),
+    includesUploads: boolean('includes_uploads').notNull().default(true),
+    s3Key: text('s3_key'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    startedAt: timestamp('started_at', { withTimezone: true }).defaultNow().notNull(),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+  },
+  (t) => [index('backups_started_idx').on(t.startedAt)],
+);
+
 export type Tenant = typeof tenants.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Branch = typeof branches.$inferSelect;
@@ -735,5 +803,157 @@ export type NotifyMessageRow = typeof notifyMessages.$inferSelect;
 export type Survey = typeof surveys.$inferSelect;
 export type SurveyResponse = typeof surveyResponses.$inferSelect;
 export type Invoice = typeof invoices.$inferSelect;
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type Backup = typeof backups.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
 export type PaymentGatewayRow = typeof paymentGateways.$inferSelect;
+
+/* ------------------------------------------------------------------ */
+/* Citas                                                               */
+/* ------------------------------------------------------------------ */
+
+export const appointments = pgTable(
+  'appointments',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    branchId: uuid('branch_id')
+      .notNull()
+      .references(() => branches.id, { onDelete: 'cascade' }),
+    serviceId: uuid('service_id')
+      .notNull()
+      .references(() => services.id, { onDelete: 'cascade' }),
+    /** Código corto para presentarse en el kiosco. */
+    code: text('code').notNull(),
+    /** Identificador en el sistema de origen (HIS, ERP, agenda propia). */
+    externalId: text('external_id'),
+    source: text('source').$type<AppointmentSource>().notNull(),
+    status: text('status').$type<AppointmentStatus>().notNull().default('booked'),
+    scheduledAt: timestamp('scheduled_at', { withTimezone: true }).notNull(),
+    durationMinutes: integer('duration_minutes').notNull().default(15),
+    customer: jsonb('customer').$type<AppointmentCustomer>().notNull().default({}),
+    /** Documento normalizado (sin puntos ni guiones) para buscar al presentarse. */
+    document: text('document').notNull().default(''),
+    professional: text('professional'),
+    notes: text('notes').notNull().default(''),
+    publicToken: text('public_token').notNull(),
+    ticketId: uuid('ticket_id').references(() => tickets.id, { onDelete: 'set null' }),
+    checkedInAt: timestamp('checked_in_at', { withTimezone: true }),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    cancelReason: text('cancel_reason'),
+    reminderSentAt: timestamp('reminder_sent_at', { withTimezone: true }),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex('appointments_tenant_code_idx').on(t.tenantId, t.code),
+    uniqueIndex('appointments_public_token_idx').on(t.publicToken),
+    uniqueIndex('appointments_external_idx').on(t.tenantId, t.externalId).where(sql`${t.externalId} IS NOT NULL`),
+    index('appointments_branch_time_idx').on(t.branchId, t.scheduledAt),
+    index('appointments_tenant_time_idx').on(t.tenantId, t.scheduledAt),
+    index('appointments_document_idx').on(t.tenantId, t.document),
+  ],
+);
+export type Appointment = typeof appointments.$inferSelect;
+
+/** Horarios con cita de cada servicio en cada sucursal (agenda de la reserva en línea). */
+export const bookingSchedules = pgTable(
+  'booking_schedules',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    branchId: uuid('branch_id')
+      .notNull()
+      .references(() => branches.id, { onDelete: 'cascade' }),
+    serviceId: uuid('service_id')
+      .notNull()
+      .references(() => services.id, { onDelete: 'cascade' }),
+    days: jsonb('days').$type<number[]>().notNull(),
+    from: text('from_time').notNull(),
+    to: text('to_time').notNull(),
+    slotMinutes: integer('slot_minutes').notNull(),
+    capacity: integer('capacity').notNull().default(1),
+    online: boolean('online').notNull().default(true),
+    active: boolean('active').notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (t) => [index('booking_schedules_branch_idx').on(t.branchId, t.serviceId)],
+);
+export type BookingSchedule = typeof bookingSchedules.$inferSelect;
+
+/* ------------------------------------------------------------------ */
+/* Factura electrónica SIFEN                                           */
+/* ------------------------------------------------------------------ */
+
+/** Emisor: la plataforma (`scope = 'platform'`) o una organización (`scope = id`). */
+export const sifenIssuers = pgTable(
+  'sifen_issuers',
+  {
+    id: id(),
+    scope: text('scope').notNull(),
+    tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }),
+    settings: jsonb('settings').$type<SifenIssuerSettings>().notNull(),
+    /** Certificado .p12 (base64) cifrado, su clave y el CSC, cifrados con JWT_SECRET. */
+    certEnc: text('cert_enc').notNull().default(''),
+    certPasswordEnc: text('cert_password_enc').notNull().default(''),
+    certInfo: jsonb('cert_info').$type<{ subject: string; validFrom: string; validTo: string } | null>(),
+    cscEnc: text('csc_enc').notNull().default(''),
+    nextNumber: integer('next_number').notNull().default(1),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex('sifen_issuers_scope_idx').on(t.scope)],
+);
+export type SifenIssuer = typeof sifenIssuers.$inferSelect;
+
+export const sifenDocuments = pgTable(
+  'sifen_documents',
+  {
+    id: id(),
+    scope: text('scope').notNull(),
+    tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }),
+    cdc: text('cdc').notNull(),
+    type: integer('type').notNull().default(1),
+    establishment: text('establishment').notNull(),
+    point: text('point').notNull(),
+    number: integer('number').notNull(),
+    status: text('status').$type<SifenStatus>().notNull().default('pending'),
+    environment: text('environment').$type<SifenEnvironment>().notNull(),
+    issuedAt: timestamp('issued_at', { withTimezone: true }).notNull(),
+    receiver: jsonb('receiver').$type<SifenReceiver>().notNull(),
+    items: jsonb('items').$type<SifenItem[]>().notNull(),
+    currency: text('currency').$type<'PYG' | 'USD'>().notNull().default('PYG'),
+    exchangeRate: real('exchange_rate'),
+    condition: text('condition').$type<'cash' | 'credit'>().notNull().default('cash'),
+    paymentType: integer('payment_type').notNull().default(1),
+    creditDays: integer('credit_days'),
+    notes: text('notes').notNull().default(''),
+    totals: jsonb('totals').$type<SifenTotals>().notNull(),
+    /** XML firmado con el QR (lo que se envía a la SET). */
+    xml: text('xml').notNull(),
+    qrUrl: text('qr_url').notNull(),
+    /** Datos del emisor al emitir (el KuDE no cambia si después se cambia la configuración). */
+    issuer: jsonb('issuer').$type<SifenKudeDTO['issuer']>().notNull(),
+    setCode: text('set_code'),
+    setMessage: text('set_message'),
+    setProtocol: text('set_protocol'),
+    sourceType: text('source_type').$type<'payment' | 'invoice' | 'manual'>().notNull().default('manual'),
+    sourceId: uuid('source_id'),
+    publicToken: text('public_token').notNull(),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+    approvedAt: timestamp('approved_at', { withTimezone: true }),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    cancelReason: text('cancel_reason'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex('sifen_documents_number_idx').on(t.scope, t.type, t.establishment, t.point, t.number),
+    uniqueIndex('sifen_documents_cdc_idx').on(t.cdc),
+    uniqueIndex('sifen_documents_token_idx').on(t.publicToken),
+    index('sifen_documents_scope_created_idx').on(t.scope, t.createdAt),
+    index('sifen_documents_source_idx').on(t.sourceType, t.sourceId),
+  ],
+);
+export type SifenDocument = typeof sifenDocuments.$inferSelect;

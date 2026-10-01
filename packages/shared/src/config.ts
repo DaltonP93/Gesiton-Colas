@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { appointmentSettingsSchema } from './appointments';
+import { fiscalProfileSchema } from './sifen';
 import { ALERT_SOUNDS, DISPLAY_LAYOUTS, LOCALES } from './enums';
 import { notificationSettingsSchema } from './notifications';
 import { tenantPaymentSettingsSchema } from './payments';
@@ -113,6 +115,26 @@ export const privacySettingsSchema = z.object({
 });
 export type PrivacySettings = z.infer<typeof privacySettingsSchema>;
 
+/** Alertas cuando una TV o un kiosco se desconecta. */
+export const deviceAlertSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    /** Minutos sin conexión antes de avisar. */
+    minutes: z.number().int().min(2).max(120).default(5),
+    /** Días (0 = domingo) y horario en que se avisa: fuera de horario las TVs suelen estar apagadas. */
+    days: z.array(z.number().int().min(0).max(6)).max(7).default([1, 2, 3, 4, 5, 6]),
+    from: z.string().regex(/^\d{2}:\d{2}$/).default('07:00'),
+    to: z.string().regex(/^\d{2}:\d{2}$/).default('20:00'),
+    /** Correos que reciben la alerta (vacío = los administradores). */
+    emails: z.array(z.email().max(200)).max(10).default([]),
+    /** Teléfonos para WhatsApp/SMS (módulo «Avisos»). */
+    phones: z.array(z.string().trim().max(30)).max(5).default([]),
+    /** Avisar también cuando vuelve a conectarse. */
+    recovery: z.boolean().default(true),
+  })
+  .prefault({});
+export type DeviceAlertSettings = z.infer<typeof deviceAlertSchema>;
+
 export const tenantSettingsSchema = z.object({
   branding: brandingSchema.prefault({}),
   terminology: terminologySchema.prefault({}),
@@ -125,6 +147,10 @@ export const tenantSettingsSchema = z.object({
   /** Avisos por WhatsApp / SMS (módulo «notifications»). */
   notifications: notificationSettingsSchema.prefault({}),
   payments: tenantPaymentSettingsSchema.prefault({}),
+  alerts: z.object({ devices: deviceAlertSchema }).prefault({}),
+  appointments: appointmentSettingsSchema,
+  /** Datos para la factura que la plataforma le emite a la organización. */
+  fiscal: fiscalProfileSchema,
 });
 export type TenantSettings = z.infer<typeof tenantSettingsSchema>;
 
@@ -351,6 +377,8 @@ export const kioskConfigSchema = z.object({
   priorityMode: z.enum(['buttons', 'list', 'none']).default('buttons'),
   /** Campos del cliente que se piden antes de emitir el turno (claves de customerFields o name/document/phone/email). */
   askFields: z.array(z.string()).default([]),
+  /** Botón «Tengo una cita» (módulo de citas): el cliente se presenta con su documento o código. */
+  appointments: z.boolean().default(true),
   showQr: z.boolean().default(true),
   showWaitingCount: z.boolean().default(true),
   showBranch: z.boolean().default(true),

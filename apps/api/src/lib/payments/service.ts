@@ -4,7 +4,7 @@ import {
   PAYMENT_GATEWAY_INFO,
   PLANS,
   formatMoney,
-  toMinor,
+  monthlyCharges,
   type BillingSettings,
   type Currency,
   type GatewayBody,
@@ -21,6 +21,7 @@ import { decryptSecret, encryptSecret, randomToken } from '../crypto';
 import { invoiceMail, type EmailBrand } from '../emails';
 import { badRequest } from '../errors';
 import type { Mailer } from '../mailer';
+import type { Audit } from '../audit';
 import { createCheckout, fetchStatus, GatewayError, parseWebhook, type GatewayRuntime } from './gateways';
 
 export const PLATFORM_PAY_SCOPE = 'platform';
@@ -41,6 +42,7 @@ export function toInvoiceDTO(row: Invoice, tenantName: string, now = new Date())
     description: row.description,
     amount: row.amount,
     currency: row.currency,
+    lines: row.lines ?? [],
     status: row.status,
     overdue: row.status === 'pending' && row.dueDate < todayISO(now),
     dueDate: row.dueDate,
@@ -61,6 +63,8 @@ interface PaymentsDeps {
   emailBrand(tenant: Tenant | null): Promise<EmailBrand>;
   /** Se llama cuando se paga un turno (tiempo real y webhooks). */
   onTicketPaid?(payment: Payment): void;
+  /** Registro de auditoría (suspensiones y reactivaciones automáticas). */
+  audit?: Audit;
 }
 
 export interface StartPaymentInput {
@@ -348,7 +352,10 @@ export class Payments {
       .set({ status: 'active', suspendedReason: null })
       .where(and(eq(tenants.id, tenantId), eq(tenants.status, 'suspended'), eq(tenants.suspendedReason, 'billing')))
       .returning({ id: tenants.id });
-    if (res.length) this.deps.log.info({ tenantId }, 'facturación: organización reactivada al pagar');
+    if (res.length) {
+      this.deps.log.info({ tenantId }, 'facturación: organización reactivada al pagar');
+      this.deps.audit?.record({ tenantId, actor: { kind: 'system', id: null, name: 'Sistema' }, action: 'tenant.reactivated', entity: 'invoice', summary: 'Organización reactivada al acreditarse el pago' });
+    }
     return res.length > 0;
   }
 
@@ -401,17 +408,20 @@ export class Payments {
     const today = todayISO();
     let created = 0;
     for (const tenant of rows) {
-      const plan = settings.plans[tenant.plan];
-      if (!plan || plan.monthlyPrice <= 0) continue;
-      const amount = toMinor(plan.monthlyPrice, plan.currency);
+      // Plan + módulos adicionales activados que el plan no incluye.
+      const charges = monthlyCharges(settings, tenant);
+      if (charges.total <= 0) continue;
+      const month = new Date(`${period}-15T12:00:00Z`).toLocaleDateString('es', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+      const extras = charges.lines.filter((l) => l.module).length;
       const [invoice] = await this.deps.db
         .insert(invoices)
         .values({
           tenantId: tenant.id,
           period,
-          description: `Plan ${PLANS[tenant.plan].name} · ${new Date(`${period}-15T12:00:00Z`).toLocaleDateString('es', { month: 'long', year: 'numeric', timeZone: 'UTC' })}`,
-          amount,
-          currency: plan.currency,
+          description: `Plan ${PLANS[tenant.plan].name}${extras ? ` + ${extras} ${extras === 1 ? 'módulo adicional' : 'módulos adicionales'}` : ''} · ${month}`,
+          amount: charges.total,
+          currency: charges.currency,
+          lines: charges.lines,
           dueDate: addDays(today, settings.billing.dueDays),
           createdBy: options.userId ?? null,
         })
@@ -466,7 +476,12 @@ export class Payments {
       .set({ status: 'suspended', suspendedReason: 'billing' })
       .where(and(inArray(tenants.id, overdue.map((o) => o.tenantId)), eq(tenants.status, 'active'), eq(tenants.isDemo, false)))
       .returning({ id: tenants.id });
-    if (res.length) this.deps.log.warn({ count: res.length }, 'facturación: organizaciones suspendidas por falta de pago');
+    if (res.length) {
+      this.deps.log.warn({ count: res.length }, 'facturación: organizaciones suspendidas por falta de pago');
+      for (const { id } of res) {
+        this.deps.audit?.record({ tenantId: id, actor: { kind: 'system', id: null, name: 'Sistema' }, action: 'tenant.suspended_billing', entity: 'invoice', summary: `Organización suspendida por falta de pago (facturas vencidas hace más de ${billing.graceDays} días)` });
+      }
+    }
     return res.length;
   }
 

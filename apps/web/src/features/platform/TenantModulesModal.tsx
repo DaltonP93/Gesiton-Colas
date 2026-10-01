@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { MODULE_IDS, MODULES, PLANS, type ModuleId, type ModuleOverrides, type TenantDTO } from '@gc/shared';
+import { MODULE_IDS, MODULES, PLANS, formatMoney, monthlyCharges, toMinor, type ModuleId, type ModuleOverrides, type PlatformSettings, type TenantDTO } from '@gc/shared';
 import { Badge, Button, Modal, cx, useFeedback } from '../../components/ui';
 import { api, errorMessage } from '../../lib/api';
 
@@ -12,14 +12,16 @@ type Choice = 'plan' | 'on' | 'off';
  */
 export function TenantModulesModal({
   tenant,
-  planModules,
+  settings,
   onClose,
 }: {
   tenant: TenantDTO & { modules: ModuleId[] };
-  /** Módulos que incluye el plan de la organización. */
-  planModules: ModuleId[];
+  /** Ajustes de la plataforma: módulos de cada plan y precios de los adicionales. */
+  settings: PlatformSettings;
   onClose: () => void;
 }) {
+  const plan = settings.plans[tenant.plan];
+  const planModules = plan.modules;
   const { toast } = useFeedback();
   const qc = useQueryClient();
   const initial = Object.fromEntries(
@@ -43,6 +45,7 @@ export function TenantModulesModal({
   const effective = (id: ModuleId) => (choices[id] === 'plan' ? planModules.includes(id) : choices[id] === 'on');
   const overrides: ModuleOverrides = {};
   for (const id of MODULE_IDS) if (choices[id] !== 'plan') overrides[id] = choices[id] === 'on';
+  const charges = monthlyCharges(settings, { plan: tenant.plan, modules: overrides });
 
   return (
     <Modal
@@ -53,6 +56,10 @@ export function TenantModulesModal({
       description={`Plan ${PLANS[tenant.plan].name}. «Según el plan» toma lo que incluye el plan; puede forzar cada módulo para esta organización.`}
       footer={
         <>
+          <span className="mr-auto text-sm text-muted">
+            Cargo mensual: <strong className="text-fg tabular-nums">{formatMoney(charges.total, charges.currency)}</strong>
+            {charges.lines.some((l) => l.module) && ` (plan + ${charges.lines.filter((l) => l.module).length} adicional)`}
+          </span>
           <Button variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
@@ -71,6 +78,9 @@ export function TenantModulesModal({
                 <p className="flex flex-wrap items-center gap-2 font-medium">
                   {MODULES[id].name}
                   {on ? <Badge color="#16a34a">Activo</Badge> : <Badge color="#64748b">Inactivo</Badge>}
+                  {!planModules.includes(id) && (settings.addons[id] ?? 0) > 0 && (
+                    <span className="text-xs font-normal text-muted">Adicional: {formatMoney(toMinor(settings.addons[id]!, plan.currency), plan.currency)}/mes</span>
+                  )}
                 </p>
                 <p className="text-xs text-muted">{MODULES[id].description}</p>
               </div>

@@ -66,7 +66,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await api(app, root, 'PUT', '/platform/settings', { billing: { enabled: false, autoSuspend: false }, plans: { pro: { monthlyPrice: 0 } } });
+  await api(app, root, 'PUT', '/platform/settings', { billing: { enabled: false, autoSuspend: false }, plans: { pro: { monthlyPrice: 0 } }, addons: { payments: 0 } });
   await api(app, root, 'PUT', '/platform/payments/gateway', { enabled: false, provider: 'stripe' });
   await app.close();
   fake.close();
@@ -277,6 +277,24 @@ describe('cobros de turnos', () => {
     expect(list.body.totals.amount).toBe(200000);
     expect(list.body.totals.manual).toBe(50000);
     expect(list.body.items.find((i: { method: string }) => i.method === 'cash')).toMatchObject({ provider: 'manual', recordedBy: 'Admin', ticketCode: ticket.code });
+  });
+
+  it('la factura del mes suma los módulos adicionales activados', async () => {
+    // El plan Profesional no incluye «Cobros a clientes»; la organización lo tiene activado aparte.
+    await api(app, root, 'PUT', '/platform/settings', { plans: { pro: { monthlyPrice: 150000 } }, addons: { payments: 80000, surveys: 50000 } });
+    const billing = await api(app, org, 'GET', '/billing');
+    expect(billing.body.monthly).toEqual({
+      currency: 'PYG',
+      total: 230000,
+      lines: [
+        { description: 'Plan Profesional', amount: 150000 },
+        { description: 'Módulo adicional: Cobros a clientes', amount: 80000, module: 'payments' },
+      ],
+    });
+    await api(app, root, 'POST', '/platform/billing/generate', { period: '2099-02', notify: false });
+    const invoice = (await api(app, org, 'GET', '/billing')).body.invoices.find((i: { period: string }) => i.period === '2099-02');
+    expect(invoice).toMatchObject({ amount: 230000, description: 'Plan Profesional + 1 módulo adicional · febrero de 2099' });
+    expect(invoice.lines).toHaveLength(2);
   });
 
   it('la pasarela de una organización no confirma pagos de otra', async () => {

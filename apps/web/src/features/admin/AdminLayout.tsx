@@ -1,9 +1,12 @@
+import { useQuery } from '@tanstack/react-query';
 import {
   Activity,
   BarChart3,
+  CalendarClock,
   ChevronsLeft,
   ChevronsRight,
   CreditCard,
+  FileText,
   Headset,
   LayoutGrid,
   LogOut,
@@ -19,11 +22,12 @@ import {
   Tablet,
   UserRound,
   Video,
+  WifiOff,
   X,
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
-import type { Role, ModuleId } from '@gc/shared';
+import type { ModuleId, OfflineDeviceDTO, Role } from '@gc/shared';
 import { cx } from '../../components/ui';
 import { api, assetUrl } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
@@ -82,10 +86,12 @@ export function AdminLayout() {
       items: [
         { to: '/app', label: 'Inicio', icon: <LayoutGrid />, role: 'agent', end: true },
         { to: '/app/atencion', label: 'Atención', icon: <Headset />, role: 'agent' },
+        { to: '/app/citas', label: 'Citas', icon: <CalendarClock />, role: 'agent', module: ['appointments'] },
         { to: '/app/monitor', label: 'Monitor en vivo', icon: <Activity />, role: 'manager' },
         { to: '/app/reportes', label: 'Reportes', icon: <BarChart3 />, role: 'manager', also: ['/app/resumen'], module: ['reports'] },
         { to: '/app/encuestas', label: 'Encuestas', icon: <Star />, role: 'manager', module: ['surveys'] },
         { to: '/app/cobros', label: 'Cobros', icon: <CreditCard />, role: 'manager', module: ['payments'] },
+        { to: '/app/facturas', label: 'Facturas', icon: <FileText />, role: 'agent', module: ['invoicing'] },
       ],
     },
     {
@@ -316,10 +322,33 @@ export function AdminLayout() {
           <span className="truncate font-semibold">{branding.appName}</span>
         </header>
         <main className="mx-auto w-full max-w-[96rem] flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          {can('manager') && !billingSuspended && <OfflineDevicesBanner />}
           {/* Suspendida por falta de pago: solo queda disponible «Plan y facturación». */}
           {billingSuspended && pathname !== '/app/facturacion' ? <Navigate to="/app/facturacion" replace /> : <Outlet />}
         </main>
       </div>
+    </div>
+  );
+}
+
+/** Aviso en el panel cuando hay TVs o kioscos desconectados. */
+function OfflineDevicesBanner() {
+  const { hasModule } = useAuth();
+  const enabled = hasModule('displays') || hasModule('kiosks');
+  const offline = useQuery({ queryKey: ['devices-offline'], queryFn: () => api.get<OfflineDeviceDTO[]>('/devices/offline'), enabled, refetchInterval: 60_000 });
+  const list = offline.data ?? [];
+  if (!list.length) return null;
+  const names = list.slice(0, 3).map((d) => `${d.kind === 'display' ? 'Pantalla' : 'Kiosco'} «${d.name}» (${d.branch})`).join(', ');
+  return (
+    <div role="alert" className="mb-6 flex flex-wrap items-center gap-3 rounded-ui border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+      <WifiOff className="size-5 shrink-0 text-amber-600" />
+      <p className="min-w-0 flex-1">
+        <strong>{list.length === 1 ? 'Un equipo está desconectado' : `${list.length} equipos están desconectados`}:</strong> {names}
+        {list.length > 3 ? ` y ${list.length - 3} más` : ''}.
+      </p>
+      <Link to={list.some((d) => d.kind === 'display') ? '/app/pantallas' : '/app/kioscos'} className="font-semibold text-primary-text hover:underline">
+        Ver equipos
+      </Link>
     </div>
   );
 }

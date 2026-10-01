@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Ban, CalendarPlus, CheckCircle2, FilePlus2, Mail, Receipt, Wallet } from 'lucide-react';
+import { AlertTriangle, Ban, CalendarPlus, CheckCircle2, FilePlus2, FileText, Mail, Receipt, Wallet } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
   CURRENCIES,
@@ -7,15 +7,19 @@ import {
   MANUAL_METHODS,
   MANUAL_METHOD_LABELS,
   formatMoney,
+  fromMinor,
   type BillingSettings,
   type BillingStatsDTO,
   type Currency,
   type InvoiceDTO,
   type ManualMethod,
   type PlatformSettings,
+  type SifenDocumentDTO,
+  type SifenIssuerDTO,
   type TenantDTO,
 } from '@gc/shared';
 import { GatewayForm } from '../../components/GatewayForm';
+import { InvoiceForm, type InvoicePrefill } from '../../components/sifen/InvoiceForm';
 import { Badge, Button, EmptyState, Field, Input, Loading, Modal, Select, Stat, Table, Textarea, Toggle, cx, useFeedback } from '../../components/ui';
 import { api, errorMessage } from '../../lib/api';
 import { formatDateTime, todayISO, shiftDays } from '../../lib/format';
@@ -37,12 +41,48 @@ export function statusBadge(inv: Pick<InvoiceDTO, 'status' | 'overdue'>) {
 
 export const dateOnly = (iso: string) => iso.split('-').reverse().join('/');
 
+/** Detalle de la factura (plan y módulos adicionales). */
+export function InvoiceLines({ invoice }: { invoice: Pick<InvoiceDTO, 'lines' | 'currency'> }) {
+  if (invoice.lines.length < 2) return null;
+  return (
+    <ul className="mt-1 space-y-0.5 text-xs text-muted">
+      {invoice.lines.map((l, i) => (
+        <li key={i} className="flex justify-between gap-4">
+          <span>{l.description}</span>
+          <span className="tabular-nums">{formatMoney(l.amount, invoice.currency)}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function BillingTab() {
   const qc = useQueryClient();
   const { toast } = useFeedback();
   const [filter, setFilter] = useState<Filter>('all');
   const [creating, setCreating] = useState(false);
   const [paying, setPaying] = useState<InvoiceDTO | null>(null);
+  const [eInvoice, setEInvoice] = useState<InvoicePrefill | null>(null);
+  // Factura electrónica SIFEN de la plataforma (si está configurada).
+  const sifen = useQuery({ queryKey: ['sifen', '/platform/invoicing', 'issuer'], queryFn: () => api.get<SifenIssuerDTO>('/platform/invoicing/issuer'), retry: false });
+  const sifenReady = Boolean(sifen.data?.enabled && !sifen.data.missing.length);
+  const eDocs = useQuery({
+    queryKey: ['sifen', '/platform/invoicing', 'by-invoice'],
+    queryFn: () => api.get<SifenDocumentDTO[]>('/platform/invoicing/documents?sourceType=invoice'),
+    enabled: sifenReady,
+  });
+  const eDocOf = (invoiceId: string) => eDocs.data?.find((d) => d.source.id === invoiceId && d.status !== 'rejected' && d.status !== 'error');
+  const tenants = useQuery({ queryKey: ['platform', 'tenants', ''], queryFn: () => api.get<TenantDTO[]>('/platform/tenants'), enabled: sifenReady });
+  const prefillFor = (inv: InvoiceDTO): InvoicePrefill => {
+    const fiscal = tenants.data?.find((t) => t.id === inv.tenantId)?.settings.fiscal;
+    const lines = inv.lines.length ? inv.lines : [{ description: inv.description, amount: inv.amount }];
+    return {
+      receiver: { kind: fiscal?.ruc && /^\d{1,8}-\d$/.test(fiscal.ruc) ? 'ruc' : 'ci', document: fiscal?.ruc ?? '', name: fiscal?.name || inv.tenantName, email: fiscal?.email ?? '', address: fiscal?.address ?? '' },
+      items: lines.map((l) => ({ code: '', description: l.description.slice(0, 120), quantity: 1, unitPrice: fromMinor(l.amount, inv.currency), iva: sifen.data?.defaultIva ?? 10 })),
+      paymentType: inv.method === 'cash' ? 1 : inv.method === 'card' ? 3 : inv.method === 'transfer' ? 5 : inv.method === 'qr' ? 21 : 99,
+      source: { type: 'invoice', id: inv.id },
+    };
+  };
   const settings = useQuery({ queryKey: ['platform', 'settings'], queryFn: () => api.get<PlatformSettings>('/platform/settings') });
   const stats = useQuery({ queryKey: ['platform', 'billing-stats'], queryFn: () => api.get<BillingStatsDTO>('/platform/billing/stats') });
   const list = useQuery({
@@ -151,6 +191,7 @@ export function BillingTab() {
                     <td className="font-medium whitespace-nowrap">{inv.tenantName}</td>
                     <td className="min-w-56">
                       {inv.description}
+                      <InvoiceLines invoice={inv} />
                       {inv.status === 'paid' && (
                         <span className="block text-xs text-muted">
                           Pagada {inv.paidAt ? formatDateTime(inv.paidAt) : ''} · {inv.method && (MANUAL_METHOD_LABELS[inv.method as ManualMethod] ?? inv.method)}
@@ -162,6 +203,19 @@ export function BillingTab() {
                     <td className="whitespace-nowrap tabular-nums">{dateOnly(inv.dueDate)}</td>
                     <td>{statusBadge(inv)}</td>
                     <td>
+                      {inv.status === 'paid' && sifenReady && (inv.currency === 'PYG' || inv.currency === 'USD') && (
+                        <div className="flex justify-end">
+                          {eDocOf(inv.id) ? (
+                            <a href={eDocOf(inv.id)!.kudeUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs font-medium whitespace-nowrap text-primary hover:underline">
+                              <FileText className="size-3.5" /> {eDocOf(inv.id)!.number}
+                            </a>
+                          ) : (
+                            <Button size="sm" variant="secondary" icon={<FileText className="size-3.5" />} onClick={() => setEInvoice(prefillFor(inv))}>
+                              Factura electrónica
+                            </Button>
+                          )}
+                        </div>
+                      )}
                       {inv.status === 'pending' && (
                         <div className="flex justify-end gap-1">
                           <Button size="sm" variant="secondary" icon={<CheckCircle2 className="size-3.5" />} onClick={() => setPaying(inv)}>
@@ -190,6 +244,15 @@ export function BillingTab() {
 
       {creating && <NewInvoiceModal onClose={() => setCreating(false)} onCreated={refresh} defaultCurrency={currency} />}
       {paying && <PayInvoiceModal invoice={paying} onClose={() => setPaying(null)} onPaid={refresh} />}
+      {eInvoice && (
+        <InvoiceForm
+          base="/platform/invoicing"
+          defaultIva={sifen.data?.defaultIva ?? 10}
+          prefill={eInvoice}
+          onClose={() => setEInvoice(null)}
+          onIssued={() => void qc.invalidateQueries({ queryKey: ['sifen', '/platform/invoicing'] })}
+        />
+      )}
     </div>
   );
 }

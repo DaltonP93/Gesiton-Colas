@@ -61,6 +61,8 @@ const settingsBody = z.object({
       }),
     )
     .optional(),
+  /** Precio mensual de cada módulo adicional (0 = sin cargo). */
+  addons: z.partialRecord(z.enum(MODULE_IDS), z.number().min(0).max(1_000_000_000)).optional(),
   // Sin valores por defecto: lo que no se envía queda como está.
   billing: z
     .object({
@@ -72,6 +74,17 @@ const settingsBody = z.object({
       issuerName: z.string().trim().max(160),
       issuerTaxId: z.string().trim().max(40),
       instructions: z.string().trim().max(1000),
+    })
+    .partial()
+    .optional(),
+  backups: z
+    .object({
+      enabled: z.boolean(),
+      hour: z.number().int().min(0).max(23),
+      timezone: z.string().trim().min(1).max(64),
+      keepDays: z.number().int().min(1).max(365),
+      includeUploads: z.boolean(),
+      s3: z.boolean(),
     })
     .partial()
     .optional(),
@@ -420,6 +433,13 @@ export const platformRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async 
     '/platform/settings',
     { preHandler: superadmin, schema: { tags, summary: 'Guardar los ajustes de la plataforma', body: settingsBody } },
     async (request): Promise<PlatformSettings> => {
+      if (request.body.backups?.timezone) {
+        try {
+          new Intl.DateTimeFormat('es', { timeZone: request.body.backups.timezone });
+        } catch {
+          throw badRequest('Zona horaria inválida');
+        }
+      }
       if (request.body.homePage === 'redirect') {
         const url = request.body.homeRedirectUrl ?? (await ctx.platform.get()).homeRedirectUrl;
         if (!url) throw badRequest('Indique la dirección a la que se redirige la página principal');

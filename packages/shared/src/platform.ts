@@ -52,6 +52,47 @@ export type PlanConfig = z.infer<ReturnType<typeof planConfig>>;
 
 export const platformPlansSchema = z.object(Object.fromEntries(PLAN_IDS.map((id) => [id, planConfig(id)])) as Record<PlanId, ReturnType<typeof planConfig>>);
 
+/** Copias de seguridad automáticas (base de datos y archivos subidos). */
+export const backupSettingsSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    /** Hora del día (0-23) en `timezone`. */
+    hour: z.number().int().min(0).max(23).default(3),
+    timezone: z.string().max(64).default('America/Asuncion'),
+    /** Días que se conservan las copias. */
+    keepDays: z.number().int().min(1).max(365).default(14),
+    /** Incluir las imágenes, videos y audios subidos (si se guardan en el disco del servidor). */
+    includeUploads: z.boolean().default(true),
+    /** Copiar también a S3 (requiere S3_BUCKET y credenciales en el servidor). */
+    s3: z.boolean().default(false),
+  })
+  .prefault({});
+export type BackupSettings = z.infer<typeof backupSettingsSchema>;
+
+export interface BackupDTO {
+  id: string;
+  file: string;
+  sizeBytes: number;
+  status: 'running' | 'ok' | 'failed';
+  error: string | null;
+  trigger: 'auto' | 'manual';
+  includesUploads: boolean;
+  s3Key: string | null;
+  /** El archivo sigue en el servidor y se puede descargar. */
+  available: boolean;
+  startedAt: string;
+  finishedAt: string | null;
+}
+
+export interface BackupStatusDTO {
+  settings: BackupSettings;
+  items: BackupDTO[];
+  /** pg_dump instalado en el servidor. */
+  ready: boolean;
+  dir: string;
+  s3Available: boolean;
+}
+
 export const platformSettingsSchema = z.object({
   homePage: z.enum(HOME_PAGES).default('landing'),
   homeRedirectUrl: z.string().max(2048).default(''),
@@ -64,8 +105,14 @@ export const platformSettingsSchema = z.object({
   brand: platformBrandSchema.prefault({}),
   /** Módulos y precio de cada plan. */
   plans: platformPlansSchema.prefault({}),
+  /**
+   * Precio mensual de cada módulo cuando se activa a una organización cuyo plan no lo incluye
+   * (en la moneda del plan de esa organización). Sin precio = sin cargo adicional.
+   */
+  addons: z.partialRecord(z.enum(MODULE_IDS), z.number().min(0).max(1_000_000_000)).default({}),
   /** Facturación de los planes a las organizaciones. */
   billing: billingSettingsSchema.prefault({}),
+  backups: backupSettingsSchema,
 });
 export type PlatformSettings = z.infer<typeof platformSettingsSchema>;
 

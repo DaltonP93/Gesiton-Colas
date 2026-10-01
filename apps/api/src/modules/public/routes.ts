@@ -10,6 +10,7 @@ import {
   type CallDTO,
   type DisplayBootstrapDTO,
   type IssuedTicketDTO,
+  type KioskAppointmentMatchDTO,
   type KioskBootstrapDTO,
   type KioskConfig,
   type PublicConfigDTO,
@@ -47,7 +48,7 @@ import {
   toServiceDTO,
 } from '../../lib/dto';
 import { assertModuleActive, assertTenantAvailable } from '../../lib/auth';
-import { badRequest, notFound } from '../../lib/errors';
+import { badRequest, conflict, notFound } from '../../lib/errors';
 import { dayInTimezone } from '../../lib/tz';
 import { ticketCharge } from '../payments/routes';
 import { ticketSurveyInfo } from '../surveys/routes';
@@ -222,7 +223,56 @@ export const publicRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
         idlePlaylist: await idlePlaylist(tenant.id, config),
         prices:
           settings.payments.showPriceOnKiosk && (await ctx.modulesOf(tenant)).includes('payments') ? { currency: settings.payments.currency } : null,
+        appointments: config.appointments && (await ctx.modulesOf(tenant)).includes('appointments'),
       };
+    },
+  );
+
+  /* ------------------- Llegada de citas en el kiosco ------------------- */
+
+  const appointmentQuery = z.object({ query: z.string().trim().min(3).max(40) });
+
+  async function kioskAppointments(token: string) {
+    const context = await kioskContext(token);
+    if (!context.config.appointments) throw badRequest('Este kiosco no recibe citas');
+    await assertModuleActive(ctx.modulesOf, context.tenant, 'appointments');
+    return context;
+  }
+
+  app.post(
+    '/public/kiosks/:token/appointments/lookup',
+    {
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+      schema: { tags, summary: 'Buscar las citas de hoy por documento o código (kiosco)', params: tokenParam, security: [], body: appointmentQuery },
+    },
+    async (request): Promise<KioskAppointmentMatchDTO[]> => {
+      const { kiosk, tenant } = await kioskAppointments(request.params.token);
+      return (await ctx.appointments.lookupToday(tenant, kiosk.branchId, request.body.query)).matches;
+    },
+  );
+
+  app.post(
+    '/public/kiosks/:token/appointments/:id/check-in',
+    {
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+      schema: {
+        tags,
+        summary: 'Presentarse a una cita: emite el turno (kiosco)',
+        params: tokenParam.extend({ id: z.uuid() }),
+        security: [],
+        // Se repite lo que escribió el cliente: el kiosco solo puede presentar citas que encontró.
+        body: appointmentQuery,
+      },
+    },
+    async (request, reply): Promise<IssuedTicketDTO> => {
+      const { kiosk, tenant } = await kioskAppointments(request.params.token);
+      const { matches } = await ctx.appointments.lookupToday(tenant, kiosk.branchId, request.body.query);
+      const match = matches.find((m) => m.id === request.params.id);
+      if (!match) throw notFound('Cita');
+      if (!match.canCheckIn) throw conflict(match.reason ?? 'No se puede presentar ahora');
+      const result = await ctx.appointments.checkIn(tenant, match.id, { channel: 'kiosk' });
+      reply.code(201);
+      return { ticket: result.ticket, waitingAhead: result.waitingAhead, trackingUrl: result.trackingUrl };
     },
   );
 
