@@ -14,6 +14,7 @@ import type {
 import type { ModuleId, ModuleOverrides } from './modules';
 import type { PlanId, PlanLimits } from './plans';
 import type { Schedule } from './schedule';
+import type { LegalPendingDTO } from './legal';
 
 /** Fechas serializadas en ISO-8601. */
 type ISODate = string;
@@ -62,6 +63,8 @@ export interface MeDTO {
   modules: ModuleId[];
   /** La plataforma factura los planes (muestra «Plan y facturación» a los administradores). */
   billing: boolean;
+  /** Documentos que el administrador debe aceptar en nombre de la organización (nueva versión). */
+  legal: LegalPendingDTO[];
 }
 
 export interface BranchDTO {
@@ -264,6 +267,14 @@ export interface PublicTenantDTO {
   terminology: Terminology;
   locale: Locale;
   timezone: string;
+  /** Aviso de privacidad para los clientes (reserva, kiosco, fila virtual, encuestas); null = no se muestra. */
+  privacyNotice: PrivacyNoticeDTO | null;
+}
+
+export interface PrivacyNoticeDTO {
+  text: string;
+  /** Política completa de la organización (enlace externo). */
+  url: string | null;
 }
 
 export interface DisplayBootstrapDTO {

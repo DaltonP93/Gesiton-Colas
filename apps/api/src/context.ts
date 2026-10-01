@@ -12,6 +12,7 @@ import { Appointments } from './lib/appointments';
 import { Audit } from './lib/audit';
 import { Backups } from './lib/backups';
 import { Sifen } from './lib/sifen/service';
+import { Legal } from './lib/legal';
 import { DeviceMonitor } from './lib/deviceMonitor';
 import { Notifier } from './lib/notifier';
 import { Payments } from './lib/payments/service';
@@ -50,6 +51,8 @@ export interface AppContext {
   appointments: Appointments;
   /** Factura electrónica SIFEN (Paraguay). */
   sifen: Sifen;
+  /** Términos, privacidad y tratamiento de datos: versiones y aceptaciones. */
+  legal: Legal;
   /** Notifica un cambio de turno a pantallas, operadores, seguimiento público y webhooks. */
   publishTicket(
     tenantId: string,
@@ -150,6 +153,7 @@ export function createContext(config: AppConfig, db: Database, log: FastifyBaseL
     // Se crea al final: usa publishTicket de este mismo contexto.
     appointments: null as unknown as Appointments,
     sifen,
+    legal: new Legal(db, platform, publicUrl),
     log,
     emailBrand,
     publishTicket(tenantId, event, ticket, extra = {}, options = {}) {

@@ -112,6 +112,18 @@ export const privacySettingsSchema = z.object({
    * en cada turno. Después se borran y queda solo la estadística. 0 = no se borran.
    */
   retentionDays: z.number().int().min(0).max(3650).default(0),
+  /** Aviso de privacidad que ven los clientes en la reserva en línea, el kiosco, la fila virtual y las encuestas. */
+  notice: z
+    .object({
+      enabled: z.boolean().default(false),
+      /** Texto propio; vacío = el texto estándar armado con el nombre y el plazo de conservación. */
+      text: z.string().max(4000).default(''),
+      /** Enlace a la política completa de la organización. */
+      url: z.union([z.literal(''), z.url({ protocol: /^https?$/ }).max(2048)]).default(''),
+      /** Dónde pedir el acceso o el borrado de los datos (correo, teléfono o dirección). */
+      contact: z.string().trim().max(200).default(''),
+    })
+    .prefault({}),
 });
 export type PrivacySettings = z.infer<typeof privacySettingsSchema>;
 

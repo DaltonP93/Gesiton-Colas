@@ -3,6 +3,7 @@ import { DEFAULT_PLAN_MODULES, MODULE_IDS } from './modules';
 import { PLAN_IDS, type PlanId } from './plans';
 import { CURRENCIES } from './currency';
 import { billingSettingsSchema } from './payments';
+import { legalSettingsSchema, type LegalIndexDTO } from './legal';
 
 const color = z.string().regex(/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i, 'Color hexadecimal inválido');
 
@@ -113,6 +114,8 @@ export const platformSettingsSchema = z.object({
   /** Facturación de los planes a las organizaciones. */
   billing: billingSettingsSchema.prefault({}),
   backups: backupSettingsSchema,
+  /** Titular del software y aceptación de los términos (Plataforma → Legal). */
+  legal: legalSettingsSchema,
 });
 export type PlatformSettings = z.infer<typeof platformSettingsSchema>;
 
@@ -131,6 +134,8 @@ export interface PublicConfigDTO {
   /** Hay un servidor de correo configurado (se pueden enviar invitaciones, códigos y recuperaciones). */
   emailEnabled: boolean;
   brand: PlatformBrand;
+  /** Términos, privacidad y tratamiento de datos publicados. */
+  legal: LegalIndexDTO;
 }
 
 /* ------------------------------------------------------------------ */

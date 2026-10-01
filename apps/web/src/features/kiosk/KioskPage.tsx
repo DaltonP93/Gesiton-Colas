@@ -23,6 +23,7 @@ import { translator } from '../../lib/i18n';
 import { connectSocket } from '../../lib/socket';
 import { fontStack, loadFont, readableOn, setCustomCss } from '../../lib/theme';
 import { printTicket } from './printTicket';
+import { PrivacyNotice } from '../../components/legal/PrivacyNotice';
 
 type Service = KioskBootstrapDTO['services'][number];
 type KioskTheme = KioskBootstrapDTO['kiosk']['config']['theme'];
@@ -375,7 +376,7 @@ function Kiosk({ boot, token, refetch }: { boot: KioskBootstrapDTO; token: strin
         )}
         {step.name === 'form' && (
           <StepFrame title={t('kiosk.yourData')} subtitle={step.service.name} onBack={reset} t={t}>
-            <CustomerForm fields={askFields} t={t} shape={shapeClass(theme)} onSubmit={(data) => void issue(step.service, step.priority, data)} />
+            <CustomerForm fields={askFields} t={t} tenant={tenant} shape={shapeClass(theme)} onSubmit={(data) => void issue(step.service, step.priority, data)} />
           </StepFrame>
         )}
         {step.name === 'issuing' && (
@@ -645,7 +646,19 @@ const TOP_ICON: Record<KioskTheme['iconSize'], [string, string]> = {
   xl: ['size-40', 'size-20'],
 };
 
-function CustomerForm({ fields, t, onSubmit, shape }: { fields: CustomerField[]; t: ReturnType<typeof translator>; onSubmit: (data: Record<string, string>) => void; shape: string }) {
+function CustomerForm({
+  fields,
+  t,
+  onSubmit,
+  shape,
+  tenant,
+}: {
+  fields: CustomerField[];
+  t: ReturnType<typeof translator>;
+  onSubmit: (data: Record<string, string>) => void;
+  shape: string;
+  tenant: KioskBootstrapDTO['tenant'];
+}) {
   const [data, setData] = useState<Record<string, string>>({});
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -693,6 +706,7 @@ function CustomerForm({ fields, t, onSubmit, shape }: { fields: CustomerField[];
       >
         <Check className="size-7" /> {t('kiosk.continue')}
       </button>
+      <PrivacyNotice notice={tenant.privacyNotice} organization={tenant.name} label={t('privacy.notice')} className="text-[0.95em]" />
     </form>
   );
 }

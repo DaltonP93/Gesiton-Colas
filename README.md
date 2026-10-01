@@ -36,6 +36,7 @@ Plataforma **SaaS** de gestión de turnos, pantallas y publicidad digital. Organ
 | **Factura electrónica SIFEN** | Facturas electrónicas de **Paraguay** (Manual Técnico v150): XML con CDC, **firma digital** con el certificado .p12 del emisor, **QR con CSC**, envío a la **SET** (pruebas y producción), consulta, **anulación**, **KuDE** imprimible y envío por correo. Cada organización factura a sus clientes (a mano, desde un cobro o **automática al cobrar**) y la plataforma factura sus planes con su propio emisor. Ver [docs/SIFEN.md](docs/SIFEN.md). |
 | **Registro de actividad** | Quién cambió qué: cada cambio guarda la persona, la fecha, la IP y los datos enviados (sin contraseñas ni claves), además de los ingresos y los intentos fallidos. Filtros, búsqueda y CSV en Configuración → Registro de actividad y, para toda la plataforma, en Plataforma → Actividad. Lo que hace el soporte dentro de una organización queda marcado. |
 | **Alertas de equipos** | Aviso por **correo, WhatsApp o SMS** cuando una TV o un kiosco deja de responder (después de N minutos, solo en el horario elegido) y cuando vuelve; una sola alerta por corte y un aviso en el panel con los equipos desconectados. |
+| **Términos y licencia** | Licencia propietaria del código ([LICENSE](LICENSE)) y documentos propios para Paraguay: **términos del servicio**, **política de privacidad**, **acuerdo de tratamiento de datos** y **contrato de licencia** para instalación propia. El superadministrador los completa, edita y publica por versión; cada organización los acepta al registrarse y en cada cambio importante, con constancia de quién, cuándo y desde qué IP. Cada organización puede mostrar su **aviso de privacidad** en la reserva, el kiosco y las encuestas. Ver [docs/legal](docs/legal/README.md). |
 | **Copias de seguridad** | Copia **diaria automática** de la base y los archivos, con plazo de conservación, subida opcional a **S3**, descarga desde Plataforma → Copias, aviso si falla y restauración por consola en una sola transacción (ver [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md#copias-de-seguridad)). |
 | **Privacidad** | Plazo de conservación de datos personales, borrado a pedido del titular y exportación de datos personales solo para administradores (ver [docs/SEGURIDAD.md](docs/SEGURIDAD.md)). |
 
@@ -123,6 +124,7 @@ docker compose exec app node apps/api/dist/db/admin-cli.js superadmin correo@emp
 | `/app/facturacion`, `/app/cobros` | Plan y facturas de la organización · cobros de turnos |
 | `/pago/:token` | Página de pago (checkout de la pasarela y confirmación) |
 | `/encuesta/:token`, `/encuesta/s/:token` | Encuesta del turno y encuesta por enlace general o QR (`?sucursal=`) |
+| `/terminos`, `/privacidad`, `/tratamiento-de-datos` | Documentos legales publicados (con sus versiones anteriores) |
 | `/api/docs` | Documentación interactiva de la API |
 
 ## Documentación
@@ -132,4 +134,9 @@ docker compose exec app node apps/api/dist/db/admin-cli.js superadmin correo@emp
 - [Migración desde la versión anterior](docs/MIGRACION.md).
 - [Pagos y facturación](docs/PAGOS.md): planes, cobros a clientes y pasarelas.
 - [Factura electrónica SIFEN](docs/SIFEN.md): emisor, timbrado, certificado, CSC, pruebas y producción.
-- [Hoja de ruta](docs/HOJA-DE-RUTA.md): próximos pasos y pendientes (incluida la licencia / EULA).
+- [Documentos legales](docs/legal/README.md): licencia, términos del servicio, privacidad, tratamiento de datos y contrato de licencia.
+- [Hoja de ruta](docs/HOJA-DE-RUTA.md): próximos pasos y pendientes.
+
+## Licencia
+
+Software propietario: todos los derechos reservados (ver [LICENSE](LICENSE)). Los componentes de terceros conservan sus licencias ([docs/LICENCIAS-DE-TERCEROS.md](docs/LICENCIAS-DE-TERCEROS.md)).

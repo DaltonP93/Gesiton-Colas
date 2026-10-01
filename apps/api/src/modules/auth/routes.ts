@@ -3,10 +3,11 @@ import { eq } from 'drizzle-orm';
 import type { FastifyRequest } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { LOCALES, PLANS, type MeDTO } from '@gc/shared';
+import { LEGAL_DOCS, LOCALES, PLANS, type LegalKind, type MeDTO } from '@gc/shared';
 import type { AppContext } from '../../context';
 import { createDemoOrganization } from '../../db/demo';
 import { createTenantWithDefaults } from '../../db/seed';
+import type { DbOrTx } from '../../db/client';
 import { tenants, users, type Tenant, type User } from '../../db/schema';
 import { assertTenantAvailable, hashPassword, sessionsResetNow, verifyPassword } from '../../lib/auth';
 import { toTenantDTO, toUserDTO } from '../../lib/dto';
@@ -47,7 +48,45 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
       limits: tenant ? PLANS[tenant.plan] : null,
       modules: tenant ? await ctx.modulesOf(tenant) : [],
       billing: tenant ? (await ctx.platform.get()).billing.enabled : false,
+      // El administrador acepta las nuevas versiones en nombre de la organización (el soporte no).
+      legal: tenant && user.role === 'admin' ? await ctx.legal.pendingFor(tenant.id) : [],
     };
+  }
+
+  /** Exige la casilla «Acepto los términos» si hay documentos publicados para aceptar. */
+  async function assertTermsAccepted(accepted: boolean | undefined) {
+    if (accepted) return;
+    if ((await ctx.legal.index()).acceptance) {
+      throw new AppError(400, 'terms_required', 'Para continuar, acepte los términos y condiciones del servicio y el acuerdo de tratamiento de datos.');
+    }
+  }
+
+  /** Constancia de aceptación de la organización nueva (registro y demo). */
+  async function acceptForNewTenant(tx: DbOrTx, request: FastifyRequest, admin: User, tenant: Tenant) {
+    if (!(await ctx.legal.index()).acceptance) return [];
+    const accepted = await ctx.legal.accept(
+      {
+        tenant: { id: tenant.id, name: tenant.name },
+        user: { id: admin.id, name: admin.name, email: admin.email },
+        ip: request.ip,
+        userAgent: request.headers['user-agent'] ?? null,
+      },
+      tx,
+    );
+    return accepted;
+  }
+
+  function auditAcceptance(request: FastifyRequest, admin: User, accepted: { kind: LegalKind; version: number }[], how: string) {
+    if (!accepted.length) return;
+    ctx.audit.record({
+      tenantId: admin.tenantId,
+      actor: { kind: 'user', id: admin.id, name: admin.name, email: admin.email, role: admin.role },
+      action: 'legal.accept',
+      entity: 'legal',
+      summary: `Aceptó ${accepted.map((d) => `«${LEGAL_DOCS[d.kind].title}» (versión ${d.version})`).join(' y ')} ${how}`,
+      ip: request.ip,
+      userAgent: request.headers['user-agent'] ?? null,
+    });
   }
 
   async function findUser(address: string) {
@@ -133,6 +172,8 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
           password,
           timezone: z.string().max(64).optional(),
           locale: z.enum(LOCALES).optional(),
+          /** Casilla «Acepto los términos» (obligatoria si hay términos publicados). */
+          acceptTerms: z.boolean().optional(),
         }),
       },
     },
@@ -141,11 +182,12 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
         throw forbidden('El registro de nuevas organizaciones está deshabilitado');
       }
       const body = request.body;
+      await assertTermsAccepted(body.acceptTerms);
       const [exists] = await ctx.db.select({ id: users.id }).from(users).where(eq(users.email, body.email)).limit(1);
       if (exists) throw conflict('Ya existe una cuenta con ese email. Inicie sesión o recupere su contraseña.');
       const verification = ctx.config.EMAIL_VERIFICATION;
-      const { admin, tenant } = await ctx.db.transaction((tx) =>
-        createTenantWithDefaults(tx, {
+      const { admin, tenant, accepted } = await ctx.db.transaction(async (tx) => {
+        const created = await createTenantWithDefaults(tx, {
           organizationName: body.organizationName,
           adminName: body.name,
           adminEmail: body.email,
@@ -153,8 +195,10 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
           timezone: body.timezone,
           locale: body.locale,
           emailVerified: verification === 'off',
-        }),
-      );
+        });
+        return { ...created, accepted: await acceptForNewTenant(tx, request, created.admin, created.tenant) };
+      });
+      auditAcceptance(request, admin, accepted, 'al crear la organización');
       if (verification !== 'off') {
         // La cuenta ya existe: si el correo falla se puede reenviar la verificación después.
         await sendVerification(admin, tenant).catch((error) => request.log.warn({ err: error }, 'No se pudo enviar la verificación'));
@@ -181,12 +225,14 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
           name: z.string().trim().min(2).max(120),
           organizationName: z.string().trim().max(120).optional(),
           timezone: z.string().max(64).optional(),
+          acceptTerms: z.boolean().optional(),
         }),
       },
     },
     async (request) => {
       if (!ctx.config.ALLOW_DEMO || !(await ctx.platform.get()).allowDemo) throw forbidden('Las demos están deshabilitadas en esta instalación');
       const body = request.body;
+      await assertTermsAccepted(body.acceptTerms);
       const existing = await findUser(body.email);
       if (existing) {
         // Ya tiene cuenta: se le envía un acceso por correo en lugar de crear otra demo.
@@ -197,9 +243,11 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
         return { ok: true, message: 'Le enviamos un correo con el acceso a su demo.' };
       }
       const days = ctx.config.DEMO_DAYS;
-      const { admin, tenant } = await ctx.db.transaction((tx) =>
-        createDemoOrganization(tx, { email: body.email, name: body.name, organizationName: body.organizationName, timezone: body.timezone, days }),
-      );
+      const { admin, tenant, accepted } = await ctx.db.transaction(async (tx) => {
+        const created = await createDemoOrganization(tx, { email: body.email, name: body.name, organizationName: body.organizationName, timezone: body.timezone, days });
+        return { ...created, accepted: await acceptForNewTenant(tx, request, created.admin, created.tenant) };
+      });
+      auditAcceptance(request, admin, accepted, 'al pedir la demo');
       const { token: link, code } = await issueToken(ctx.db, admin.id, 'email_login', { withCode: true, ttlMs: 7 * 24 * 3600 * 1000 });
       await mail(demoMail(admin.email, admin.name, `${base}/acceso?token=${link}`, code!, days, await brandOf(tenant)), tenant.id);
       return { ok: true, message: 'Le enviamos un correo con el acceso a su demo.' };

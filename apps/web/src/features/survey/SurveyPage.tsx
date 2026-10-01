@@ -7,6 +7,7 @@ import { ApiError, api, assetUrl } from '../../lib/api';
 import { translator } from '../../lib/i18n';
 import { applyBranding } from '../../lib/theme';
 import { SurveyForm } from './SurveyForm';
+import { PrivacyNotice } from '../../components/legal/PrivacyNotice';
 
 /** Encuesta pública: del turno (/encuesta/:token) o por enlace general / QR (/encuesta/s/:token?sucursal=). */
 export default function SurveyPage({ general = false }: { general?: boolean }) {
@@ -73,6 +74,7 @@ export default function SurveyPage({ general = false }: { general?: boolean }) {
         {status === 'answered' && <Card icon={<CheckCircle2 className="size-12 text-emerald-600" />} title={t('survey.answered')} />}
         {status === 'not_ready' && <Card icon={<Clock className="size-12 text-primary" />} title={t('survey.notReady')} />}
         {status === 'expired' && <Card icon={<Clock className="size-12 text-muted" />} title={t('survey.expired')} />}
+        <PrivacyNotice notice={data.tenant.privacyNotice} organization={data.tenant.name} label={t('privacy.notice')} className="mt-6 text-muted" />
       </main>
     </div>
   );

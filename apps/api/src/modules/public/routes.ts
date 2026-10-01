@@ -87,7 +87,7 @@ export const publicRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
     '/public/config',
     { schema: { tags, summary: 'Opciones públicas de la instalación: página de inicio, registro, demo y marca del ingreso', security: [] } },
     async (): Promise<PublicConfigDTO> => {
-      const [settings, mail] = await Promise.all([ctx.platform.get(), ctx.mailer.resolve(null)]);
+      const [settings, mail, legal] = await Promise.all([ctx.platform.get(), ctx.mailer.resolve(null), ctx.legal.index()]);
       return {
         homePage: settings.homePage,
         homeRedirectUrl: settings.homeRedirectUrl,
@@ -99,6 +99,7 @@ export const publicRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (a
         // Con DEV_OUTBOX (pruebas) los correos se leen del buzón de desarrollo: cuentan como enviados.
         emailEnabled: mail.source !== 'none' || ctx.config.DEV_OUTBOX,
         brand: settings.brand,
+        legal,
       };
     },
   );

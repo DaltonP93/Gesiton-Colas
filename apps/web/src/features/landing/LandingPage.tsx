@@ -16,6 +16,7 @@ import { Button } from '../../components/ui';
 import { assetUrl } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { usePublicConfig } from '../../lib/queries';
+import { LegalFooter } from '../../components/legal/LegalFooter';
 
 const features = [
   { icon: <MonitorPlay />, title: 'Pantallas inteligentes', text: 'Llamados con voz y sonido, historial, reloj y diseños intercambiables para cualquier TV, Smart TV o Android TV.' },
@@ -150,11 +151,13 @@ export function LandingPage() {
         </div>
       </section>
 
-      <footer className="py-10 text-center text-sm text-muted">
-        © {new Date().getFullYear()} {name} · <a href="/api/docs" className="hover:text-fg">Documentación de la API</a> ·{' '}
-        <a href="/licencias-de-terceros.txt" className="hover:text-fg">
-          Licencias de terceros
-        </a>
+      <footer className="space-y-2 py-10 text-center text-sm text-muted">
+        <p>
+          <a href="/api/docs" className="hover:text-fg">
+            Documentación de la API
+          </a>
+        </p>
+        <LegalFooter className="text-xs" />
       </footer>
     </div>
   );

@@ -32,6 +32,7 @@ import type {
   CustomerData,
   DisplayConfig,
   KioskConfig,
+  LegalKind,
   MediaKind,
   MediaProvider,
   MailSecurity,
@@ -957,3 +958,54 @@ export const sifenDocuments = pgTable(
   ],
 );
 export type SifenDocument = typeof sifenDocuments.$inferSelect;
+
+/**
+ * Versiones publicadas de los documentos legales (términos, privacidad, tratamiento de datos).
+ * Nunca se modifican: `content` es exactamente el texto que se publicó y que aceptaron las organizaciones.
+ */
+export const legalDocuments = pgTable(
+  'legal_documents',
+  {
+    id: id(),
+    kind: text('kind').$type<LegalKind>().notNull(),
+    version: integer('version').notNull(),
+    /** Texto con variables ({{titular}}…) tal como lo dejó el superadministrador. */
+    source: text('source').notNull(),
+    /** Texto publicado, con los datos del titular reemplazados. */
+    content: text('content').notNull(),
+    /** Cambio importante: las organizaciones tienen que volver a aceptar. */
+    requiresAcceptance: boolean('requires_acceptance').notNull().default(true),
+    /** Qué cambió respecto de la versión anterior. */
+    note: text('note'),
+    publishedBy: uuid('published_by').references(() => users.id, { onDelete: 'set null' }),
+    publishedByName: text('published_by_name'),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('legal_documents_kind_version_idx').on(t.kind, t.version)],
+);
+export type LegalDocument = typeof legalDocuments.$inferSelect;
+
+/**
+ * Constancia de aceptación de un documento por una organización (quién, cuándo y desde dónde).
+ * Se conserva aunque se borren la organización o el usuario: es la prueba del contrato.
+ */
+export const legalAcceptances = pgTable(
+  'legal_acceptances',
+  {
+    id: id(),
+    tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'set null' }),
+    tenantName: text('tenant_name').notNull(),
+    documentId: uuid('document_id')
+      .notNull()
+      .references(() => legalDocuments.id, { onDelete: 'restrict' }),
+    kind: text('kind').$type<LegalKind>().notNull(),
+    version: integer('version').notNull(),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    userName: text('user_name').notNull(),
+    userEmail: text('user_email').notNull(),
+    ip: text('ip'),
+    userAgent: text('user_agent'),
+    acceptedAt: timestamp('accepted_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex('legal_acceptances_tenant_document_idx').on(t.tenantId, t.documentId), index('legal_acceptances_kind_idx').on(t.kind, t.tenantId, t.version)],
+);

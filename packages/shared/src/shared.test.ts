@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  LEGAL_TEMPLATES,
+  LEGAL_VARIABLES,
+  LICENSE_VARIABLES,
+  defaultPrivacyNotice,
+  legalHolderSchema,
+  legalMissing,
+  legalVars,
+  renderLegal,
   DEFAULT_TICKET_CSS,
   DEFAULT_TICKET_TEMPLATE,
   TICKET_PRESETS,
@@ -263,5 +271,38 @@ describe('numeración y módulos', () => {
     expect(effectiveModules(DEFAULT_PLAN_MODULES.free, { advertising: false })).not.toContain('advertising');
     expect(effectiveModules(DEFAULT_PLAN_MODULES.enterprise, null)).toHaveLength(MODULE_IDS.length);
     expect(defaultPlatformSettings().plans.pro.modules).toContain('notifications');
+  });
+});
+
+describe('documentos legales', () => {
+  const holder = legalHolderSchema.parse({ name: 'Colas S.A.', taxId: '80012345-6', address: 'Asunción', email: 'legal@colas.test' });
+  const vars = legalVars(holder, { appName: 'Turnos', publicUrl: 'https://turnos.test/', version: 2, date: new Date('2026-10-01T15:00:00Z') });
+
+  it('reemplaza las variables y avisa las desconocidas', () => {
+    expect(renderLegal('{{titular}} ({{ ruc }}) en {{sitio}}/terminos, v{{version}} del {{fecha}}', vars).text).toBe('Colas S.A. (80012345-6) en https://turnos.test/terminos, v2 del 1 de octubre de 2026');
+    expect(renderLegal('Hola {{nadie}}', vars)).toEqual({ text: 'Hola {{nadie}}', unknown: ['nadie'] });
+    expect(renderLegal('{{licenciatario}}', { licenciatario: '' }, '____').text).toBe('____');
+  });
+
+  it('las plantillas usan solo variables conocidas', () => {
+    const known = Object.fromEntries([...LEGAL_VARIABLES, ...LICENSE_VARIABLES].map((v) => [v.key, 'x']));
+    for (const [kind, text] of Object.entries(LEGAL_TEMPLATES)) {
+      const { unknown } = renderLegal(text, kind === 'license' ? known : vars);
+      expect(unknown, kind).toEqual([]);
+    }
+  });
+
+  it('indica los datos que faltan del titular', () => {
+    expect(legalMissing(holder)).toEqual([]);
+    expect(legalMissing(legalHolderSchema.parse({}))).toEqual(['razón social o nombre', 'RUC', 'domicilio', 'correo de contacto']);
+  });
+
+  it('arma el aviso de privacidad estándar con el plazo de conservación', () => {
+    const privacy = tenantSettingsSchema.parse({}).privacy;
+    expect(privacy.notice.enabled).toBe(false);
+    expect(defaultPrivacyNotice('Clínica Sur', { ...privacy, retentionDays: 365 })).toContain('Se borran automáticamente a un año.');
+    expect(defaultPrivacyNotice('Clínica Sur', { ...privacy, retentionDays: 45 })).toContain('a los 45 días');
+    expect(defaultPrivacyNotice('Clínica Sur', privacy)).toContain('Se conservan solo mientras sean necesarios');
+    expect(defaultPrivacyNotice('Clínica Sur', privacy)).toMatch(/borrado de sus datos a Clínica Sur\.$/);
   });
 });

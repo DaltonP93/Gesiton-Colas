@@ -16,3 +16,5 @@ export * from './billing';
 export * from './audit';
 export * from './appointments';
 export * from './sifen';
+export * from './legal';
+export * from './legalTemplates';

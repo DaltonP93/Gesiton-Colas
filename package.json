@@ -2,6 +2,7 @@
   "name": "gestion-colas",
   "version": "3.0.0",
   "private": true,
+  "license": "UNLICENSED",
   "description": "Gestión de Colas — plataforma SaaS de gestión de turnos, pantallas y cartelería digital",
   "workspaces": [
     "packages/*",
@@ -21,7 +22,8 @@
     "db:seed": "npm run db:seed --workspace @gc/api",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "legal:templates": "node scripts/legal-templates.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0"

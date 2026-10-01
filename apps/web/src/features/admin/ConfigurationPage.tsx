@@ -5,6 +5,7 @@ import {
   ChevronRight,
   ClipboardList,
   CreditCard,
+  FileCheck2,
   FileText,
   Globe,
   Hash,
@@ -44,9 +45,10 @@ const PaymentsSettingsPage = lazy(() => import('./PaymentsSettingsPage'));
 const AlertsSettingsPage = lazy(() => import('./AlertsSettingsPage'));
 const AppointmentsSettingsPage = lazy(() => import('./AppointmentsSettingsPage'));
 const InvoicingSettingsPage = lazy(() => import('./InvoicingSettingsPage'));
+const LegalStatusSection = lazy(() => import('./LegalStatusSection'));
 
 type TabKey = 'marca' | 'region' | 'terminologia' | 'turnos' | 'cliente';
-type PageKey = 'sucursales' | 'servicios' | 'citas' | 'alertas' | 'usuarios' | 'actividad' | 'correo' | 'avisos' | 'cobros' | 'factura' | 'integraciones';
+type PageKey = 'sucursales' | 'servicios' | 'citas' | 'alertas' | 'usuarios' | 'actividad' | 'correo' | 'avisos' | 'cobros' | 'factura' | 'integraciones' | 'contrato';
 export type ConfigSection = 'inicio' | TabKey | PageKey;
 
 interface SectionDef {
@@ -80,6 +82,7 @@ const PAGE_COMPONENTS: Record<PageKey, ComponentType> = {
   cobros: PaymentsSettingsPage,
   factura: InvoicingSettingsPage,
   integraciones: IntegrationsPage,
+  contrato: LegalStatusSection,
 };
 function ActivitySection() {
   return (
@@ -119,6 +122,7 @@ export default function ConfigurationPage() {
       { key: 'inicio', label: 'Resumen', short: 'Resumen', description: 'Toda la configuración de un vistazo', icon: <LayoutGrid />, group: '' },
       { key: 'marca', label: 'Marca y apariencia', short: 'Marca', description: 'Logo, colores, tipografía, menú y fondo', icon: <Palette />, group: 'Organización' },
       { key: 'region', label: 'Idioma y zona horaria', short: 'Idioma', description: 'Idioma de pantallas y kioscos, hora local', icon: <Globe />, group: 'Organización' },
+      { key: 'contrato', label: 'Términos y contrato', short: 'Términos', description: 'Términos del servicio y tratamiento de datos aceptados', icon: <FileCheck2 />, group: 'Organización' },
       { key: 'terminologia', label: 'Terminología', short: 'Terminología', description: `${terms.ticket}, ${terms.counter.toLowerCase()} y demás palabras`, icon: <Type />, group: 'Organización' },
       { key: 'sucursales', label: `${terms.branches} y ${terms.counters.toLowerCase()}`, short: terms.branches, description: 'Lugares de atención y puestos', icon: <Building2 />, group: 'Atención' },
       { key: 'servicios', label: `${terms.services} y prioridades`, short: terms.services, description: 'Qué se atiende y quién pasa primero', icon: <ClipboardList />, group: 'Atención' },
@@ -308,6 +312,7 @@ function Overview({ sections }: { sections: SectionDef[] }) {
     cobros: `Moneda ${settings.payments.currency}${settings.payments.online ? ' · pago en línea' : ''}`,
     avisos: Object.values(settings.notifications.events).filter((e) => e.enabled).length + ' avisos activos',
     integraciones: 'API REST, webhooks y tiempo real',
+    contrato: me?.legal.length ? 'Hay una versión nueva para aceptar' : 'Constancia de aceptación',
   };
 
   return (

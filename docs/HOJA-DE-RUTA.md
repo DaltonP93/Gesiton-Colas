@@ -4,14 +4,13 @@ Estado al 1 de octubre de 2026 y próximos pasos sugeridos. El foco comercial: *
 sistemas que el cliente ya tiene** (HIS, ERP, agendas, CRM). En hospitales y clínicas la agenda y la historia clínica
 viven en el HIS: el valor está en la llegada, la fila, el llamado, la experiencia del paciente y los datos de atención.
 
-## Pendiente: licencia / EULA propia
+## Licencia y documentos legales
 
-> **Recordatorio:** el proyecto todavía no tiene archivo de licencia. Antes de vender o instalar en clientes conviene
-> definir un **contrato de licencia (EULA) / términos del servicio SaaS** propios: titularidad del software, uso
-> permitido por plan, prohibición de redistribuir, soporte y actualizaciones, datos personales (encargado del
-> tratamiento), disponibilidad, limitación de responsabilidad, ley aplicable y jurisdicción. Pídalo cuando quiera
-> armarlo; conviene que lo revise un abogado. Los avisos de terceros ya están en
-> [LICENCIAS-DE-TERCEROS.md](LICENCIAS-DE-TERCEROS.md).
+Ya están la licencia propietaria ([LICENSE](../LICENSE)) y las plantillas de **términos del servicio**, **política de
+privacidad**, **acuerdo de tratamiento de datos** y **contrato de licencia** para instalación propia
+([docs/legal](legal/README.md)), con publicación por versión y aceptación de cada organización en el sistema.
+**Falta:** completar los datos del titular en el `LICENSE` y en Plataforma → Legal, y que un abogado revise los textos
+antes de publicarlos.
 
 ## Ya disponible
 
@@ -19,7 +18,8 @@ Atención y fila (sucursales, servicios, prioridades, numeración, consola, moni
 kioscos y fila virtual, sonidos y voz, reportes, integraciones (API REST, API keys, webhooks), avisos por WhatsApp y
 SMS, encuestas (NPS/CSAT), cobros a clientes (Bancard, PagoPar, Stripe, manual), facturación de planes con módulos
 adicionales, **citas** (API/CSV/reserva en línea, llegada en el kiosco por horario), **factura electrónica SIFEN**,
-**registro de actividad**, **alertas de equipos desconectados** y **copias de seguridad automáticas**. Cada función
+**registro de actividad**, **alertas de equipos desconectados**, **copias de seguridad automáticas** y **términos y
+contratos** con aceptación por versión. Cada función
 es un módulo que el superadministrador activa por plan o por organización, con precio de módulo adicional.
 
 ## Próximos pasos recomendados (en orden)
@@ -74,4 +74,4 @@ es un módulo que el superadministrador activa por plan o por organización, con
   **cambiar la contraseña de MySQL del sistema anterior** y pedir a GitHub Support que purgue las referencias en caché
   de los pull requests antiguos. Considerar volver **privado** el repositorio.
 - Reemplazar el sonido de origen no documentado señalado en [LICENCIAS-DE-TERCEROS.md](LICENCIAS-DE-TERCEROS.md).
-- Definir la licencia / EULA (ver arriba).
+- Completar el titular en el `LICENSE` y en Plataforma → Legal, revisar los documentos con un abogado y publicarlos.

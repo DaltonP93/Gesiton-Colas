@@ -1,5 +1,5 @@
 import type { FastifyBaseLogger, FastifyReply, FastifyRequest } from 'fastify';
-import type { AuditActorKind, AuditEntity } from '@gc/shared';
+import { LEGAL_DOCS, type AuditActorKind, type AuditEntity, type LegalKind } from '@gc/shared';
 import type { Database } from '../db/client';
 import { auditLogs } from '../db/schema';
 
@@ -114,6 +114,9 @@ const ROUTES: Record<string, RouteMeta> = {
   'POST /tickets/:id/charge/manual': M('payment.manual', 'payment', 'Registró un cobro en el puesto'),
   'POST /billing/invoices/:id/pay': M('invoice.pay_online', 'invoice', 'Inició el pago en línea de una factura'),
   'POST /privacy/erase': M('privacy.erase', 'privacy', 'Borró los datos personales de una persona'),
+  'POST /legal/accept': M('legal.accept', 'legal', 'Aceptó los términos del servicio'),
+  'PUT /platform/legal/settings': M('legal.settings', 'legal', 'Cambió los datos del titular y la aceptación de los términos'),
+  'POST /platform/legal/:kind/publish': M('legal.publish', 'legal', 'Publicó una versión nueva de un documento legal'),
   // Plataforma
   'POST /platform/tenants': M('platform.tenant_create', 'platform', 'Creó la organización {name}'),
   'PUT /platform/tenants/:id': M('platform.tenant_update', 'platform', 'Modificó una organización (plan, estado o módulos)'),
@@ -246,6 +249,13 @@ export class Audit {
         }
         const name = typeof body?.name === 'string' ? `«${body.name}»` : typeof body?.email === 'string' ? `«${body.email}»` : '';
         let summary = meta.label.replace('{name}', name).replace(/\s+/g, ' ').trim();
+        if (key === 'POST /legal/accept' && Array.isArray(body?.documents)) {
+          const docs = (body.documents as { kind: LegalKind; version: number }[]).map((d) => `«${LEGAL_DOCS[d.kind]?.title ?? d.kind}» (versión ${d.version})`);
+          summary = `Aceptó ${docs.join(' y ')} en nombre de la organización`;
+        }
+        if (key === 'POST /platform/legal/:kind/publish' && params.kind) {
+          summary = `Publicó una versión nueva de «${LEGAL_DOCS[params.kind as LegalKind]?.title ?? params.kind}»`;
+        }
         if (key === 'PUT /tenant' && body) {
           const parts = [...(typeof body.name === 'string' ? ['nombre'] : []), ...Object.keys((body.settings as object) ?? {})];
           if (parts.length) summary = `Cambió la configuración: ${parts.join(', ')}`;
@@ -253,7 +263,13 @@ export class Audit {
         // Las acciones de la plataforma sobre una organización también se ven en esa organización.
         const tenantId = route.startsWith('/platform/tenants/:id') ? (params.id ?? null) : route.startsWith('/platform') ? null : who.tenantId;
         // Borrado a pedido: no se guarda el dato que se pidió borrar (solo qué tipo de dato).
-        const changes = key === 'POST /privacy/erase' ? { field: body?.field ?? null } : body;
+        // Documento publicado: el texto completo queda en su versión, no hace falta repetirlo.
+        const changes =
+          key === 'POST /privacy/erase'
+            ? { field: body?.field ?? null }
+            : key === 'POST /platform/legal/:kind/publish'
+              ? { kind: params.kind, requiresAcceptance: body?.requiresAcceptance ?? true, note: body?.note ?? null }
+              : body;
         this.record({ ...who, tenantId, action: meta.action, entity: meta.entity, entityId: params.id ?? createdId, summary, changes });
       } catch (error) {
         this.log.error({ err: error }, 'auditoría: error en el registro automático');

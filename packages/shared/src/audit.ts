@@ -29,6 +29,7 @@ export const AUDIT_ENTITIES = {
   device: 'Dispositivos',
   appointment: 'Citas',
   invoicing: 'Factura electrónica',
+  legal: 'Términos y contratos',
   platform: 'Plataforma',
 } as const;
 export type AuditEntity = keyof typeof AUDIT_ENTITIES;
