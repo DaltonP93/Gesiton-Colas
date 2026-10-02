@@ -9,6 +9,7 @@ import type { FastifyRequest } from 'fastify';
 import { hashPassword, sessionsResetNow, tenantIdOf } from '../../lib/auth';
 import { randomToken } from '../../lib/crypto';
 import { sendInvite } from '../../lib/invites';
+import { removeAvatar } from '../../lib/avatars';
 import { toUserDTO } from '../../lib/dto';
 import { badRequest, conflict, notFound } from '../../lib/errors';
 import { assertWithinLimit } from '../../lib/plans';
@@ -178,6 +179,7 @@ export const userRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
     if (!target) throw notFound('Usuario');
     if (target.role === 'admin') await assertAnotherAdmin(tenantId, target.id);
     await ctx.db.delete(users).where(eq(users.id, target.id));
+    await removeAvatar(ctx.storage, target.avatarUrl);
     return reply.code(204).send();
   });
 };

@@ -416,7 +416,23 @@ export interface MenuItem {
 }
 
 /** Botón «más acciones» con un menú desplegable (se cierra al elegir, al tocar afuera o con Escape). */
-export function Menu({ items, label = 'Más acciones', align = 'right' }: { items: (MenuItem | false | null | undefined)[]; label?: string; align?: 'left' | 'right' }) {
+type MenuTriggerProps = { onClick: () => void; 'aria-haspopup': 'menu'; 'aria-expanded': boolean };
+
+export function Menu({
+  items,
+  label = 'Más acciones',
+  align = 'right',
+  trigger,
+  header,
+}: {
+  items: (MenuItem | false | null | undefined)[];
+  label?: string;
+  align?: 'left' | 'right';
+  /** Botón propio para abrir el menú (por defecto, tres puntos). */
+  trigger?: (props: MenuTriggerProps) => ReactNode;
+  /** Contenido fijo arriba de las opciones (p. ej. nombre y correo del usuario). */
+  header?: ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const visible = items.filter((i): i is MenuItem => Boolean(i));
@@ -436,9 +452,14 @@ export function Menu({ items, label = 'Más acciones', align = 'right' }: { item
   if (!visible.length) return null;
   return (
     <div ref={root} className="relative">
-      <IconButton label={label} aria-haspopup="menu" aria-expanded={open} icon={<EllipsisVertical className="size-4" />} onClick={() => setOpen((o) => !o)} />
+      {trigger ? (
+        trigger({ onClick: () => setOpen((o) => !o), 'aria-haspopup': 'menu', 'aria-expanded': open })
+      ) : (
+        <IconButton label={label} aria-haspopup="menu" aria-expanded={open} icon={<EllipsisVertical className="size-4" />} onClick={() => setOpen((o) => !o)} />
+      )}
       {open && (
-        <div role="menu" className={cx('gc-fade-in absolute top-full z-40 mt-1 min-w-52 rounded-ui border border-border bg-surface p-1 shadow-xl', align === 'right' ? 'right-0' : 'left-0')}>
+        <div role="menu" aria-label={label} className={cx('gc-fade-in absolute top-full z-40 mt-1 min-w-52 rounded-ui border border-border bg-surface p-1 shadow-xl', align === 'right' ? 'right-0' : 'left-0')}>
+          {header && <div className="border-b border-border px-3 pt-2 pb-2.5 mb-1">{header}</div>}
           {visible.map((item, i) => (
             <button
               key={i}
@@ -513,6 +534,7 @@ export function Modal({
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
 }) {
   const panel = useRef<HTMLDivElement>(null);
+  const titleId = useId();
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -533,11 +555,16 @@ export function Modal({
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
         className={cx('gc-fade-in flex max-h-[92vh] w-full flex-col rounded-t-2xl bg-surface text-fg shadow-2xl outline-none sm:rounded-ui', widths[size])}
       >
         <header className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
           <div>
-            {title && <h2 className="text-lg font-semibold">{title}</h2>}
+            {title && (
+              <h2 id={titleId} className="text-lg font-semibold">
+                {title}
+              </h2>
+            )}
             {description && <p className="mt-0.5 text-sm text-muted">{description}</p>}
           </div>
           <IconButton label="Cerrar" icon={<X className="size-4" />} onClick={onClose} />

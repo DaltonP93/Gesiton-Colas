@@ -28,6 +28,7 @@ import {
 import { useState, type ReactNode } from 'react';
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import type { ModuleId, OfflineDeviceDTO, Role } from '@gc/shared';
+import { Avatar } from '../../components/Avatar';
 import { cx } from '../../components/ui';
 import { api, assetUrl } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
@@ -208,9 +209,7 @@ export function AdminLayout() {
           title={compact ? me?.user.name : undefined}
           className={cx('flex items-center rounded-ui hover:bg-[var(--gc-nav-hover)]', compact ? 'justify-center py-2' : 'gap-3 px-3 py-2')}
         >
-          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--gc-nav-hover)]">
-            <UserRound className="size-4" />
-          </span>
+          {me ? <Avatar name={me.user.name} url={me.user.avatarUrl} size="sm" /> : <UserRound className="size-4" />}
           {!compact && (
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-medium">{me?.user.name}</span>

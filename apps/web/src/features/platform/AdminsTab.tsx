@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Plus, Send, ShieldCheck, Trash2, UserCog } from 'lucide-react';
+import { Pencil, Plus, Send, Trash2, UserCog } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
+import { useNavigate } from 'react-router';
 import type { InviteResultDTO, UserDTO } from '@gc/shared';
+import { Avatar } from '../../components/Avatar';
 import { InviteResultModal } from '../../components/InviteResult';
 import { Badge, Button, Card, EmptyState, Field, IconButton, Input, Loading, Modal, Table, Toggle, useFeedback } from '../../components/ui';
 import { api, errorMessage, session } from '../../lib/api';
@@ -13,6 +15,7 @@ type Editing = { user: UserDTO | null };
 /** Superadministradores: quienes administran toda la plataforma. */
 export function AdminsTab() {
   const { me } = useAuth();
+  const navigate = useNavigate();
   const { toast, confirm } = useFeedback();
   const qc = useQueryClient();
   const admins = useQuery({ queryKey: ['platform', 'admins'], queryFn: () => api.get<UserDTO[]>('/platform/admins') });
@@ -87,9 +90,7 @@ export function AdminsTab() {
                 <tr key={u.id}>
                   <td>
                     <div className="flex items-center gap-3">
-                      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary/10 text-primary-text">
-                        <ShieldCheck className="size-4" />
-                      </span>
+                      <Avatar name={u.name} url={u.avatarUrl} />
                       <div className="min-w-0">
                         <p className="font-medium">
                           {u.name} {self && <span className="text-xs font-normal text-muted">(usted)</span>}
@@ -105,7 +106,11 @@ export function AdminsTab() {
                   <td>
                     <div className="flex justify-end gap-1">
                       {u.invitePending && <IconButton label="Reenviar invitación" icon={<Send className="size-4" />} onClick={() => void resend(u)} />}
-                      <IconButton label="Editar" icon={<Pencil className="size-4" />} onClick={() => setEditing({ user: u })} />
+                      {self ? (
+                        <IconButton label="Mi perfil" icon={<Pencil className="size-4" />} onClick={() => navigate('/plataforma/perfil')} />
+                      ) : (
+                        <IconButton label="Editar" icon={<Pencil className="size-4" />} onClick={() => setEditing({ user: u })} />
+                      )}
                       {!self && <IconButton label="Quitar" icon={<Trash2 className="size-4 text-red-600" />} onClick={() => void handleDelete(u)} />}
                     </div>
                   </td>

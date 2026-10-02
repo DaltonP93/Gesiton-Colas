@@ -17,7 +17,7 @@ import {
   ResetPasswordPage,
   VerifyEmailPage,
 } from './features/auth/AuthPages';
-import { LandingPage } from './features/landing/LandingPage';
+import { LandingPage, onLandingDomain } from './features/landing/LandingPage';
 
 const PortalPage = lazy(() => import('./features/portal/PortalPage'));
 const PairDevicePage = lazy(() => import('./features/portal/PairDevicePage'));
@@ -51,6 +51,8 @@ const InvoicesPage = lazy(() => import('./features/admin/InvoicesPage'));
 const KudePage = lazy(() => import('./features/invoice/KudePage'));
 const LegalPage = lazy(() => import('./features/legal/LegalPage'));
 const LicenseContractPage = lazy(() => import('./features/platform/LicenseContractPage'));
+const PlatformProfilePage = lazy(() => import('./features/platform/PlatformProfilePage'));
+const LandingEditorPage = lazy(() => import('./features/platform/landing/LandingEditorPage'));
 
 function Lazy({ children }: { children: ReactNode }) {
   return <Suspense fallback={<Loading />}>{children}</Suspense>;
@@ -77,6 +79,8 @@ function Home() {
   const { me, loading } = useAuth();
   const config = usePublicConfig();
   if (loading || config.isLoading) return <Loading />;
+  // Con dominio propio, la presentación se ve siempre en ese dominio (aunque haya una sesión abierta).
+  if (config.data?.landing.enabled && onLandingDomain(config.data.landing.domain)) return <LandingPage />;
   if (me) return <Navigate to={me.tenant ? '/app' : '/plataforma'} replace />;
   if (config.data?.homePage === 'login') return <Navigate to="/login" replace />;
   if (config.data?.homePage === 'redirect' && config.data.homeRedirectUrl) return <ExternalRedirect url={config.data.homeRedirectUrl} />;
@@ -106,6 +110,7 @@ const page = (el: ReactNode, role?: Role, modules?: ModuleId[]) => (
 
 export const router = createBrowserRouter([
   { path: '/', element: <Home /> },
+  { path: '/presentacion', element: <LandingPage standalone /> },
   { path: '/login', element: <LoginPage /> },
   { path: '/registro', element: <RegisterPage /> },
   { path: '/demo', element: <DemoPage /> },
@@ -161,6 +166,8 @@ export const router = createBrowserRouter([
   },
   { path: '/plataforma', element: page(<PlatformPage />, 'superadmin') },
   { path: '/plataforma/contrato-de-licencia', element: page(<LicenseContractPage />, 'superadmin') },
+  { path: '/plataforma/perfil', element: page(<PlatformProfilePage />, 'superadmin') },
+  { path: '/plataforma/presentacion', element: page(<LandingEditorPage />, 'superadmin') },
   { path: '/terminos', element: <Lazy><LegalPage kind="terms" /></Lazy> },
   { path: '/privacidad', element: <Lazy><LegalPage kind="privacy" /></Lazy> },
   { path: '/tratamiento-de-datos', element: <Lazy><LegalPage kind="dpa" /></Lazy> },

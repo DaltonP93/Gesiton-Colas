@@ -43,7 +43,7 @@ for (const [name, viewport] of [
     await ctx.addInitScript((t) => localStorage.setItem('gc.token', t!), token);
     const mobile = await ctx.newPage();
     const overflowing: string[] = [];
-    for (const path of [...PAGES, '/', '/login', '/terminos', `/kiosco/${kiosk}?modo=movil`]) {
+    for (const path of [...PAGES, '/', '/presentacion', '/login', '/terminos', `/kiosco/${kiosk}?modo=movil`]) {
       await mobile.goto(path);
       await mobile.waitForLoadState('networkidle');
       const extra = await mobile.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

@@ -18,11 +18,8 @@ internacionales sobre la materia.
    b) instalado en servidores propios, según un Contrato de licencia de uso firmado con el titular.
    Las plantillas de esos documentos están en docs/legal/.
 
-4. Exclusiones:
-   a) Los componentes de terceros incluidos o utilizados conservan sus propias licencias
-      (ver docs/LICENCIAS-DE-TERCEROS.md). Esta licencia no limita los derechos que esas licencias otorgan.
-   b) El directorio legacy/novosga contiene el sistema anterior (NovoSGA, Copyright (c) 2012-2016
-      Rogerio Lino), que conserva su licencia MIT (legacy/novosga/LICENSE) y no forma parte del Software.
+4. Los componentes de terceros incluidos o utilizados conservan sus propias licencias
+   (ver docs/LICENCIAS-DE-TERCEROS.md). Esta licencia no limita los derechos que esas licencias otorgan.
 
 5. SALVO LO QUE ESTABLEZCA EL CONTRATO FIRMADO CON EL TITULAR, EL SOFTWARE SE ENTREGA «EN EL ESTADO EN
    QUE SE ENCUENTRA», SIN GARANTÍAS DE NINGÚN TIPO.
@@ -36,4 +33,4 @@ PROPRIETARY SOFTWARE — ALL RIGHTS RESERVED
 Copyright (c) 2026 [OWNER]. This software and its documentation are proprietary. No license is granted
 by accessing this repository. Any use, copying, modification, distribution or offering as a service
 requires a written agreement with the owner. Third-party components keep their own licenses
-(docs/LICENCIAS-DE-TERCEROS.md); legacy/novosga remains under its MIT license.
+(docs/LICENCIAS-DE-TERCEROS.md).

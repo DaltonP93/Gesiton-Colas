@@ -2,8 +2,6 @@
 
 Plataforma **SaaS** de gestión de turnos, pantallas y publicidad digital. Organiza la atención de todas sus sucursales, muestra contenido en las salas de espera y se integra con cualquier sistema mediante API REST, webhooks y eventos en tiempo real.
 
-> Versión 3 — reescritura completa del sistema anterior (NovoSGA 2 / Symfony 4). El código original se conserva como referencia en [`legacy/novosga`](legacy/novosga).
-
 ## Qué incluye
 
 | Módulo | Descripción |
@@ -22,7 +20,7 @@ Plataforma **SaaS** de gestión de turnos, pantallas y publicidad digital. Organ
 | **Reportes** | Espera y atención promedio, por servicio, operador, hora y día. Monitor en vivo y exportación a CSV/Excel. |
 | **Integraciones** | API REST con OpenAPI/Swagger (`/api/docs`), API keys con permisos, **webhooks firmados (HMAC-SHA256) con reintentos**, Socket.IO. Ideal para ERP, CRM, WhatsApp, Zapier, Make o n8n. |
 | **SaaS** | Registro autónomo de organizaciones, datos aislados por organización, planes con límites (sucursales, pantallas, kioscos, usuarios, almacenamiento), superadministrador con modo soporte. |
-| **Plataforma (superadministrador)** | Varios **superadministradores** (alta, edición, invitación, baja). **Página principal configurable**: presentación del producto, directamente el **login** o redirección a otro sitio. Registro, demos e ingreso por código activables. **Marca de la plataforma** (nombre, logo, color, frase e imagen del ingreso, correo de soporte). Por organización: ver usuarios, **definir contraseñas** y generar **enlaces de acceso** de un solo uso. |
+| **Plataforma (superadministrador)** | Varios **superadministradores** (alta, edición, invitación, baja). **Página principal configurable**: presentación del producto, directamente el **login** o redirección a otro sitio. **Editor de la página de presentación** con 6 plantillas, vista previa en computadora, tablet y celular, secciones (funciones, pasos, precios, testimonios, clientes, preguntas, contacto…) y dominio propio. **Mi perfil** con foto, correo y celular para los avisos. Registro, demos e ingreso por código activables. **Marca de la plataforma** (nombre, logo, color, frase e imagen del ingreso, correo de soporte). Por organización: ver usuarios, **definir contraseñas** y generar **enlaces de acceso** de un solo uso. |
 | **Correo saliente (SMTP) desde el panel** | El superadministrador configura el servidor de toda la plataforma y **cada organización puede usar el suyo** (Configuración → Correo saliente), con proveedores precargados (Gmail, Microsoft 365, SES, Brevo, Mailgun, Zoho), contraseña cifrada y **correo de prueba**. Sin correo, las invitaciones muestran el **enlace para copiar o enviar por WhatsApp**. |
 | **Acceso por correo** | **Demo por correo** (organización de ejemplo con historial, operadores, publicidad y turnos, con vencimiento), verificación de email, **olvidé mi contraseña**, ingreso sin contraseña con **enlace o código de 6 dígitos**, invitación de usuarios por correo. SMTP con cualquier proveedor. |
 | **Portal de herramientas** | Al ingresar, un portal abre la consola, el **kiosco / triage** o el **panel TV** con un clic, copia enlaces o muestra el QR. Las TVs y tablets se **vinculan con un código de 6 dígitos** desde `/vincular`, sin escribir URLs largas; el equipo recuerda su pantalla. |
@@ -52,7 +50,6 @@ apps/
   web/        Panel, consola, pantallas, kioscos y seguimiento (React 19, Vite, Tailwind CSS 4)
 packages/
   shared/     Tipos, esquemas de configuración, detección de plataformas y plantillas
-legacy/       Sistema anterior (solo referencia)
 docs/         Guías de integración y despliegue
 ```
 
@@ -109,6 +106,7 @@ docker compose exec app node apps/api/dist/db/admin-cli.js superadmin correo@emp
 | Ruta | Uso |
 | --- | --- |
 | `/` | Página principal: presentación del producto, el login o una redirección (lo elige el superadministrador) |
+| `/presentacion` | Página de presentación (también en su dominio propio, si se configura) |
 | `/registro`, `/login`, `/demo` | Alta de organización, inicio de sesión y demo por correo |
 | `/ingresar-con-correo`, `/olvide-contrasena` | Acceso con código por correo y recuperación de contraseña |
 | `/app` | Portal de herramientas (consola, kiosco, panel TV, administración) |
@@ -120,6 +118,7 @@ docker compose exec app node apps/api/dist/db/admin-cli.js superadmin correo@emp
 | `/kiosco/:token` | Kiosco táctil · `?modo=movil` para fila virtual |
 | `/t/:token` | Seguimiento del turno del cliente |
 | `/plataforma` | Superadministrador: organizaciones, facturación, SIFEN, comunicaciones (correo, WhatsApp/SMS y avisos), legal, actividad, copias y ajustes |
+| `/plataforma/presentacion`, `/plataforma/perfil` | Editor de la página de presentación · perfil del superadministrador |
 | `/app/configuracion/correo` | Servidor de correo propio de la organización |
 | `/app/configuracion/avisos` | Avisos por WhatsApp y SMS: canal, mensajes e historial |
 | `/app/encuestas` | Encuestas de satisfacción: resultados (NPS, CSAT, comentarios) y constructor |

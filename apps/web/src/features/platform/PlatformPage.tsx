@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BadgeCheck, Blocks, Building2, CalendarPlus, DatabaseBackup, FileText, HardDrive, History, LogIn, LogOut, Megaphone, MonitorPlay, PauseCircle, PlayCircle, Plus, Receipt, Scale, Search, Settings2, Shield, ShieldCheck, Ticket, UserCog, Users } from 'lucide-react';
+import { BadgeCheck, Blocks, Building2, CalendarPlus, DatabaseBackup, FileText, HardDrive, History, LogIn, Megaphone, MonitorPlay, PauseCircle, PlayCircle, Plus, Receipt, Scale, Search, Settings2, ShieldCheck, Ticket, UserCog, Users } from 'lucide-react';
 import { useEffect, useId, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { MODULES, PLAN_IDS, PLANS, type InviteResultDTO, type ModuleId, type PlanId, type PlatformSettings, type TenantDTO } from '@gc/shared';
@@ -25,7 +25,6 @@ import {
   cx,
   useFeedback,
 } from '../../components/ui';
-import { assetUrl } from '../../lib/api';
 import { AdminsTab } from './AdminsTab';
 import { BackupsTab } from './BackupsTab';
 import { BillingTab } from './BillingTab';
@@ -33,6 +32,7 @@ import { SifenTab } from './SifenTab';
 import { LegalTab } from './LegalTab';
 import { CommsTab } from './CommsTab';
 import { PlatformSettingsTab } from './PlatformSettingsTab';
+import { PlatformShell } from './PlatformShell';
 import { TenantModulesModal } from './TenantModulesModal';
 import { TenantUsersModal } from './TenantUsersModal';
 import { api, errorMessage } from '../../lib/api';
@@ -78,8 +78,6 @@ function useDebounced<T>(value: T, delay = 300): T {
 }
 
 export default function PlatformPage() {
-  const { me, logout, impersonate, platformBrand } = useAuth();
-  const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
   const [tab, setTab] = useState<PlatformTab>(() => {
     const hash = window.location.hash.slice(1) as PlatformTab;
@@ -112,53 +110,7 @@ export default function PlatformPage() {
   };
 
   return (
-    <div className="min-h-screen bg-bg text-fg">
-      <header className="sticky top-0 z-30 border-b border-border bg-surface/90 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-[112rem] items-center gap-3 px-4 sm:px-6 lg:px-8">
-          {platformBrand.logoUrl ? (
-            <img src={assetUrl(platformBrand.logoUrl)} alt="" className="h-9 max-w-32 shrink-0 object-contain" />
-          ) : (
-            <div className="grid size-9 shrink-0 place-items-center rounded-ui bg-primary text-primary-fg">
-              <Shield className="size-5" />
-            </div>
-          )}
-          <div className="min-w-0">
-            <p className="truncate text-sm font-bold">{platformBrand.appName}</p>
-            <p className="truncate text-xs text-muted">Plataforma</p>
-          </div>
-          <div className="ml-auto flex items-center gap-3">
-            <div className="hidden min-w-0 text-right sm:block">
-              <p className="truncate text-sm font-medium">{me?.user.name}</p>
-              <p className="truncate text-xs text-muted">{me?.user.email}</p>
-            </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={<LogOut className="size-4" />}
-              onClick={() => {
-                logout();
-                navigate('/login');
-              }}
-            >
-              Cerrar sesión
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      {me?.tenant && (
-        <div className="flex flex-wrap items-center justify-center gap-3 bg-accent px-4 py-2 text-sm font-medium text-accent-fg">
-          Modo soporte activo en «{me.tenant.name}».
-          <button type="button" className="rounded-ui bg-black/15 px-2 py-0.5 hover:bg-black/25" onClick={() => navigate('/app')}>
-            Volver a la organización
-          </button>
-          <button type="button" className="rounded-ui bg-black/15 px-2 py-0.5 hover:bg-black/25" onClick={() => void impersonate(null)}>
-            Salir del modo soporte
-          </button>
-        </div>
-      )}
-
-      <main className="mx-auto w-full max-w-[112rem] px-4 py-6 sm:px-6 lg:px-8">
+    <PlatformShell>
         <PageHeader
           title={titles[tab].title}
           description={titles[tab].description}
@@ -201,10 +153,8 @@ export default function PlatformPage() {
         {tab === 'administradores' && <AdminsTab />}
         {tab === 'copias' && <BackupsTab />}
         {tab === 'ajustes' && <PlatformSettingsTab />}
-      </main>
-
       {creating && <CreateTenantModal onClose={() => setCreating(false)} />}
-    </div>
+    </PlatformShell>
   );
 }
 

@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import type { FastifyRequest } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -10,12 +10,14 @@ import { createTenantWithDefaults } from '../../db/seed';
 import type { DbOrTx } from '../../db/client';
 import { tenants, users, type Tenant, type User } from '../../db/schema';
 import { assertTenantAvailable, hashPassword, sessionsResetNow, verifyPassword } from '../../lib/auth';
+import { removeAvatar, storeAvatar } from '../../lib/avatars';
 import { toTenantDTO, toUserDTO } from '../../lib/dto';
 import { demoMail, emailLoginMail, resetPasswordMail, verifyEmailMail } from '../../lib/emails';
 import { MailError, type MailMessage } from '../../lib/mailer';
 import { AppError, badRequest, conflict, forbidden, unauthorized } from '../../lib/errors';
 import { createThrottle } from '../../lib/throttle';
 import { consumeCode, consumeToken, issueToken, peekToken } from '../../lib/tokens';
+import { phoneNumber } from '../../lib/schemas';
 import { userScope } from '../tickets/queue';
 
 const email = z.string().trim().toLowerCase().email().max(200);
@@ -474,10 +476,14 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
       schema: {
         tags,
         summary: 'Actualizar perfil propio',
-        description: 'Al cambiar la contraseña se cierran las demás sesiones y la respuesta incluye un token nuevo.',
+        description:
+          'Al cambiar la contraseña se cierran las demás sesiones y la respuesta incluye un token nuevo. ' +
+          'El correo solo lo cambian los superadministradores (con la contraseña actual); en una organización lo cambia un administrador.',
         body: z.object({
           name: z.string().trim().min(2).max(120).optional(),
           locale: z.enum(LOCALES).nullable().optional(),
+          phone: z.union([phoneNumber, z.literal('')]).nullable().optional(),
+          email: email.optional(),
           currentPassword: z.string().max(200).optional(),
           newPassword: password.optional(),
         }),
@@ -487,14 +493,24 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
       if (request.auth?.kind !== 'user') throw badRequest('Disponible solo para usuarios');
       const { user } = request.auth;
       const body = request.body;
+      const changesEmail = body.email !== undefined && body.email !== user.email;
+      if (changesEmail && user.role !== 'superadmin') throw forbidden('Pídale a un administrador de la organización que cambie su correo');
       const patch: Partial<typeof users.$inferInsert> = {};
       if (body.name) patch.name = body.name;
       if (body.locale !== undefined) patch.locale = body.locale;
-      if (body.newPassword) {
+      if (body.phone !== undefined) patch.phone = body.phone || null;
+      if ((body.newPassword || changesEmail) && user.hasPassword) {
         // Quien ingresó por correo y aún no tiene contraseña puede definirla sin la actual.
-        if (user.hasPassword && (!body.currentPassword || !(await verifyPassword(body.currentPassword, user.passwordHash)))) {
+        if (!body.currentPassword || !(await verifyPassword(body.currentPassword, user.passwordHash))) {
           throw badRequest('La contraseña actual no es correcta');
         }
+      }
+      if (changesEmail) {
+        const [exists] = await ctx.db.select({ id: users.id }).from(users).where(and(eq(users.email, body.email!), ne(users.id, user.id)));
+        if (exists) throw conflict('Ya existe un usuario con ese email');
+        patch.email = body.email;
+      }
+      if (body.newPassword) {
         patch.passwordHash = await hashPassword(body.newPassword);
         patch.hasPassword = true;
         patch.sessionsValidAfter = sessionsResetNow();
@@ -504,6 +520,37 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
       if (!body.newPassword) return data;
       const [fresh] = await ctx.db.select().from(users).where(eq(users.id, user.id));
       return { ...data, token: await ctx.auth.signToken(fresh!) };
+    },
+  );
+
+  app.post(
+    '/auth/me/avatar',
+    {
+      preHandler: ctx.auth.require(),
+      config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+      schema: { tags, summary: 'Subir la foto de perfil (JPG, PNG o WebP, hasta 2 MB)', consumes: ['multipart/form-data'] },
+    },
+    async (request) => {
+      if (request.auth?.kind !== 'user') throw badRequest('Disponible solo para usuarios');
+      const file = await request.file();
+      if (!file) throw badRequest('Adjunte una foto');
+      const { user } = request.auth;
+      const url = await storeAvatar(ctx.storage, user.id, file);
+      await ctx.db.update(users).set({ avatarUrl: url }).where(eq(users.id, user.id));
+      await removeAvatar(ctx.storage, user.avatarUrl);
+      return me(user.id, request.auth.tenantId);
+    },
+  );
+
+  app.delete(
+    '/auth/me/avatar',
+    { preHandler: ctx.auth.require(), schema: { tags, summary: 'Quitar la foto de perfil' } },
+    async (request) => {
+      if (request.auth?.kind !== 'user') throw badRequest('Disponible solo para usuarios');
+      const { user } = request.auth;
+      await ctx.db.update(users).set({ avatarUrl: null }).where(eq(users.id, user.id));
+      await removeAvatar(ctx.storage, user.avatarUrl);
+      return me(user.id, request.auth.tenantId);
     },
   );
 };

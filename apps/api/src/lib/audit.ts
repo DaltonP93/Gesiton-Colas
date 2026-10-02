@@ -59,6 +59,7 @@ const M = (action: string, entity: AuditEntity, label: string): RouteMeta => ({ 
 
 const ROUTES: Record<string, RouteMeta> = {
   'PUT /auth/me': M('profile.update', 'user', 'Actualizó su perfil'),
+  'DELETE /auth/me/avatar': M('profile.update', 'user', 'Quitó su foto de perfil'),
   'PUT /tenant': M('tenant.update', 'tenant', 'Cambió la configuración'),
   'POST /users': M('user.create', 'user', 'Creó el usuario {name}'),
   'PUT /users/:id': M('user.update', 'user', 'Modificó el usuario {name}'),

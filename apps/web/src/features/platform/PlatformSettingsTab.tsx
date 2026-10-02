@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ExternalLink, Globe, LogIn, Presentation } from 'lucide-react';
+import { ExternalLink, Globe, LogIn, Paintbrush, Presentation } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
-import { CURRENCIES, MODULE_IDS, MODULES, PLAN_IDS, PLANS, type Currency, type HomePage, type ModuleId, type PlanId, type PlatformSettings } from '@gc/shared';
+import { Link } from 'react-router';
+import { CURRENCIES, LANDING_TEMPLATE_INFO, MODULE_IDS, MODULES, PLAN_IDS, PLANS, type Currency, type HomePage, type ModuleId, type PlanId, type PlatformSettings } from '@gc/shared';
 import { ImageField } from '../../components/ImageField';
 import { Button, Checkbox, ColorInput, Field, Input, Loading, Select, Textarea, Toggle, cx, useFeedback } from '../../components/ui';
 import { api, assetUrl, errorMessage } from '../../lib/api';
@@ -14,6 +15,9 @@ const HOME_OPTIONS: { value: HomePage; label: string; hint: string; icon: ReactN
 
 const sameJson = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
+/** Lo que se edita en esta pestaña (el resto tiene su propia pantalla). */
+const ownFields = ({ backups: _b, notices: _n, legal: _l, landing: _p, ...rest }: PlatformSettings) => rest;
+
 /** Ajustes globales: página principal, acceso, marca de la plataforma y correo saliente. */
 export function PlatformSettingsTab() {
   const { toast } = useFeedback();
@@ -25,8 +29,8 @@ export function PlatformSettingsTab() {
   }, [settings.data, draft]);
 
   const save = useMutation({
-    // Las copias, los avisos y lo legal se guardan en sus propias pestañas.
-    mutationFn: ({ backups: _backups, notices: _notices, legal: _legal, ...body }: PlatformSettings) => api.put<PlatformSettings>('/platform/settings', body),
+    // Las copias, los avisos, lo legal y la presentación se guardan en sus propias pantallas.
+    mutationFn: (draft: PlatformSettings) => api.put<PlatformSettings>('/platform/settings', ownFields(draft)),
     onSuccess: (data) => {
       qc.setQueryData(['platform', 'settings'], data);
       void qc.invalidateQueries({ queryKey: ['public-config'] });
@@ -42,7 +46,7 @@ export function PlatformSettingsTab() {
   const set = <K extends keyof PlatformSettings>(key: K, value: PlatformSettings[K]) => setDraft((d) => (d ? { ...d, [key]: value } : d));
   const setBrand = <K extends keyof PlatformSettings['brand']>(key: K, value: PlatformSettings['brand'][K]) =>
     setDraft((d) => (d ? { ...d, brand: { ...d.brand, [key]: value } } : d));
-  const dirty = !sameJson({ ...draft, backups: null }, { ...settings.data, backups: null });
+  const dirty = !sameJson(ownFields(draft), ownFields(settings.data));
   const origin = window.location.origin;
 
   return (
@@ -79,6 +83,24 @@ export function PlatformSettingsTab() {
               <Input type="url" value={draft.homeRedirectUrl} onChange={(e) => set('homeRedirectUrl', e.target.value.trim())} placeholder="https://www.suempresa.com" />
             </Field>
           )}
+          <div className="flex flex-wrap items-center gap-3 rounded-ui border border-border bg-subtle/50 p-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-ui bg-primary/10 text-primary-text">
+              <Paintbrush className="size-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">Página de presentación</p>
+              <p className="text-xs text-muted">
+                Plantilla {LANDING_TEMPLATE_INFO[settings.data.landing.template].name} · {settings.data.landing.enabled ? 'publicada' : 'no publicada'} en{' '}
+                <a href="/presentacion" target="_blank" rel="noreferrer" className="font-medium text-primary-text hover:underline">
+                  {origin}/presentacion
+                </a>
+                . Elija entre 6 plantillas y cambie textos, imágenes, secciones, colores y dominio.
+              </p>
+            </div>
+            <Link to="/plataforma/presentacion">
+              <Button icon={<Paintbrush className="size-4" />}>Personalizar</Button>
+            </Link>
+          </div>
           <p className="flex items-center gap-2 text-xs text-muted">
             <Globe className="size-3.5" /> El ingreso siempre está en{' '}
             <a href="/login" target="_blank" rel="noreferrer" className="font-medium text-primary-text hover:underline">
