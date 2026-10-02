@@ -76,6 +76,8 @@ const WEB_CSP = [
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
+  // Solo el propio sitio puede embeber estas páginas en un iframe (anti-clickjacking).
+  "frame-ancestors 'self'",
 ].join('; ');
 
 export interface BuildOptions {

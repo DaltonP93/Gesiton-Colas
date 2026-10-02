@@ -11,6 +11,7 @@ import {
   PLAN_IDS,
   UPLOAD_MIME_TYPES,
   deepMerge,
+  isSafeImage,
   landingSettingsSchema,
   type AccessLinkDTO,
   type ModuleOverrides,
@@ -34,7 +35,10 @@ import { EXTENSIONS } from '../media/routes';
 const email = z.string().trim().toLowerCase().email().max(200);
 const password = z.string().min(8, 'La contraseña debe tener al menos 8 caracteres').max(200);
 const hex = z.string().regex(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i, 'Color hexadecimal inválido');
-const optionalUrl = z.string().trim().max(2048).nullable();
+// Imagen de marca: subida a la plataforma (/uploads/) o una dirección http(s). Nada de javascript:/data:.
+const optionalUrl = z
+  .union([z.literal(''), z.string().trim().max(2048).refine(isSafeImage, 'Use una imagen subida o una dirección http(s)')])
+  .nullable();
 
 const settingsBody = z.object({
   homePage: z.enum(HOME_PAGES).optional(),
@@ -492,7 +496,7 @@ export const platformRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async 
       schema: { tags, summary: 'Subir una imagen de la plataforma (logo, favicon, fondo del ingreso)', consumes: ['multipart/form-data'] },
     },
     async (request, reply) => {
-      const file = await request.file();
+      const file = await request.file({ limits: { fileSize: (MAX_ASSET_MB + 1) * 1024 * 1024 } });
       if (!file) throw badRequest('Adjunte un archivo');
       if (UPLOAD_MIME_TYPES[file.mimetype] !== 'image') {
         file.file.resume();

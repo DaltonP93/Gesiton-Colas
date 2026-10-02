@@ -162,6 +162,9 @@ const Or = () => (
 
 const landingFor = (me: MeDTO) => (me.tenant ? '/app' : '/plataforma');
 
+/** Solo acepta rutas internas en ?next= (evita redirigir a sitios externos vía //evil.com o un esquema). */
+const safeNext = (next: string | null): string | null => (next && next.startsWith('/') && !next.startsWith('//') ? next : null);
+
 /** Consume un token de un solo uso al montar (protegido contra el doble montaje de StrictMode). */
 function useTokenOnce<T>(run: (token: string) => Promise<T>) {
   const [params] = useSearchParams();
@@ -230,7 +233,8 @@ export function LoginPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  if (me && params.get('next')) return <Navigate to={params.get('next')!} replace />;
+  const next = safeNext(params.get('next'));
+  if (me && next) return <Navigate to={next} replace />;
   if (me) return <SignedInNotice me={me} />;
   const q = email ? `?email=${encodeURIComponent(email)}` : '';
   const emailLogin = config?.allowEmailLogin !== false && config?.emailEnabled !== false;
@@ -242,7 +246,7 @@ export function LoginPage() {
     setLoading(true);
     try {
       const res = await login(email, password);
-      navigate(params.get('next') ?? landingFor(res), { replace: true });
+      navigate(next ?? landingFor(res), { replace: true });
     } catch (err) {
       setError({ message: errorMessage(err), code: err instanceof ApiError ? err.code : undefined });
     } finally {

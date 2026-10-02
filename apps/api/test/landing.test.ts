@@ -110,4 +110,15 @@ describe('página de presentación', () => {
     expect((await app.inject({ method: 'GET', url: '/', headers: { host: 'www.colas.test' } })).body).toContain('og:title');
     await api(app, root, 'PUT', '/platform/settings', { homePage: 'landing', landing: { domain: '' } });
   });
+
+  it('no interpreta los patrones de reemplazo ($&, $`) del título SEO', async () => {
+    await api(app, root, 'PUT', '/platform/settings', { homePage: 'landing', landing: { enabled: true, seo: { title: 'Promo $& y $` fin', description: '' } } });
+    const home = await app.inject({ method: 'GET', url: '/' });
+    expect(home.statusCode).toBe(200);
+    // El título queda literal (una sola etiqueta), sin fragmentos del documento insertados.
+    expect(home.body).toContain('<title>Promo $&amp; y $` fin</title>');
+    expect(home.body.match(/<title>/g)).toHaveLength(1);
+    expect(home.body).not.toContain('<title>Promo $& y $` fin<!doctype');
+    await api(app, root, 'PUT', '/platform/settings', { landing: { seo: { title: '' } } });
+  });
 });

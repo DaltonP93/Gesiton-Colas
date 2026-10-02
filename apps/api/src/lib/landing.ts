@@ -31,9 +31,11 @@ export function landingHead(html: string, settings: PlatformSettings, publicUrl:
     ...(imageUrl ? [`<meta property="og:image" content="${escapeHtml(imageUrl)}" />`] : []),
     `<meta name="twitter:card" content="${imageUrl ? 'summary_large_image' : 'summary'}" />`,
   ].join('\n    ');
+  // Reemplazos con función: así `$&`, `$\`` y demás en los textos del titular no se interpretan.
+  const titleTag = `<title>${escapeHtml(title)}</title>`;
   const clean = html.replace(/\s*<meta name="description"[^>]*>/i, '');
   const withTitle = /<title>[\s\S]*?<\/title>/i.test(clean)
-    ? clean.replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtml(title)}</title>`)
-    : clean.replace(/<head>/i, `<head>\n    <title>${escapeHtml(title)}</title>`);
-  return withTitle.replace(/<\/head>/i, `    ${tags}\n  </head>`);
+    ? clean.replace(/<title>[\s\S]*?<\/title>/i, () => titleTag)
+    : clean.replace(/<head>/i, () => `<head>\n    ${titleTag}`);
+  return withTitle.replace(/<\/head>/i, () => `    ${tags}\n  </head>`);
 }

@@ -10,7 +10,7 @@ import { createTenantWithDefaults } from '../../db/seed';
 import type { DbOrTx } from '../../db/client';
 import { tenants, users, type Tenant, type User } from '../../db/schema';
 import { assertTenantAvailable, hashPassword, sessionsResetNow, verifyPassword } from '../../lib/auth';
-import { removeAvatar, storeAvatar } from '../../lib/avatars';
+import { AVATAR_MAX_BYTES, removeAvatar, storeAvatar } from '../../lib/avatars';
 import { toTenantDTO, toUserDTO } from '../../lib/dto';
 import { demoMail, emailLoginMail, resetPasswordMail, verifyEmailMail } from '../../lib/emails';
 import { MailError, type MailMessage } from '../../lib/mailer';
@@ -532,7 +532,8 @@ export const authRoutes = (ctx: AppContext): FastifyPluginAsyncZod => async (app
     },
     async (request) => {
       if (request.auth?.kind !== 'user') throw badRequest('Disponible solo para usuarios');
-      const file = await request.file();
+      // Corta el flujo temprano: deja un margen sobre el tope real que aplica storeAvatar (mensaje 413 claro).
+      const file = await request.file({ limits: { fileSize: AVATAR_MAX_BYTES + 1024 * 1024 } });
       if (!file) throw badRequest('Adjunte una foto');
       const { user } = request.auth;
       const url = await storeAvatar(ctx.storage, user.id, file);

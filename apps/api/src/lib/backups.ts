@@ -21,6 +21,7 @@ import { backupTargets, backups, users, type Backup, type BackupTarget } from '.
 import { friendlyTargetError, uploaderFor, type TargetSecrets } from './backupTargets';
 import { decryptSecret, encryptSecret } from './crypto';
 import { badRequest, notFound } from './errors';
+import { assertPublicHost, assertPublicUrl } from './net';
 import type { Mailer } from './mailer';
 import type { PlatformNotices } from './platformNotices';
 
@@ -449,10 +450,23 @@ export class Backups {
     if (input.kind === 'sftp' && !secrets.password && !secrets.privateKey) throw badRequest('Indique la contraseña o la clave privada');
   }
 
+  /** Evita SSRF: el destino no puede apuntar a direcciones privadas/internas (salvo WEBHOOKS_ALLOW_PRIVATE). */
+  private async assertTargetReachable(input: BackupTargetInput) {
+    if (this.deps.config.WEBHOOKS_ALLOW_PRIVATE) return;
+    try {
+      if (input.kind === 'webdav') await assertPublicUrl(input.config.url);
+      else if (input.kind === 'sftp') await assertPublicHost(input.config.host);
+      else if (input.kind === 's3' && input.config.endpoint) await assertPublicUrl(input.config.endpoint);
+    } catch (error) {
+      throw badRequest(error instanceof Error ? error.message : 'El destino apunta a una dirección no permitida');
+    }
+  }
+
   async saveTarget(input: BackupTargetInput, id?: string): Promise<BackupTargetDTO> {
     const existing = id ? await this.findTarget(id) : undefined;
     const secrets = this.mergeSecrets(input, existing);
     this.assertComplete(input, secrets);
+    await this.assertTargetReachable(input);
     const values = {
       kind: input.kind,
       name: input.name,
@@ -479,6 +493,7 @@ export class Backups {
     const existing = id ? await this.findTarget(id) : undefined;
     const secrets = this.mergeSecrets(input, existing);
     this.assertComplete(input, secrets);
+    await this.assertTargetReachable(input);
     let result: BackupTargetTestDTO;
     try {
       const { message, fingerprint } = await uploaderFor(input.kind, input.config, secrets).test();
